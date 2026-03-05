@@ -433,6 +433,193 @@ def create_app(filepath: str = None, engine_version: str = "5.6"):
         """List all validated plugins."""
         return jsonify(list(app.config["LOADED_PLUGINS"].values()))
 
+    # ---- Script Generation Routes ----
+
+    @app.route("/api/script/generate", methods=["POST"])
+    def api_script_generate():
+        """Generate a UE5.6 Python script for a given operation.
+        
+        Body: {"domain": "actors", "method": "spawn", "params": {"actor_class": "StaticMeshActor"}}
+        OR:   {"operation": "actors.spawn", "params": {"actor_class": "StaticMeshActor"}}
+        """
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        try:
+            from core.script_generator import ScriptGenerator
+            gen = ScriptGenerator()
+            params = data.get("params", {})
+
+            # Support both formats
+            if "domain" in data and "method" in data:
+                domain = data["domain"]
+                method = data["method"]
+            elif "operation" in data:
+                parts = data["operation"].split(".", 1)
+                if len(parts) == 2:
+                    domain, method = parts
+                else:
+                    return jsonify({"error": "Operation must be 'domain.method' format, e.g. 'actors.spawn'"}), 400
+            else:
+                return jsonify({"error": "Missing 'domain'+'method' or 'operation' in request body"}), 400
+
+            script = gen.generate_from_request(domain, method, params)
+            return jsonify({
+                "success": True,
+                "operation": f"{domain}.{method}",
+                "script": script,
+                "line_count": len(script.strip().split('\n')),
+            })
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/script/operations")
+    def api_script_operations():
+        """List all available script generation operations grouped by domain."""
+        try:
+            from core.script_generator import ScriptGenerator
+            import inspect
+            gen = ScriptGenerator()
+            raw = gen.list_domains()
+            domains = []
+            for domain_name, info in raw.items():
+                domain_obj = getattr(gen, domain_name)
+                ops = []
+                for method_name in info['methods']:
+                    method_fn = getattr(domain_obj, method_name)
+                    sig = inspect.signature(method_fn)
+                    params = []
+                    for pname, param in sig.parameters.items():
+                        if pname == 'self':
+                            continue
+                        params.append({
+                            'name': pname,
+                            'required': param.default is inspect.Parameter.empty,
+                            'default': str(param.default) if param.default is not inspect.Parameter.empty else None,
+                        })
+                    ops.append({
+                        'id': f'{domain_name}.{method_name}',
+                        'method': method_name,
+                        'description': (method_fn.__doc__ or '').strip().split('\n')[0],
+                        'params': params,
+                    })
+                domains.append({
+                    'name': domain_name.replace('_', ' ').title(),
+                    'key': domain_name,
+                    'description': info['doc'],
+                    'operations': ops,
+                })
+            return jsonify({'domains': domains})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/script/save", methods=["POST"])
+    def api_script_save():
+        """Generate a script and save it to a file."""
+        data = request.get_json()
+        if not data or "output_path" not in data:
+            return jsonify({"error": "Missing 'output_path'"}), 400
+
+        try:
+            from core.script_generator import ScriptGenerator
+            gen = ScriptGenerator()
+            params = data.get("params", {})
+            output_path = data["output_path"]
+
+            if "domain" in data and "method" in data:
+                domain, method = data["domain"], data["method"]
+            elif "operation" in data:
+                parts = data["operation"].split(".", 1)
+                domain, method = parts[0], parts[1] if len(parts) == 2 else ''
+            else:
+                return jsonify({"error": "Missing 'domain'+'method' or 'operation'"}), 400
+
+            script = gen.generate_from_request(domain, method, params)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(script)
+            return jsonify({"success": True, "path": output_path, "line_count": len(script.strip().split('\n'))})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    # ---- Project Scanning Routes ----
+
+    @app.route("/api/project/scan", methods=["POST"])
+    def api_project_scan():
+        """Scan a full UE project directory."""
+        data = request.get_json()
+        if not data or "project_root" not in data:
+            return jsonify({"error": "Missing 'project_root' in request body"}), 400
+
+        try:
+            from core.project_scanner import ProjectScanner
+            scanner = ProjectScanner(data["project_root"])
+            # Use bridge if available for deep inspection
+            bridge = app.config.get("ASSET_FILE")
+            report = scanner.full_scan(bridge=None)  # bridge for deep scan is optional
+            app.config["PROJECT_SCANNER"] = scanner
+            app.config["PROJECT_REPORT"] = report
+            return jsonify(report)
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/project/info")
+    def api_project_info():
+        """Get cached project scan results."""
+        report = app.config.get("PROJECT_REPORT")
+        if report is None:
+            return jsonify({"error": "No project scanned. POST to /api/project/scan first."}), 400
+        return jsonify(report)
+
+    @app.route("/api/project/assets")
+    def api_project_assets():
+        """Get the asset registry from the last project scan."""
+        scanner = app.config.get("PROJECT_SCANNER")
+        if scanner is None or scanner.asset_registry is None:
+            return jsonify({"error": "No project scanned."}), 400
+        reg = scanner.asset_registry
+        # Return paginated asset list
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 100, type=int)
+        asset_type = request.args.get('type', None)
+
+        assets = list(reg.assets.values())
+        if asset_type:
+            assets = [a for a in assets if a.asset_type == asset_type]
+
+        total = len(assets)
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_assets = assets[start:end]
+
+        return jsonify({
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "assets": [
+                {"name": a.name, "path": a.path, "type": a.asset_type,
+                 "size_bytes": a.size_bytes, "has_uexp": a.has_uexp}
+                for a in page_assets
+            ],
+        })
+
+    @app.route("/api/project/levels")
+    def api_project_levels():
+        """Get all levels from the last project scan."""
+        scanner = app.config.get("PROJECT_SCANNER")
+        if scanner is None:
+            return jsonify({"error": "No project scanned."}), 400
+        return jsonify([
+            {
+                "name": l.name, "path": l.path,
+                "size_kb": round(l.size_bytes / 1024, 1),
+                "has_logic": l.has_logic, "is_persistent": l.is_persistent,
+                "actor_count": l.actor_count, "function_count": l.function_count,
+                "referenced_blueprints": l.referenced_blueprints,
+            }
+            for l in scanner.levels
+        ])
+
     return app
 
 

@@ -1205,6 +1205,12 @@ ul { list-style: none; }
         <li class="nav-item" data-view="plugins" tabindex="0" role="button">
           <span class="nav-item__icon">P</span><span class="nav-item__label">Plugins</span>
         </li>
+        <li class="nav-item" data-view="scripts" tabindex="0" role="button">
+          <span class="nav-item__icon">S</span><span class="nav-item__label">Scripts</span>
+        </li>
+        <li class="nav-item" data-view="project" tabindex="0" role="button">
+          <span class="nav-item__icon">R</span><span class="nav-item__label">Project</span>
+        </li>
       </ul>
     </div>
     <div class="sidebar__section" id="actorListSection" style="display:none;">
@@ -1323,6 +1329,8 @@ async function render() {
       case 'graph':        await renderGraph(c); break;
       case 'levels':       await renderLevels(c); break;
       case 'plugins':      await renderPlugins(c); break;
+      case 'scripts':      await renderScripts(c); break;
+      case 'project':      await renderProject(c); break;
     }
   } catch (e) {
     c.innerHTML = '<div class="empty-state"><div class="empty-state__title">Error</div><div class="empty-state__desc">' + esc(e.message) + '</div></div>';
@@ -2056,6 +2064,238 @@ async function renderPlugins(c) {
       el.style.width = el.style.width; // trigger reflow
     });
   }, 50);
+}
+
+/* =========================================================================
+   Scripts — UE Python Script Generator
+   ========================================================================= */
+async function renderScripts(c) {
+  let operations;
+  try {
+    const res = await fetch('/api/script/operations');
+    operations = await res.json();
+  } catch (e) {
+    operations = null;
+  }
+
+  let html = '<div style="margin-bottom:var(--space-4);">';
+  html += '<h2 style="font-family:var(--font-display);font-size:var(--text-2xl);font-weight:700;color:var(--color-text);letter-spacing:-0.02em;margin-bottom:var(--space-2);">UE5.6 Script Generator</h2>';
+  html += '<p style="font-family:var(--font-body);font-size:var(--text-sm);color:var(--color-text-secondary);">Generate <code style="font-family:var(--font-mono);color:var(--color-accent);">unreal</code> Python scripts for editor operations. JARVIS generates and executes these via the API.</p>';
+  html += '</div>';
+
+  if (!operations || !operations.domains) {
+    html += '<div class="card"><div class="card__body"><div class="plugin-empty">Script generator not available. Check that <code>core/script_generator.py</code> is loaded.</div></div></div>';
+    c.innerHTML = html;
+    return;
+  }
+
+  // Domain cards
+  for (const domain of operations.domains) {
+    html += '<div class="card" style="margin-bottom:var(--space-4);">';
+    html += '<div class="card__header" style="cursor:pointer;" onclick="this.parentElement.querySelector(\'.card__body\').style.display=this.parentElement.querySelector(\'.card__body\').style.display===\'none\'?\'block\':\'none\'">';
+    html += '<h3 class="card__title">' + esc(domain.name) + '</h3>';
+    html += '<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-text-muted);">' + domain.operations.length + ' operations</span>';
+    html += '</div>';
+    html += '<div class="card__body">';
+    if (domain.description) {
+      html += '<p style="font-family:var(--font-body);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-4);">' + esc(domain.description) + '</p>';
+    }
+    html += '<table class="data-table"><thead><tr><th>Operation</th><th>Description</th><th>Parameters</th><th>Preview</th></tr></thead><tbody>';
+    for (const op of domain.operations) {
+      const paramStr = (op.params || []).map(p => '<code style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-info);">' + esc(p.name) + '</code>' + (p.required ? '<span style="color:var(--color-error);">*</span>' : '')).join(', ');
+      html += '<tr>';
+      html += '<td><code style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--color-accent);">' + esc(op.id) + '</code></td>';
+      html += '<td style="font-size:var(--text-sm);color:var(--color-text-secondary);">' + esc(op.description || '') + '</td>';
+      html += '<td>' + (paramStr || '<span style="color:var(--color-text-muted);">none</span>') + '</td>';
+      html += '<td><button class="script-preview-btn" data-op="' + esc(op.id) + '" onclick="previewScript(this)" style="font-family:var(--font-mono);font-size:var(--text-xs);padding:var(--space-1) var(--space-2);background:var(--color-elevated);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-accent);cursor:pointer;">Preview</button></td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    html += '</div></div>';
+  }
+
+  // Script preview area
+  html += '<div id="scriptPreviewArea" class="card" style="display:none;margin-top:var(--space-4);">';
+  html += '<div class="card__header"><h3 class="card__title" id="scriptPreviewTitle">Script Preview</h3></div>';
+  html += '<div class="card__body"><pre id="scriptPreviewCode" style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--color-text);background:var(--color-bg);padding:var(--space-4);border-radius:var(--radius-sm);border:1px solid var(--color-border-subtle);overflow-x:auto;white-space:pre;line-height:1.5;max-height:600px;overflow-y:auto;"></pre></div>';
+  html += '</div>';
+
+  // C++ Plugin info
+  html += '<div class="card" style="margin-top:var(--space-4);">';
+  html += '<div class="card__header"><h3 class="card__title">JarvisEditor C++ Plugin</h3></div>';
+  html += '<div class="card__body">';
+  html += '<p style="font-family:var(--font-body);font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-3);">Blueprint graph manipulation methods not exposed to Python. Install in your project\'s Plugins directory.</p>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-3);">';
+  const cppFuncs = [
+    ['AddNodeToBlueprint', 'Spawn a K2Node by class name into a Blueprint graph'],
+    ['ConnectPins', 'Wire two pins together with full bidirectional linking'],
+    ['DisconnectPin', 'Break all connections on a specific pin'],
+    ['RemoveNodeFromBlueprint', 'Safely remove a node and clean up all connections'],
+    ['CompileBlueprint', 'Force compile with error collection'],
+    ['GetAllGraphNodes', 'List all nodes in a Blueprint graph as JSON'],
+    ['GetNodePins', 'Get all pins on a node with type/connection info'],
+    ['SetNodePosition', 'Move a node to specific coordinates'],
+    ['DuplicateNode', 'Clone a node with all property values'],
+    ['CreateEventNode', 'Create a custom event node by name'],
+    ['CreateFunctionCallNode', 'Create a function call node by function name'],
+    ['SetPinDefaultValue', 'Set the default value on an unconnected input pin'],
+  ];
+  for (const [name, desc] of cppFuncs) {
+    html += '<div style="background:var(--color-surface);border:1px solid var(--color-border-subtle);border-radius:var(--radius-sm);padding:var(--space-3);">';
+    html += '<div style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--color-accent);margin-bottom:var(--space-1);">' + name + '</div>';
+    html += '<div style="font-family:var(--font-body);font-size:var(--text-xs);color:var(--color-text-muted);">' + desc + '</div>';
+    html += '</div>';
+  }
+  html += '</div></div></div>';
+
+  c.innerHTML = html;
+}
+
+async function previewScript(btn) {
+  const op = btn.dataset.op;
+  const area = document.getElementById('scriptPreviewArea');
+  const title = document.getElementById('scriptPreviewTitle');
+  const code = document.getElementById('scriptPreviewCode');
+  try {
+    const res = await fetch('/api/script/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({operation: op, params: {}})  // op is 'domain.method' format
+    });
+    const data = await res.json();
+    if (data.script) {
+      title.textContent = 'Script Preview: ' + op + ' (' + data.line_count + ' lines)';
+      code.textContent = data.script;
+      area.style.display = 'block';
+      area.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    } else {
+      code.textContent = '// Error: ' + (data.error || 'Unknown error');
+      area.style.display = 'block';
+    }
+  } catch (e) {
+    code.textContent = '// Error: ' + e.message;
+    area.style.display = 'block';
+  }
+}
+
+/* =========================================================================
+   Project — Full Project Scanner
+   ========================================================================= */
+async function renderProject(c) {
+  let report;
+  try {
+    const res = await fetch('/api/project/info');
+    if (res.ok) {
+      report = await res.json();
+    }
+  } catch (e) {
+    report = null;
+  }
+
+  let html = '<div style="margin-bottom:var(--space-4);">';
+  html += '<h2 style="font-family:var(--font-display);font-size:var(--text-2xl);font-weight:700;color:var(--color-text);letter-spacing:-0.02em;margin-bottom:var(--space-2);">Project Scanner</h2>';
+  html += '<p style="font-family:var(--font-body);font-size:var(--text-sm);color:var(--color-text-secondary);">Full UE5.6 project analysis: .uproject, plugins, assets, levels, dependencies.</p>';
+  html += '</div>';
+
+  if (!report) {
+    html += '<div class="card"><div class="card__body"><div class="plugin-empty">';
+    html += 'No project scanned yet. JARVIS will scan the project directory via <code style="font-family:var(--font-mono);color:var(--color-accent);">POST /api/project/scan</code>.<br>';
+    html += '<span style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-2);display:block;">Provide the full project root path containing the .uproject file.</span>';
+    html += '</div></div></div>';
+    c.innerHTML = html;
+    return;
+  }
+
+  // Project info card
+  const proj = report.project || {};
+  html += '<div class="card" style="margin-bottom:var(--space-4);">';
+  html += '<div class="card__header"><h3 class="card__title">' + esc(proj.project_name || 'Project') + '</h3>';
+  if (proj.engine_version) html += '<span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--color-accent);background:var(--color-accent-dim);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);">UE ' + esc(proj.engine_version) + '</span>';
+  html += '</div>';
+  html += '<div class="card__body">';
+  if (proj.description) html += '<p style="font-size:var(--text-sm);color:var(--color-text-secondary);margin-bottom:var(--space-3);">' + esc(proj.description) + '</p>';
+
+  // Stats grid
+  const stats = report.stats || {};
+  html += '<div class="stats-grid">';
+  const statItems = [
+    ['Levels', stats.level_count || 0],
+    ['Plugins', stats.plugin_count || 0],
+    ['Assets', stats.asset_count || 0],
+    ['Blueprints', stats.blueprint_count || 0],
+    ['Maps', stats.map_count || 0],
+    ['Source Modules', stats.source_module_count || 0],
+  ];
+  for (const [label, value] of statItems) {
+    html += '<div class="stat-card"><div class="stat-card__value">' + value + '</div><div class="stat-card__label">' + label + '</div></div>';
+  }
+  html += '</div>';
+
+  // Modules
+  if (proj.modules && proj.modules.length > 0) {
+    html += '<div style="margin-top:var(--space-4);">';
+    html += '<h4 style="font-family:var(--font-display);font-size:var(--text-lg);font-weight:600;color:var(--color-text);margin-bottom:var(--space-2);">Source Modules</h4>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:var(--space-2);">';
+    for (const m of proj.modules) {
+      const mName = typeof m === 'string' ? m : (m.Name || m.name || JSON.stringify(m));
+      html += '<span class="plugin-dep-chip plugin-dep-chip--enabled">' + esc(mName) + '</span>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div></div>';
+
+  // Plugins summary
+  if (report.plugins && report.plugins.length > 0) {
+    html += '<div class="card" style="margin-bottom:var(--space-4);">';
+    html += '<div class="card__header" style="cursor:pointer;" onclick="this.parentElement.querySelector(\'.card__body\').style.display=this.parentElement.querySelector(\'.card__body\').style.display===\'none\'?\'block\':\'none\'">';
+    html += '<h3 class="card__title">Plugins (' + report.plugins.length + ')</h3></div>';
+    html += '<div class="card__body">';
+    html += '<table class="data-table"><thead><tr><th>Name</th><th>Version</th><th>Modules</th><th>Status</th></tr></thead><tbody>';
+    for (const p of report.plugins) {
+      const passed = !p.errors || p.errors.length === 0;
+      html += '<tr>';
+      html += '<td style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--color-accent);">' + esc(p.friendly_name || p.plugin_name || 'Unknown') + '</td>';
+      html += '<td style="font-size:var(--text-sm);">' + esc(p.version_name || 'N/A') + '</td>';
+      html += '<td style="font-size:var(--text-sm);">' + (p.modules ? p.modules.length : 0) + '</td>';
+      html += '<td><span class="plugin-badge ' + (passed ? 'plugin-badge--pass' : 'plugin-badge--fail') + '">' + (passed ? 'OK' : (p.errors || []).length + ' issues') + '</span></td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div></div>';
+  }
+
+  // Levels summary
+  if (report.levels && report.levels.length > 0) {
+    html += '<div class="card" style="margin-bottom:var(--space-4);">';
+    html += '<div class="card__header"><h3 class="card__title">Levels (' + report.levels.length + ')</h3></div>';
+    html += '<div class="card__body">';
+    html += '<table class="data-table"><thead><tr><th>Name</th><th>Size</th><th>Logic</th><th>Persistent</th></tr></thead><tbody>';
+    for (const l of report.levels) {
+      html += '<tr>';
+      html += '<td style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--color-accent);">' + esc(l.name) + '</td>';
+      html += '<td style="font-size:var(--text-sm);">' + (l.size_kb ? l.size_kb + ' KB' : 'N/A') + '</td>';
+      html += '<td>' + (l.has_logic ? '<span style="color:var(--color-success);">Yes</span>' : '<span style="color:var(--color-text-muted);">No</span>') + '</td>';
+      html += '<td>' + (l.is_persistent ? '<span style="color:var(--color-accent);">Yes</span>' : '<span style="color:var(--color-text-muted);">No</span>') + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table></div></div>';
+  }
+
+  // Issues
+  if (report.issues && report.issues.length > 0) {
+    html += '<div class="card" style="margin-bottom:var(--space-4);">';
+    html += '<div class="card__header"><h3 class="card__title">Project Issues (' + report.issues.length + ')</h3></div>';
+    html += '<div class="card__body">';
+    for (const issue of report.issues) {
+      const sev = issue.severity || 'info';
+      html += '<div class="plugin-issue plugin-issue--' + sev + '">';
+      html += '<span class="plugin-issue__severity">' + sev.toUpperCase() + '</span>';
+      html += '<span>' + esc(issue.message || JSON.stringify(issue)) + '</span>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  c.innerHTML = html;
 }
 
 /* =========================================================================
