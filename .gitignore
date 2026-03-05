@@ -3,7 +3,7 @@ __pycache__/
 *.pyo
 .env
 *.bak
-lib/publish/
+# lib/publish/ -- tracked: contains patched UAssetAPI DLL with MetaData fix
 *.umap
 *.uasset
 *.uexp
