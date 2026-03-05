@@ -2,7 +2,7 @@
 
 # Ground Truth: UE5.6 Level Editor Architecture
 
-**Date:** Mar 04, 2026
+**Date:** Mar 05, 2026 (updated)
 **Author:** JARVIS
 
 ## 1. The Core Principle
@@ -53,7 +53,7 @@ This workflow is for a future use case where an AI runs locally on a developer's
 
 **The process is:**
 
-1.  A developer has the SOH_VR project open in the **Unreal Editor**.
+1.  A developer has the MyProject_VR project open in the **Unreal Editor**.
 2.  A `Local AI Agent` running on the same machine wants to modify a Blueprint.
 3.  The `Local AI Agent` executes a Python script that calls `unreal.JarvisBlueprintLibrary.add_node(...)`.
 4.  The **JarvisEditor C++ Plugin** receives this call and uses the editor's internal C++ functions to add the node to the graph.
@@ -109,3 +109,46 @@ As of this document, the codebase is being audited to enforce this architectural
 -   **The `ui/server.py` file will be updated** to expose these new write operations through secure, validated REST endpoints (e.g., `POST /api/edit/add-node`).
 
 This document is the law. If you find any part of the system that appears to contradict this document, report it as a bug. Do not attempt to use the system in a way that violates these stated principles.
+
+---
+
+## 5. Engine-Validated Test Results (Mar 05, 2026)
+
+The binary editing pipeline has been validated end-to-end by the actual UE 5.6 engine (Oculus fork).
+
+### What Was Proven
+
+| Test | Result |
+| :--- | :--- |
+| Extras-only edit (pin wiring: BeginPlay -> PrintString) | Opens in editor, wire visible, fires on Play |
+| Tagged property removal (EnabledState, NodeComment) + SSEO patch | Opens in editor, BeginPlay fires automatically |
+| Post-save SSEO patcher | Correctly fixes ScriptSerializationEndOffset for K2Node exports |
+| Post-save trailer patcher | Correctly fixes Package Trailer offset in header |
+
+### Critical Discovery: UAssetAPI SSEO Bug
+
+UAssetAPI recalculates `SerialSize` on save but does NOT recalculate `ScriptSerializationEndOffset` (SSEO). When tagged properties change size (addition, removal, or variable-length value changes), SSEO becomes stale and the engine asserts.
+
+**Fix:** The `core/post_save_patcher.py` module performs a binary fixup pass after every UAssetAPI save. For K2Node exports, the correct SSEO is:
+
+```
+SSEO = SerialSize - ExtrasSize - 4
+```
+
+The patcher also fixes the Package Trailer offset by scanning for the trailer magic `0xC1832A9E`.
+
+### Safe Modification Categories
+
+| Modification | SSEO Impact | Patcher Needed? |
+| :--- | :--- | :--- |
+| Extras-only (pin wiring, default values) | None | No |
+| Fixed-size property value change | None | No |
+| Variable-length property change (strings) | Stale | Yes |
+| Property addition or removal | Stale | Yes |
+
+### Confirmed by Epic Developer Assistant
+
+- SSEO = byte offset from export serial data start to end of tagged properties (past None terminator)
+- Export table entry is 112 bytes, SSEO at field offset +100
+- Pin serialization format unchanged across UE 5.4, 5.5, and 5.6
+- FEdGraphPinType serialization order confirmed stable

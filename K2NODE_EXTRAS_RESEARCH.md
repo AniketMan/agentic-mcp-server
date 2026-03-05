@@ -7,13 +7,13 @@
 
 ---
 
-## 1. Source Confirmed: Oculus UE 5.6 (from Perforce //SOH_VR/new-engine)
+## 1. Source Confirmed: Oculus UE 5.6 Fork
 
-The serialization source was pulled from both `//UE5/5.4.4-release` and `//SOH_VR/new-engine` (Oculus 5.6 fork). A diff of `EdGraphPin.cpp` and `EdGraphNode.cpp` between the two versions shows **zero changes to any Serialize function**. The diffs are limited to non-serialization code (MakeLinkTo, BreakLinkTo, node comment stripping, diff comparison). The pin serialization format is identical across both versions.
+The serialization source was pulled from both `//UE5/5.4.4-release` and the Oculus 5.6 fork. A diff of `EdGraphPin.cpp` and `EdGraphNode.cpp` between the two versions shows **zero changes to any Serialize function**. The diffs are limited to non-serialization code (MakeLinkTo, BreakLinkTo, node comment stripping, diff comparison). The pin serialization format is identical across both versions.
 
 The Extras blob is everything serialized by `UEdGraphNode::Serialize()` AFTER `Super::Serialize(Ar)`. The tagged properties (position, node GUID, etc.) are handled by UAssetAPI as the export's `Data[]` array. The Extras blob contains the pin array and any subclass-specific data.
 
-All validation was performed against clean .umap files from the SOH_VR project running on the Oculus 5.6 branch (ObjectVersionUE5 = 1017 = OS_SUB_OBJECT_SHADOW_SERIALIZATION).
+All validation was performed against clean .umap files from the VR project running on the Oculus 5.6 branch (ObjectVersionUE5 = 1017 = OS_SUB_OBJECT_SHADOW_SERIALIZATION).
 
 ### 1.1 Full Inheritance Chain (Serialization Order)
 
@@ -296,4 +296,4 @@ Manus agents ONLY use Workflow A. They never touch the C++ plugin.
 | 0.4 | 2026-03-05 07:00 PST | Subclass sources pulled from P4. Full inheritance chain documented. |
 | 0.5 | 2026-03-05 07:30 PST | FString null vs empty distinction discovered and fixed. 52/56 pass. |
 | 1.0 | 2026-03-05 08:30 PST | FINAL. 56/56 byte-perfect reconstruction. FString fix (None vs ""), FName raw tuples, FText raw dicts. All subclass extras documented. UAssetAPI patches documented. |
-| 1.1 | 2026-03-05 09:00 PST | Source confirmed against Oculus 5.6 fork (//SOH_VR/new-engine). Zero serialization changes vs 5.4.4. All validation against Oculus 5.6 branch assets. |
+| 1.1 | 2026-03-05 09:00 PST | Source confirmed against Oculus 5.6 fork. Zero serialization changes vs 5.4.4. All validation against Oculus 5.6 branch assets. |

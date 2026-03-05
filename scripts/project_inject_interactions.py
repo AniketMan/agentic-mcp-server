@@ -1,6 +1,6 @@
 """
 UE 5.6 Level Editor -- Generated Script
-SOH Interaction Logic Injection -- All 4 Level Blueprints
+Interaction Logic Injection -- All 4 Level Blueprints
 =========================================================
 
 Adds 22 interaction chains across 4 Level Script Blueprints:
@@ -323,7 +323,7 @@ def process_level(lib, level_name, level_path, interactions, y_start=3500):
 
 try:
     log("=" * 60)
-    log("SOH Interaction Logic Injection")
+    log("Interaction Logic Injection")
     log("=" * 60)
 
     # --- Pre-flight check: verify JarvisEditor plugin ---

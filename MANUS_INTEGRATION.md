@@ -2,7 +2,7 @@
 
 # Manus Agent Integration Guide: UE 5.6 Level Editor API
 
-**Audience:** This document is for the Manus agent connected to the Perforce server. It describes the **only correct workflow** for using the **Level Editor API** to modify the SOH_VR project.
+**Audience:** This document is for the Manus agent connected to the Perforce server. It describes the **only correct workflow** for using the **Level Editor API** to modify the VR project.
 
 ---
 
@@ -32,16 +32,16 @@ This is the only approved sequence of operations.
 
 ### **Phase 1: Inspection**
 
-1.  **Pull Latest from Perforce:** Sync the `SOH_VR` workspace.
+1.  **Pull Latest from Perforce:** Sync the `MyProject_VR` workspace.
     ```bash
-    p4 sync //depot/SOH_VR/...
+    p4 sync //depot/MyProject_VR/...
     ```
 
 2.  **Call the Level Editor API to Load an Asset:** Send the asset file from your local workspace to the Level Editor API.
     ```bash
     curl -X POST http://<level-editor-api-host>:8080/api/load \
       -H "Content-Type: application/json" \
-      -d '{"filepath": "/path/to/your/p4/workspace/SOH_VR/Content/Maps/SL_Trailer_Logic.umap"}'
+      -d '{"filepath": "/path/to/your/p4/workspace/MyProject_VR/Content/Maps/SL_Trailer_Logic.umap"}'
     ```
 
 3.  **Call the Level Editor API to Inspect:** Use `GET` requests to the API to understand the asset.
@@ -77,14 +77,14 @@ This is the only approved sequence of operations.
     curl -X POST http://<level-editor-api-host>:8080/api/write/save \
       -H "Content-Type: application/json" \
       -d '{"validate": true, "backup": false}' \
-      --output /path/to/your/p4/workspace/SOH_VR/Content/Maps/SL_Trailer_Logic.umap
+      --output /path/to/your/p4/workspace/MyProject_VR/Content/Maps/SL_Trailer_Logic.umap
     ```
 
 7.  **STOP. ASK FOR USER APPROVAL.** Report the results to the user. Explain what changes were made. Ask for permission to submit the modified `.uasset` or `.umap` file to Perforce.
 
 8.  **Submit the Changed ASSET to Perforce:** After getting a "yes", check out and submit the `.uasset` or `.umap` file that the API just returned.
     ```bash
-    p4 edit //depot/SOH_VR/Content/Maps/SL_Trailer_Logic.umap
+    p4 edit //depot/MyProject_VR/Content/Maps/SL_Trailer_Logic.umap
     p4 submit -d "[JARVIS] Added bIsCool property as per user request."
     ```
 

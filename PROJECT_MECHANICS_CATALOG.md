@@ -1,4 +1,4 @@
-# SOH Mechanics Catalog
+# Project Mechanics Catalog
 ## Date: 2026-03-05
 
 ## Interaction Pattern (Every Scene Uses This)
@@ -7,7 +7,7 @@ Each interaction follows the same 4-node chain:
 
 ```
 K2Node_CustomEvent (trigger)
-  -> K2Node_GetSubsystem (get SOHGameplayMessageSubsystem)
+  -> K2Node_GetSubsystem (get GameplayMessageSubsystem)
      -> K2Node_CallFunction (K2_BroadcastMessage)
         -> K2Node_MakeStruct (Msg_StoryStep with TagName)
 ```
@@ -52,7 +52,7 @@ Additional CallFunction nodes for:
 - Scene7_End -> LS_7_6
 
 ## Key Systems
-- **SOHGameplayMessageSubsystem** - central message bus
+- **GameplayMessageSubsystem** - central message bus
 - **Msg_StoryStep** - struct with TagName field (e.g., "Message.Event.StoryStep")
 - **K2_BroadcastMessage** - sends story progression events
 - **DisableActor/EnableActor** - toggle interactive objects

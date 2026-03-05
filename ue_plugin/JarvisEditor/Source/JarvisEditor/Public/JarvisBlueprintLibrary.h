@@ -228,7 +228,7 @@ public:
 	 *
 	 * @param Blueprint       The Blueprint to modify
 	 * @param GraphName       Name of the graph
-	 * @param StructPath      Path or name of the struct (e.g. "Msg_StoryStep", "/Script/SOH.Msg_StoryStep")
+	 * @param StructPath      Path or name of the struct (e.g. "Msg_StoryStep", "/Script/MyProject.Msg_StoryStep")
 	 * @param NodePosX        X position
 	 * @param NodePosY        Y position
 	 * @return                The created node, or nullptr on failure

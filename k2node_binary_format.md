@@ -2,7 +2,7 @@
 
 **Author:** Manus AI
 **Date:** 2026-03-05
-**Version:** 1.0
+**Version:** 2.0
 
 ## 1. Overview
 
@@ -85,6 +85,59 @@ Common tagged properties for K2Nodes include:
 
 Any robust binary editor must read and write both the `Extras` blob and these tagged properties correctly.
 
+## 6. ScriptSerializationEndOffset (SSEO)
+
+Every export in a `.umap` file has a `ScriptSerializationEndOffset` (SSEO) field stored in the export table. This field marks the byte offset from the start of the export's serialized data to the point where tagged property serialization ends (just past the `None` terminator). The engine uses this as a boundary check during deserialization.
+
+**Critical finding:** UAssetAPI correctly recalculates `SerialSize` when export data changes, but does NOT recalculate SSEO. If you modify tagged properties in a way that changes their serialized size (adding/removing properties, changing variable-length string values), SSEO becomes stale and the engine will assert:
+
+> `ScriptSerializationEndOffset X does not match offset during deserialization Y for object Z`
+
+For K2Node exports specifically, the relationship is:
+
+```
+SSEO = SerialSize - ExtrasSize - 4
+```
+
+Where `ExtrasSize` is the byte length of the Extras blob and the `4` accounts for the trailing int32 after the Extras blob.
+
+This formula does NOT hold for all export types. `BlueprintGeneratedClass`, `Level`, and CDO exports have additional serialization data between the SSEO boundary and the Extras blob.
+
+### Export Table Entry Layout (UE 5.6)
+
+The export table entry is 112 bytes per entry. Key fields:
+
+| Field Offset | Data Type       | Field Name                      |
+|-------------|-----------------|----------------------------------|
+| +0          | `FPackageIndex` | ClassIndex                       |
+| +4          | `FPackageIndex` | SuperIndex                       |
+| +8          | `FPackageIndex` | TemplateIndex                    |
+| +12         | `FPackageIndex` | OuterIndex                       |
+| +16         | `FName`         | ObjectName                       |
+| +24         | `int64`         | SerialSize                       |
+| +32         | `int64`         | SerialOffset                     |
+| ...         | ...             | (other fields)                   |
+| +100        | `int64`         | ScriptSerializationEndOffset     |
+
+This layout has been verified against the Oculus fork of UE 5.6 and confirmed by Epic's Developer Assistant [2].
+
+### Safe vs. Unsafe Modifications
+
+| Modification Type                          | SSEO Impact | Patcher Needed? |
+|-------------------------------------------|-------------|------------------|
+| Extras-only (pin wiring, default values)  | None        | No               |
+| Fixed-size property value change (enum)   | None        | No               |
+| Variable-length property change (strings) | SSEO stale  | Yes              |
+| Property addition or removal              | SSEO stale  | Yes              |
+
+## 7. Package Trailer Offset
+
+UE 5.6 packages include a Package Trailer at the end of the file, identified by the magic bytes `0xC1832A9E` (little-endian for `0x9E2A83C1`). The offset to this trailer is stored in the package summary header. When export data grows or shrinks, the trailer moves but the header offset is not always updated by UAssetAPI.
+
+The post-save patcher must scan for the trailer magic and update the header offset accordingly.
+
 ## References
 
 [1] Manus AI. (2026, March 5). *Epic Developer Assistant Confirmation (UE 5.6)*. /home/ubuntu/ue56-level-editor/epic_assistant_confirmation.md
+
+[2] Manus AI. (2026, March 5). *Epic Developer Assistant SSEO Confirmation*. /home/ubuntu/ue56-level-editor/epic_sseo_confirmation.md

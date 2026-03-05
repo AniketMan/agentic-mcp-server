@@ -11,7 +11,7 @@ The Extras blob format was reverse-engineered from UE 5.4.4 source:
   EdGraphPin.cpp, EdGraphNode.cpp, K2Node.cpp, K2Node_EditablePinBase.cpp,
   K2Node_Event.cpp, K2Node_CustomEvent.cpp
 
-Confirmed byte-perfect on 56/56 K2Nodes from SOH_VR Oculus 5.6 branch assets.
+Confirmed byte-perfect on 56/56 K2Nodes from Oculus 5.6 branch assets.
 
 Author: JARVIS
 Date: 2026-03-05
