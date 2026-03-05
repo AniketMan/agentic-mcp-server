@@ -1,0 +1,26 @@
+# Key imports for K2Node injection:
+# K2Node classes (under /Script/BlueprintGraph = pkg -63):
+#   [3] (pkg=-4) K2Node_CallFunction outer=-63
+#   [4] (pkg=-5) K2Node_CustomEvent outer=-63
+#   [5] (pkg=-6) K2Node_GetSubsystem outer=-63
+#   [6] (pkg=-7) K2Node_MakeStruct outer=-63
+#   [7] (pkg=-8) EdGraph outer=-63
+#   [46] (pkg=-47) EdGraphNode_Comment outer=-73 (/Script/UnrealEd)
+
+# Key object references for pin types:
+#   [35] (pkg=-36) GameplayMessageSubsystem class under /Script/GameplayMessageRuntime (-66)
+#   [44] (pkg=-45) EnablerComponent class under /Script/SohVr (-72)
+#   [75] (pkg=-76) ScriptStruct GameplayTag under /Script/GameplayTags (-67)
+#   [80] (pkg=-81) UserDefinedStruct Msg_StoryStep under /Game/Blueprints/Data/Message/Msg_StoryStep (-59)
+
+# Package imports:
+#   [62] (pkg=-63) /Script/BlueprintGraph
+#   [63] (pkg=-64) /Script/CoreUObject
+#   [64] (pkg=-65) /Script/Engine
+#   [65] (pkg=-66) /Script/GameplayMessageRuntime
+#   [66] (pkg=-67) /Script/GameplayTags
+#   [71] (pkg=-72) /Script/SohVr
+#   [72] (pkg=-73) /Script/UnrealEd
+
+# EventGraph is export[37] (pkg=38)
+# All K2Nodes have outer=38 (EventGraph)
