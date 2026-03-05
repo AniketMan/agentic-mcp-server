@@ -260,6 +260,288 @@ def create_app(filepath: str = None, engine_version: str = "5.6"):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    # ====================================================================
+    # WRITE ENDPOINTS — Direct binary editing via UAssetAPI
+    # These are the PRIMARY endpoints for the Manus workflow.
+    # See GROUND_TRUTH.md for architecture details.
+    # ====================================================================
+
+    @app.route("/api/write/add-import", methods=["POST"])
+    def api_write_add_import():
+        """Add a new import (class/package reference) to the import table.
+
+        Body: {
+            "class_package": "/Script/Engine",
+            "class_name": "Package",
+            "object_name": "/Script/Engine",
+            "outer_index": 0  // optional, default 0
+        }
+        Returns: {"success": true, "import_index": -22, "negative_index": -22}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        required = ["class_package", "class_name", "object_name"]
+        missing = [k for k in required if k not in data]
+        if missing:
+            return jsonify({"error": f"Missing required fields: {missing}"}), 400
+
+        try:
+            idx = af.add_import(
+                class_package=data["class_package"],
+                class_name=data["class_name"],
+                object_name=data["object_name"],
+                outer_index=data.get("outer_index", 0),
+            )
+            return jsonify({"success": True, "import_index": idx, "negative_index": idx})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/find-or-add-import", methods=["POST"])
+    def api_write_find_or_add_import():
+        """Find an existing import by object_name, or add it if missing.
+
+        Body: {
+            "class_package": "/Script/Engine",
+            "class_name": "Package",
+            "object_name": "/Script/Engine"
+        }
+        Returns: {"success": true, "import_index": -21, "was_existing": true}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        required = ["class_package", "class_name", "object_name"]
+        missing = [k for k in required if k not in data]
+        if missing:
+            return jsonify({"error": f"Missing required fields: {missing}"}), 400
+
+        try:
+            existing = af.find_import(data["object_name"])
+            was_existing = existing is not None
+            idx = af.find_or_add_import(
+                class_package=data["class_package"],
+                class_name=data["class_name"],
+                object_name=data["object_name"],
+            )
+            return jsonify({"success": True, "import_index": idx, "was_existing": was_existing})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/add-export", methods=["POST"])
+    def api_write_add_export():
+        """Create a new NormalExport (actor, component, etc.).
+
+        Body: {
+            "object_name": "MyActor_0",
+            "class_index": -5,        // FPackageIndex (negative = import)
+            "outer_index": 1,         // FPackageIndex (positive = export, 0 = root)
+            "super_index": 0,         // optional, default 0
+            "template_index": 0,      // optional, default 0
+            "object_flags": 8        // optional, default RF_Public (8)
+        }
+        Returns: {"success": true, "export_index": 14, "package_index": 15}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        required = ["object_name", "class_index", "outer_index"]
+        missing = [k for k in required if k not in data]
+        if missing:
+            return jsonify({"error": f"Missing required fields: {missing}"}), 400
+
+        try:
+            exp_idx, pkg_idx = af.add_export(
+                object_name=data["object_name"],
+                class_index=data["class_index"],
+                outer_index=data["outer_index"],
+                super_index=data.get("super_index", 0),
+                template_index=data.get("template_index", 0),
+                object_flags=data.get("object_flags", 8),
+            )
+            return jsonify({"success": True, "export_index": exp_idx, "package_index": pkg_idx})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/add-actor", methods=["POST"])
+    def api_write_add_actor():
+        """Add an export to the LevelExport.Actors list.
+
+        Body: {"export_package_index": 15}
+        Returns: {"success": true, "actor_count": 14}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data or "export_package_index" not in data:
+            return jsonify({"error": "Missing 'export_package_index'"}), 400
+
+        try:
+            result = af.add_actor_to_level(data["export_package_index"])
+            if not result:
+                return jsonify({"error": "Failed to add actor. Not a .umap or no LevelExport."}), 400
+            # Get updated actor count
+            level_exp = af.get_level_export()
+            count = level_exp.Actors.Count if level_exp else 0
+            return jsonify({"success": True, "actor_count": count})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/remove-actor", methods=["POST"])
+    def api_write_remove_actor():
+        """Remove an actor from the LevelExport.Actors list.
+
+        Body: {"export_package_index": 15}
+        Returns: {"success": true, "actor_count": 12}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data or "export_package_index" not in data:
+            return jsonify({"error": "Missing 'export_package_index'"}), 400
+
+        try:
+            result = af.remove_actor_from_level(data["export_package_index"])
+            if not result:
+                return jsonify({"error": "Actor not found in level or not a .umap."}), 400
+            level_exp = af.get_level_export()
+            count = level_exp.Actors.Count if level_exp else 0
+            return jsonify({"success": True, "actor_count": count})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/add-property", methods=["POST"])
+    def api_write_add_property():
+        """Add a new property to an export's Data list.
+
+        Body: {
+            "export_index": 5,
+            "property_name": "bIsEnabled",
+            "property_type": "bool",   // bool, int, float, str, name, object, byte, text, enum, softobject
+            "value": true              // optional, type-appropriate default used if omitted
+        }
+        Returns: {"success": true, "property_count": 7}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        required = ["export_index", "property_name", "property_type"]
+        missing = [k for k in required if k not in data]
+        if missing:
+            return jsonify({"error": f"Missing required fields: {missing}"}), 400
+
+        try:
+            af.add_property(
+                export_index=data["export_index"],
+                prop_name=data["property_name"],
+                prop_type=data["property_type"],
+                value=data.get("value"),
+            )
+            # Return updated property count
+            from core.uasset_bridge import NormalExport
+            exp = af.get_export(data["export_index"])
+            count = exp.Data.Count if isinstance(exp, NormalExport) and exp.Data else 0
+            return jsonify({"success": True, "property_count": count})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/remove-property", methods=["POST"])
+    def api_write_remove_property():
+        """Remove a property from an export by name.
+
+        Body: {"export_index": 5, "property_name": "bIsEnabled"}
+        Returns: {"success": true, "removed": true, "property_count": 6}
+        """
+        af = _require_asset(app)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        required = ["export_index", "property_name"]
+        missing = [k for k in required if k not in data]
+        if missing:
+            return jsonify({"error": f"Missing required fields: {missing}"}), 400
+
+        try:
+            removed = af.remove_property(data["export_index"], data["property_name"])
+            from core.uasset_bridge import NormalExport
+            exp = af.get_export(data["export_index"])
+            count = exp.Data.Count if isinstance(exp, NormalExport) and exp.Data else 0
+            return jsonify({"success": True, "removed": removed, "property_count": count})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/validate", methods=["GET"])
+    def api_write_validate():
+        """Run pre-save validation on the loaded asset.
+
+        Returns: {"valid": true, "issues": []}
+        or:      {"valid": false, "issues": ["Export 5 has null ClassIndex", ...]}
+        """
+        af = _require_asset(app)
+        try:
+            issues = af.validate()
+            return jsonify({"valid": len(issues) == 0, "issues": issues})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/backup", methods=["POST"])
+    def api_write_backup():
+        """Create a backup of the current asset file.
+
+        Returns: {"success": true, "backup_path": "/path/to/file.umap.bak"}
+        """
+        af = _require_asset(app)
+        try:
+            backup_path = af.backup()
+            return jsonify({"success": True, "backup_path": str(backup_path)})
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    @app.route("/api/write/save", methods=["POST"])
+    def api_write_save():
+        """Save the modified asset to disk with validation and backup.
+
+        Body: {
+            "output_path": "/path/to/output.umap",  // optional, overwrites original if omitted
+            "validate": true,                         // optional, default true
+            "backup": true                            // optional, default true
+        }
+        Returns: {"success": true, "saved_path": "...", "validation": {"valid": true, "issues": []}}
+        """
+        af = _require_asset(app)
+        data = request.get_json() or {}
+        output_path = data.get("output_path")
+        do_validate = data.get("validate", True)
+        do_backup = data.get("backup", True)
+
+        try:
+            # Pre-save validation
+            if do_validate:
+                issues = af.validate()
+                if issues:
+                    return jsonify({
+                        "error": "Pre-save validation failed",
+                        "validation": {"valid": False, "issues": issues},
+                    }), 400
+
+            saved_path = af.save(output_path, do_backup)
+            return jsonify({
+                "success": True,
+                "saved_path": str(saved_path),
+                "validation": {"valid": True, "issues": []},
+            })
+        except Exception as e:
+            return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+    # ---- Multi-Level Routes ----
+
     @app.route("/api/load-multi", methods=["POST"])
     def api_load_multi():
         """Load multiple .umap files for the Level Logic view."""
@@ -434,10 +716,18 @@ def create_app(filepath: str = None, engine_version: str = "5.6"):
         return jsonify(list(app.config["LOADED_PLUGINS"].values()))
 
     # ---- Script Generation Routes ----
+    # ========================================================================
+    # LOCAL-ONLY: These endpoints are for Workflow B (local AI with Unreal
+    # Editor open). Manus agents must NEVER call these endpoints. The Manus
+    # workflow uses direct binary editing via the /api/write/* endpoints.
+    # See GROUND_TRUTH.md for the full architecture.
+    # ========================================================================
 
     @app.route("/api/script/generate", methods=["POST"])
     def api_script_generate():
-        """Generate a UE5.6 Python script for a given operation.
+        """[LOCAL-ONLY] Generate a UE5.6 Python script for a given operation.
+        WARNING: This endpoint is for Workflow B only. Manus agents must use
+        the /api/write/* endpoints for direct binary editing instead.
         
         Body: {"domain": "actors", "method": "spawn", "params": {"actor_class": "StaticMeshActor"}}
         OR:   {"operation": "actors.spawn", "params": {"actor_class": "StaticMeshActor"}}
