@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.bak
+lib/publish/
+*.umap
+*.uasset
+*.uexp
+/tmp/
+inspect_bytecode.py
