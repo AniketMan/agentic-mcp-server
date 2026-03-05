@@ -1,231 +1,200 @@
-# Manus Integration Guide: UE 5.6 Level Editor
+# Manus Agent Integration Guide: UE 5.6 Level Editor
 
-**Objective:** This guide provides instructions for an autonomous agent to use the UE 5.6 Level Editor toolchain. The tool allows for safe inspection and modification of Unreal Engine 5.6 assets by generating and executing Python scripts within the editor.
-
----
-
-## 1. Core Concepts
-
-The tool operates on a three-layer architecture to ensure project integrity:
-
-1.  **Layer 1: Binary Inspection (Read-Only)**
-    - The tool reads `.uasset` and `.umap` files directly using the UAssetAPI library.
-    - This layer is for inspection only (reading actors, Blueprints, properties). It **never** writes back to the binary files, eliminating the risk of corruption.
-
-2.  **Layer 2: Script Generation**
-    - Based on an edit request, the tool generates a Python script that uses Unreal Engine's native `unreal` module.
-    - These scripts contain the logic to perform the requested edits (e.g., spawn an actor, change a material parameter).
-
-3.  **Layer 3: C++ Plugin Execution**
-    - For operations not exposed by the default `unreal` Python module (specifically, **Blueprint graph editing**), a C++ plugin (`JarvisEditor`) provides the necessary functions.
-    - The generated Python script calls these C++ functions from within the editor.
-
-**The fundamental principle is that all write operations are executed by the Unreal Editor itself**, leveraging the engine's native APIs for serialization, validation, and reference management. This is the only guaranteed safe way to modify UE assets programmatically.
+**Audience:** This document is written for the Manus agent connected to the Perforce server and UE5.6 editor. It describes how to use the UE 5.6 Level Editor toolchain to safely inspect and modify project assets.
 
 ---
 
-## 2. Setup and Server Launch
+## RULE ZERO: NEVER PUSH, SUBMIT, OR WRITE WITHOUT USER APPROVAL
 
-Execute the following commands in your shell to set up the environment and launch the API server.
+**Do not push anything to Perforce, do not submit any changelist, do not write any file to the project, do not execute any script inside the editor, and do not modify any asset — without explicitly asking the user for permission first and receiving a clear "yes."**
+
+This is not optional. This is not a suggestion. Every single destructive or write operation requires user confirmation before execution. The workflow is:
+
+1. You inspect.
+2. You generate a script.
+3. You **show the user what the script does and ask permission.**
+4. Only after the user says yes, you execute.
+5. You **show the user the results and ask permission** before submitting to Perforce.
+
+If you skip steps 3 or 5, you are breaking the workflow. The user's project is a production VR game. Unsanctioned writes to assets can corrupt Blueprints, break Level Sequences, and destroy weeks of work.
+
+---
+
+## Architecture: Who Does What
+
+There are two agents and one human in this pipeline. Understand your role.
+
+| Role | Responsibility | Has Access To |
+| :--- | :--- | :--- |
+| **This tool (Level Editor API)** | Inspects `.uasset`/`.umap` files. Generates Python scripts. Validates plugins. Read-only. | Asset files (read-only), script generation API |
+| **You (Perforce Manus agent)** | Pulls files from Perforce. Runs generated scripts inside UE editor. Submits changes back to Perforce **after user approval.** | Perforce depot, UE5.6 editor, project filesystem |
+| **The user (Boss)** | Approves all writes. Reviews all generated scripts before execution. Reviews all results before P4 submit. | Everything. Final authority on all decisions. |
+
+**You do not decide what gets written. You do not decide what gets submitted. You propose, the user approves.**
+
+---
+
+## Workflow: Step by Step
+
+### Step 1: Pull Latest from Perforce
+
+Sync the project workspace to head revision before doing anything.
 
 ```bash
-# Navigate to the tool's root directory
-cd /path/to/ue56-level-editor
-
-# Run the bootstrap script (one-time setup)
-# This installs the .NET SDK, builds the UAssetAPI bridge, and installs Python dependencies.
-chmod +x setup.sh
-./setup.sh
-
-# Launch the API server
-# The server will be available at http://localhost:8080
-python3 run_dashboard.py
+p4 sync //depot/SOH_VR/...
 ```
 
----
+### Step 2: Load Assets into the Level Editor API
 
-## 3. Agent Workflow
+The Level Editor API server runs in a sandbox. Send it the asset files you need to inspect.
 
-Follow this sequence of API calls and actions to inspect and edit assets.
-
-### Step 1: Load an Asset or Project
-
-All operations require an asset or project to be loaded first.
-
-**To load a single level file (.umap):**
+**Load a single level:**
 ```bash
-curl -X POST http://localhost:8080/api/load \
+curl -X POST http://<level-editor-host>:8080/api/load \
   -H "Content-Type: application/json" \
-  -d '{"path": "/absolute/path/to/YourLevel.umap"}'
+  -d '{"filepath": "/path/to/workspace/SOH_VR/Content/Maps/SL_Trailer_Logic.umap"}'
 ```
 
-**To load a full project (.uproject):**
+**Load multiple levels:**
 ```bash
-curl -X POST http://localhost:8080/api/project/scan \
+curl -X POST http://<level-editor-host>:8080/api/load-multi \
   -H "Content-Type: application/json" \
-  -d '{"project_path": "/absolute/path/to/YourProjectRoot"}'
+  -d '{"filepaths": [
+    "/path/to/workspace/SOH_VR/Content/Maps/SL_Trailer_Logic.umap",
+    "/path/to/workspace/SOH_VR/Content/Maps/SL_Restaurant_Logic.umap",
+    "/path/to/workspace/SOH_VR/Content/Maps/SL_Scene6_Logic.umap",
+    "/path/to/workspace/SOH_VR/Content/Maps/SL_Hospital_Logic.umap"
+  ]}'
 ```
 
-### Step 2: Inspect the Asset (Read-Only)
-
-Use the following GET endpoints to understand the asset's contents.
-
--   **List Actors:** `GET http://localhost:8080/api/actors`
--   **Get Actor Detail:** `GET http://localhost:8080/api/actor/<ActorName>`
--   **List Blueprint Functions:** `GET http://localhost:8080/api/functions`
--   **Get Blueprint Graph:** `GET http://localhost:8080/api/graph/<ExportIndex>`
--   **List All Script Operations:** `GET http://localhost:8080/api/script/operations`
-
-### Step 3: Generate an Edit Script
-
-To perform an edit, you must first generate a Python script. Send a POST request to the `/api/script/generate` endpoint.
-
-**Example: Generate a script to spawn a `StaticMeshActor`**
+**Scan the full project:**
 ```bash
-curl -X POST http://localhost:8080/api/script/generate \
+curl -X POST http://<level-editor-host>:8080/api/project/scan \
+  -H "Content-Type: application/json" \
+  -d '{"project_root": "/path/to/workspace/SOH_VR"}'
+```
+
+### Step 3: Inspect (Read-Only — No Approval Needed)
+
+These are all GET requests. They read data. They change nothing.
+
+| Endpoint | What It Returns |
+| :--- | :--- |
+| `GET /api/actors` | All actors in the loaded level — class, name, components, properties |
+| `GET /api/actor/<name>` | Detail for a single actor including full property list |
+| `GET /api/functions` | All Blueprint functions with bytecode status |
+| `GET /api/graph/<export_index>` | Blueprint graph with K2 nodes and connections |
+| `GET /api/levels` | All loaded levels with actors, K2 nodes, functions |
+| `GET /api/validate` | Integrity validation results |
+| `GET /api/script/operations` | Full list of all 45+ script generation operations with parameters |
+| `GET /api/project/info` | Full project scan results |
+
+Use these freely to understand the project state before proposing any edits.
+
+### Step 4: Generate a Script (Still Read-Only — No Approval Needed)
+
+When you know what edit is needed, generate the script via the API. This does NOT execute anything. It returns a Python script as text.
+
+```bash
+curl -X POST http://<level-editor-host>:8080/api/script/generate \
   -H "Content-Type: application/json" \
   -d '{
     "domain": "actors",
     "method": "spawn",
     "params": {
       "class_name": "StaticMeshActor",
-      "label": "GeneratedActor_01",
+      "label": "NewActor_01",
       "location": [150.0, 0.0, 100.0]
     }
   }'
 ```
 
-The API will respond with a JSON object containing the full Python script text.
+The response contains a `"script"` field with the full Python code. Save this to a file.
 
-### Step 4: Execute the Script in Unreal Editor
+### Step 5: STOP — Show the Script to the User and Ask for Approval
 
-The generated script must be run inside the target Unreal Engine project.
+**Before executing anything, present the generated script to the user.** Explain:
+- What the script will do in plain language
+- Which assets it will modify
+- Whether it is reversible (Ctrl+Z in editor)
 
-1.  Save the script from the API response to a file (e.g., `/tmp/edit_script.py`).
-2.  Execute the script using the UE command line:
+Wait for the user to say yes. If the user says no or asks for changes, go back to Step 4.
 
-    ```bash
-    # Path to your UE Editor executable
-    UE_EDITOR="/path/to/UnrealEngine/Engine/Binaries/Linux/UE5Editor"
+### Step 6: Execute the Script in UE Editor (Only After Approval)
 
-    # Path to your .uproject file
-    UPROJECT="/path/to/YourProject/YourProject.uproject"
+Run the approved script inside the Unreal Editor. The editor must be open with the target project loaded.
 
-    # Path to the generated script
-    SCRIPT_FILE="/tmp/edit_script.py"
+**Option A — Python console (interactive):**
+In the UE editor, go to `Window > Developer Tools > Output Log`, switch the command bar from "Cmd" to "Python", and paste the script.
 
-    # Execute the command
-    $UE_EDITOR "$UPROJECT" -ExecutePythonScript="$SCRIPT_FILE"
-    ```
-
-3.  The editor will launch, run the script, and then close. The changes will be saved to the asset.
-
----
-
-## 4. The `JarvisEditor` C++ Plugin (For Blueprint Graph Editing)
-
-**This is a critical step for any task involving the modification of Blueprint graphs.**
-
-### Why It's Necessary
-
-The standard `unreal` Python module **cannot**:
-- Add or remove nodes from a Blueprint graph (e.g., EventGraph).
-- Connect or disconnect pins between nodes.
-- Trigger Blueprint compilation.
-
-The `JarvisEditor` C++ plugin bridges this gap by exposing these functions to Python.
-
-### When It's Needed
-
-You must install and compile this plugin if the agent needs to perform tasks like:
-- "Add a `PrintString` node after the `BeginPlay` event."
-- "Create a new custom event named `OnPlayerDeath`."
-- "Connect the `OnComponentHit` event to a `Cast To BP_Player` node."
-
-For any other task (spawning actors, changing properties, editing Level Sequences), the plugin is **not** required.
-
-### Installation and Compilation (One-Time Setup Per Project)
-
-1.  **Copy Plugin Source:**
-    Copy the `ue_plugin/JarvisEditor` directory from this tool into your Unreal project's `Plugins/` directory.
-
-    ```bash
-    # Source: from this tool's directory
-    SOURCE_PLUGIN="/path/to/ue56-level-editor/ue_plugin/JarvisEditor"
-
-    # Destination: your Unreal project
-    DEST_PLUGINS_DIR="/path/to/YourProject/Plugins/"
-
-    # Create the destination directory if it doesn't exist
-    mkdir -p "$DEST_PLUGINS_DIR"
-
-    # Copy the plugin
-    cp -r "$SOURCE_PLUGIN" "$DEST_PLUGINS_DIR"
-    ```
-
-2.  **Regenerate Project Files:**
-    This step detects the new plugin and adds it to the build system.
-
-    -   **Linux:** Run `./GenerateProjectFiles.sh` in your project's root directory.
-    -   **Windows:** Right-click the `.uproject` file and select "Generate Visual Studio project files".
-
-3.  **Compile the Project:**
-    Build the project using your standard workflow. The Unreal Build Tool will automatically find and compile the `JarvisEditor` plugin.
-
-    -   **Linux/Rider:** Build the `Development Editor` configuration.
-    -   **Windows/Visual Studio:** Build the `Development Editor` configuration.
-    -   **Command Line:**
-        ```bash
-        # Path to Unreal Build Tool
-        UBT="/path/to/UnrealEngine/Engine/Build/BatchFiles/RunUAT.sh"
-
-        # Build the project editor
-        $UBT Build -project="/path/to/YourProject/YourProject.uproject" -target="UnrealEditor" -platform="Linux" -configuration="Development"
-        ```
-
-### Verification
-
-After compiling, launch the editor and run the following in the Python console (`Window > Developer Tools > Output Log`):
-
-```python
-import unreal
-
-# This should print True if the plugin is loaded correctly
-print(hasattr(unreal, 'JarvisBlueprintLibrary'))
-
-# This should list all the C++ functions
-print(dir(unreal.JarvisBlueprintLibrary))
+**Option B — Command line (headless):**
+```bash
+UE5Editor "/path/to/SOH_VR/SOH_VR.uproject" -ExecutePythonScript="/path/to/approved_script.py"
 ```
 
-If this verification passes, the agent can now generate and execute scripts that perform Blueprint graph edits.
+**Monitor the Output Log.** All JARVIS operations log with the `[JARVIS]` prefix. If the plugin is installed, Blueprint graph operations log under `LogJarvis`.
+
+**If anything goes wrong:** `Ctrl+Z` in the editor. Every operation is wrapped in an undo transaction.
+
+### Step 7: STOP — Show the Results to the User and Ask Before Submitting
+
+After the script runs, report the results to the user:
+- What changed
+- Any errors or warnings from the Output Log
+- Confirmation that the editor shows the expected state
+
+**Do not submit to Perforce until the user explicitly approves.**
+
+### Step 8: Submit to Perforce (Only After Approval)
+
+```bash
+# Check out the modified files
+p4 edit //depot/SOH_VR/Content/Maps/SL_Trailer_Logic.umap
+
+# Submit with a descriptive changelist
+p4 submit -d "[JARVIS] <description of what was changed and why>"
+```
 
 ---
 
-## 5. API and Script Quick Reference
+## The JarvisEditor C++ Plugin: When You Need It
 
-### Key API Endpoints
+Most edits (spawning actors, Level Sequences, materials, properties) work with the standard `unreal` Python module. No plugin needed.
 
-| Method | Endpoint | Description |
+**The plugin is ONLY required for Blueprint graph editing:**
+- Adding nodes to an EventGraph (Branch, PrintString, Custom Event, etc.)
+- Connecting or disconnecting pins between nodes
+- Compiling a Blueprint from script
+- Inspecting graph topology from Python
+
+If the user's task involves any of those operations, the plugin must be installed first. See `PLUGIN_EXPLAINER.md` for the full explanation of why it exists.
+
+**Plugin installation (one-time, requires user approval):**
+
+1. Copy `ue56-level-editor/ue_plugin/JarvisEditor/` to `SOH_VR/Plugins/JarvisEditor/`
+2. Regenerate project files
+3. Build Development Editor
+4. Verify: in UE Python console, `print(hasattr(unreal, 'JarvisBlueprintLibrary'))` should print `True`
+
+**Ask the user before installing the plugin.** It modifies the project's plugin list and requires a rebuild.
+
+---
+
+## Quick Reference: Script Generation Domains
+
+Query `GET /api/script/operations` for the full list with all parameters. Summary:
+
+| Domain | Operations | Plugin Required? |
 | :--- | :--- | :--- |
-| POST | `/api/load` | Load a single `.umap` or `.uasset` file. |
-| POST | `/api/project/scan` | Scan a full `.uproject` directory. |
-| GET | `/api/actors` | List all actors in the loaded level. |
-| GET | `/api/functions` | List all Blueprint functions in the loaded asset. |
-| GET | `/api/script/operations` | Get a list of all available script generation operations. |
-| POST | `/api/script/generate` | Generate a Python script for a specified operation. |
+| `actors` | spawn, spawn_blueprint, delete, set_property, move, duplicate, list_all, batch_set_property | No |
+| `assets` | load, duplicate, delete, rename, save_all_dirty, list_assets | No |
+| `sequences` | create, add_track, add_keyframe, set_playback_range, bind_actor, list_bindings | No |
+| `materials` | set_parameter, create_instance, assign_to_actor | No |
+| `blueprints` | compile, add_variable, set_variable_default, create, reparent | No (but `compile` is more reliable through the plugin) |
+| `animation` | retarget, import_fbx, set_anim_on_skeletal_mesh | No |
+| `data_tables` | list_rows, get_row | No |
+| `levels` | load_level, save_current_level, add_streaming_level, list_streaming_levels, set_level_visibility | No |
+| `pcg` | execute_graph, set_pcg_parameter | No |
+| `utility` | run_commandlet, build_lighting, take_screenshot, fix_redirectors, custom | No |
 
-### Common Script Operations (`/api/script/generate`)
-
-| Domain | Method | Description |
-| :--- | :--- | :--- |
-| `actors` | `spawn` | Spawn an actor from a class. |
-| `actors` | `spawn_blueprint` | Spawn an actor from a Blueprint asset. |
-| `actors` | `set_property` | Set a property on an actor. |
-| `assets` | `duplicate` | Duplicate an asset. |
-| `sequences` | `add_track` | Add a track to a Level Sequence. |
-| `sequences` | `add_keyframe` | Add a keyframe to a track. |
-| `materials` | `set_parameter` | Set a parameter on a Material Instance. |
-| `blueprints` | `add_variable` | Add a new variable to a Blueprint. |
-| `utility` | `custom` | Wrap arbitrary Python code in the standard safety header. |
-
-**To get the full list of all 45+ operations and their parameters, query the `/api/script/operations` endpoint.**
+**Blueprint graph node/pin manipulation** (not listed above) requires the JarvisEditor plugin. Those operations are called directly via `unreal.JarvisBlueprintLibrary.*` in the generated scripts.
