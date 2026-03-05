@@ -19,7 +19,10 @@
 #include "K2Node_DynamicCast.h"
 #include "K2Node_VariableGet.h"
 #include "K2Node_VariableSet.h"
+#include "K2Node_GetSubsystem.h"
+#include "K2Node_MakeStruct.h"
 #include "EdGraphSchema_K2.h"
+#include "UObject/UObjectIterator.h"
 #include "Editor.h"
 #include "Engine/World.h"
 #include "Engine/LevelScriptBlueprint.h"
@@ -1063,6 +1066,268 @@ void UJarvisBlueprintLibrary::EndTransaction()
 	ActiveTransaction.Reset();
 
 	UE_LOG(LogJarvis, Log, TEXT("[EXIT] EndTransaction: Transaction committed"));
+}
+
+// =============================================================================
+// SECTION 7: GENERIC NODE OPERATIONS
+// =============================================================================
+
+UEdGraphNode* UJarvisBlueprintLibrary::AddNodeToGraph(
+	UBlueprint* Blueprint,
+	const FString& GraphName,
+	const FString& NodeClassName,
+	int32 NodePosX,
+	int32 NodePosY)
+{
+	UE_LOG(LogJarvis, Log, TEXT("[ENTRY] AddNodeToGraph: BP=%s, Graph=%s, Class=%s, Pos=(%d,%d)"),
+		Blueprint ? *Blueprint->GetName() : TEXT("null"),
+		*GraphName, *NodeClassName, NodePosX, NodePosY);
+
+	if (!Blueprint)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddNodeToGraph: Blueprint is null"));
+		return nullptr;
+	}
+
+	UEdGraph* Graph = FindGraphByName(Blueprint, GraphName);
+	if (!Graph)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddNodeToGraph: Graph '%s' not found"), *GraphName);
+		return nullptr;
+	}
+
+	// Find the UClass for the node type
+	UClass* NodeClass = FindObject<UClass>(ANY_PACKAGE, *NodeClassName);
+	if (!NodeClass)
+	{
+		// Try with U prefix (e.g. "K2Node_GetSubsystem" -> "UK2Node_GetSubsystem")
+		NodeClass = FindObject<UClass>(ANY_PACKAGE, *(TEXT("U") + NodeClassName));
+	}
+	if (!NodeClass)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddNodeToGraph: Class '%s' not found"), *NodeClassName);
+		return nullptr;
+	}
+
+	// Verify it is a K2Node subclass
+	if (!NodeClass->IsChildOf(UK2Node::StaticClass()))
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddNodeToGraph: '%s' is not a K2Node subclass"), *NodeClassName);
+		return nullptr;
+	}
+
+	FScopedTransaction Transaction(FText::FromString(
+		FString::Printf(TEXT("JARVIS: Add %s node"), *NodeClassName)));
+	Graph->Modify();
+
+	UEdGraphNode* NewNode = NewObject<UEdGraphNode>(Graph, NodeClass);
+	NewNode->NodePosX = NodePosX;
+	NewNode->NodePosY = NodePosY;
+	NewNode->CreateNewGuid();
+	NewNode->PostPlacedNewNode();
+	NewNode->AllocateDefaultPins();
+
+	Graph->AddNode(NewNode, false, false);
+	NewNode->SetFlags(RF_Transactional);
+
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+	UE_LOG(LogJarvis, Log, TEXT("[EXIT] AddNodeToGraph: Created '%s' GUID=%s"),
+		*NodeClassName, *NewNode->NodeGuid.ToString());
+
+	return NewNode;
+}
+
+UEdGraphNode* UJarvisBlueprintLibrary::AddGetSubsystemNode(
+	UBlueprint* Blueprint,
+	const FString& GraphName,
+	const FString& SubsystemClassName,
+	int32 NodePosX,
+	int32 NodePosY)
+{
+	UE_LOG(LogJarvis, Log, TEXT("[ENTRY] AddGetSubsystemNode: BP=%s, Subsystem=%s"),
+		Blueprint ? *Blueprint->GetName() : TEXT("null"), *SubsystemClassName);
+
+	if (!Blueprint)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddGetSubsystemNode: Blueprint is null"));
+		return nullptr;
+	}
+
+	UEdGraph* Graph = FindGraphByName(Blueprint, GraphName);
+	if (!Graph)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddGetSubsystemNode: Graph '%s' not found"), *GraphName);
+		return nullptr;
+	}
+
+	// Find the subsystem class
+	UClass* SubsystemClass = FindObject<UClass>(ANY_PACKAGE, *SubsystemClassName);
+	if (!SubsystemClass)
+	{
+		SubsystemClass = FindObject<UClass>(ANY_PACKAGE, *(TEXT("U") + SubsystemClassName));
+	}
+	if (!SubsystemClass)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddGetSubsystemNode: Subsystem class '%s' not found"),
+			*SubsystemClassName);
+		return nullptr;
+	}
+
+	FScopedTransaction Transaction(FText::FromString(
+		FString::Printf(TEXT("JARVIS: Add Get %s"), *SubsystemClassName)));
+	Graph->Modify();
+
+	UK2Node_GetSubsystem* NewNode = NewObject<UK2Node_GetSubsystem>(Graph);
+	// Set the subsystem class before allocating pins so the output pin type is correct
+	NewNode->CustomClass = SubsystemClass;
+	NewNode->NodePosX = NodePosX;
+	NewNode->NodePosY = NodePosY;
+	NewNode->CreateNewGuid();
+	NewNode->PostPlacedNewNode();
+	NewNode->AllocateDefaultPins();
+
+	Graph->AddNode(NewNode, false, false);
+	NewNode->SetFlags(RF_Transactional);
+
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+	UE_LOG(LogJarvis, Log, TEXT("[EXIT] AddGetSubsystemNode: Created Get '%s' GUID=%s"),
+		*SubsystemClassName, *NewNode->NodeGuid.ToString());
+
+	return NewNode;
+}
+
+UEdGraphNode* UJarvisBlueprintLibrary::AddMakeStructNode(
+	UBlueprint* Blueprint,
+	const FString& GraphName,
+	const FString& StructPath,
+	int32 NodePosX,
+	int32 NodePosY)
+{
+	UE_LOG(LogJarvis, Log, TEXT("[ENTRY] AddMakeStructNode: BP=%s, Struct=%s"),
+		Blueprint ? *Blueprint->GetName() : TEXT("null"), *StructPath);
+
+	if (!Blueprint)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddMakeStructNode: Blueprint is null"));
+		return nullptr;
+	}
+
+	UEdGraph* Graph = FindGraphByName(Blueprint, GraphName);
+	if (!Graph)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddMakeStructNode: Graph '%s' not found"), *GraphName);
+		return nullptr;
+	}
+
+	// Find the struct -- try direct name first, then with F prefix, then as full path
+	UScriptStruct* StructType = FindObject<UScriptStruct>(ANY_PACKAGE, *StructPath);
+	if (!StructType)
+	{
+		StructType = FindObject<UScriptStruct>(ANY_PACKAGE, *(TEXT("F") + StructPath));
+	}
+	if (!StructType)
+	{
+		// Try loading as a full asset path
+		StructType = LoadObject<UScriptStruct>(nullptr, *StructPath);
+	}
+	if (!StructType)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] AddMakeStructNode: Struct '%s' not found"), *StructPath);
+		return nullptr;
+	}
+
+	FScopedTransaction Transaction(FText::FromString(
+		FString::Printf(TEXT("JARVIS: Add Make %s"), *StructPath)));
+	Graph->Modify();
+
+	UK2Node_MakeStruct* NewNode = NewObject<UK2Node_MakeStruct>(Graph);
+	NewNode->StructType = StructType;
+	NewNode->NodePosX = NodePosX;
+	NewNode->NodePosY = NodePosY;
+	NewNode->CreateNewGuid();
+	NewNode->PostPlacedNewNode();
+	NewNode->AllocateDefaultPins();
+
+	Graph->AddNode(NewNode, false, false);
+	NewNode->SetFlags(RF_Transactional);
+
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+	UE_LOG(LogJarvis, Log, TEXT("[EXIT] AddMakeStructNode: Created Make '%s' GUID=%s"),
+		*StructPath, *NewNode->NodeGuid.ToString());
+
+	return NewNode;
+}
+
+bool UJarvisBlueprintLibrary::SetPinDefaultValue(
+	UBlueprint* Blueprint,
+	const FString& GraphName,
+	const FString& NodeGuid,
+	const FString& PinName,
+	const FString& DefaultValue)
+{
+	UE_LOG(LogJarvis, Log, TEXT("[ENTRY] SetPinDefaultValue: Node=%s, Pin=%s, Value=%s"),
+		*NodeGuid, *PinName, *DefaultValue);
+
+	if (!Blueprint)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] SetPinDefaultValue: Blueprint is null"));
+		return false;
+	}
+
+	UEdGraphNode* Node = FindNodeByGuid(Blueprint, GraphName, NodeGuid);
+	if (!Node)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] SetPinDefaultValue: Node '%s' not found"), *NodeGuid);
+		return false;
+	}
+
+	// Find the pin -- try input first, then output
+	UEdGraphPin* Pin = FindPinByName(Node, PinName, EGPD_Input);
+	if (!Pin)
+	{
+		Pin = FindPinByName(Node, PinName, EGPD_Output);
+	}
+	if (!Pin)
+	{
+		UE_LOG(LogJarvis, Error, TEXT("[ERROR] SetPinDefaultValue: Pin '%s' not found on node '%s'"),
+			*PinName, *NodeGuid);
+		// Log available pins for debugging
+		for (UEdGraphPin* AvailPin : Node->Pins)
+		{
+			if (AvailPin && !AvailPin->bHidden)
+			{
+				UE_LOG(LogJarvis, Log, TEXT("  Available pin: '%s' (%s, %s)"),
+					*AvailPin->PinName.ToString(),
+					*AvailPin->GetDisplayName().ToString(),
+					AvailPin->Direction == EGPD_Input ? TEXT("input") : TEXT("output"));
+			}
+		}
+		return false;
+	}
+
+	FScopedTransaction Transaction(FText::FromString(
+		FString::Printf(TEXT("JARVIS: Set %s.%s = %s"), *NodeGuid, *PinName, *DefaultValue)));
+
+	// Use the schema to set the default value -- this validates type compatibility
+	const UEdGraphSchema* Schema = Node->GetGraph()->GetSchema();
+	if (Schema)
+	{
+		Schema->TrySetDefaultValue(*Pin, DefaultValue);
+	}
+	else
+	{
+		Pin->DefaultValue = DefaultValue;
+	}
+
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+
+	UE_LOG(LogJarvis, Log, TEXT("[EXIT] SetPinDefaultValue: Set '%s' = '%s'"),
+		*PinName, *DefaultValue);
+
+	return true;
 }
 
 // =============================================================================

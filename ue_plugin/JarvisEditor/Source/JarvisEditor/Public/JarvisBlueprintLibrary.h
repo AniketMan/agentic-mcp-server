@@ -36,6 +36,8 @@
 #include "K2Node_FunctionEntry.h"
 #include "K2Node_FunctionResult.h"
 #include "K2Node_MacroInstance.h"
+#include "K2Node_GetSubsystem.h"
+#include "K2Node_MakeStruct.h"
 #include "Engine/Blueprint.h"
 #include "JarvisBlueprintLibrary.generated.h"
 
@@ -181,6 +183,82 @@ public:
 		const FString& TargetClassName,
 		int32 NodePosX = 0,
 		int32 NodePosY = 0);
+
+	/**
+	 * Add a generic K2Node to a Blueprint graph by class name.
+	 * This is the universal node spawner -- works for any K2Node subclass
+	 * including K2Node_GetSubsystem, K2Node_MakeStruct, etc.
+	 *
+	 * @param Blueprint       The Blueprint to modify
+	 * @param GraphName       Name of the graph
+	 * @param NodeClassName   C++ class name (e.g. "K2Node_GetSubsystem", "K2Node_MakeStruct")
+	 * @param NodePosX        X position
+	 * @param NodePosY        Y position
+	 * @return                The created node, or nullptr on failure
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Jarvis|Nodes")
+	static UEdGraphNode* AddNodeToGraph(
+		UBlueprint* Blueprint,
+		const FString& GraphName,
+		const FString& NodeClassName,
+		int32 NodePosX = 0,
+		int32 NodePosY = 0);
+
+	/**
+	 * Add a K2Node_GetSubsystem node to get a world subsystem.
+	 * Convenience function for the common pattern of getting GameplayMessageSubsystem.
+	 *
+	 * @param Blueprint       The Blueprint to modify
+	 * @param GraphName       Name of the graph
+	 * @param SubsystemClassName  Class name of the subsystem (e.g. "GameplayMessageSubsystem")
+	 * @param NodePosX        X position
+	 * @param NodePosY        Y position
+	 * @return                The created node, or nullptr on failure
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Jarvis|Nodes")
+	static UEdGraphNode* AddGetSubsystemNode(
+		UBlueprint* Blueprint,
+		const FString& GraphName,
+		const FString& SubsystemClassName,
+		int32 NodePosX = 0,
+		int32 NodePosY = 0);
+
+	/**
+	 * Add a K2Node_MakeStruct node for a given struct type.
+	 *
+	 * @param Blueprint       The Blueprint to modify
+	 * @param GraphName       Name of the graph
+	 * @param StructPath      Path or name of the struct (e.g. "Msg_StoryStep", "/Script/SOH.Msg_StoryStep")
+	 * @param NodePosX        X position
+	 * @param NodePosY        Y position
+	 * @return                The created node, or nullptr on failure
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Jarvis|Nodes")
+	static UEdGraphNode* AddMakeStructNode(
+		UBlueprint* Blueprint,
+		const FString& GraphName,
+		const FString& StructPath,
+		int32 NodePosX = 0,
+		int32 NodePosY = 0);
+
+	/**
+	 * Set a default value on a pin by node GUID and pin name.
+	 * Used to set struct member values (e.g. Step=5 on MakeStruct).
+	 *
+	 * @param Blueprint       The Blueprint containing the graph
+	 * @param GraphName       Name of the graph
+	 * @param NodeGuid        GUID of the node
+	 * @param PinName         Name of the pin to set
+	 * @param DefaultValue    String representation of the value
+	 * @return                True if the value was set successfully
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Jarvis|Pins")
+	static bool SetPinDefaultValue(
+		UBlueprint* Blueprint,
+		const FString& GraphName,
+		const FString& NodeGuid,
+		const FString& PinName,
+		const FString& DefaultValue);
 
 	/**
 	 * Remove a node from a Blueprint graph by its GUID.
