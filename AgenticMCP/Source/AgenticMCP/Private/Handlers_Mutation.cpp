@@ -58,6 +58,8 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
+#include "Factories/BlueprintFactory.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 // SEH wrapper defined in AgenticMCPServer.cpp
 #if PLATFORM_WINDOWS
@@ -1096,7 +1098,12 @@ FString FAgenticMCPServer::HandleCreateGraph(const FString& Body)
 			UEdGraphSchema_K2::StaticClass());
 		if (NewGraph)
 		{
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+			// UE 5.6+ requires 4th param: SignatureFromObject (nullptr = no existing signature)
+			FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false, static_cast<UFunction*>(nullptr));
+#else
 			FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false);
+#endif
 		}
 	}
 	else if (GraphType == TEXT("macro"))
@@ -1254,21 +1261,47 @@ FString FAgenticMCPServer::HandleCompileBlueprint(const FString& Body)
 
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	// Check for compile errors
-	TArray<TSharedPtr<FJsonValue>> Errors;
-	for (const FCompilerNotifsAndErrors& CompileError : BP->ErrorsFromLastCompile)
+	// Collect compile diagnostics via Blueprint->Status (works on UE 5.4-5.7+)
+	// ErrorsFromLastCompile was removed in UE 5.6; use FMessageLog for detailed errors
+	FString StatusStr;
+	switch (BP->Status)
 	{
-		// Not available in all engine versions, use status instead
+	case BS_Error:       StatusStr = TEXT("error"); break;
+	case BS_UpToDate:    StatusStr = TEXT("up_to_date"); break;
+	case BS_Dirty:       StatusStr = TEXT("dirty"); break;
+	case BS_BeingCreated: StatusStr = TEXT("being_created"); break;
+	default:             StatusStr = TEXT("unknown"); break;
 	}
 
+	// Collect any compiler messages from the message log
+	TArray<TSharedPtr<FJsonValue>> DiagnosticsArray;
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+	// UE 5.6+: Use UpgradeNotesLog or compiler results from FKismetCompilerContext
+	// The Blueprint->Status enum is the authoritative compilation result
+	if (BP->Status == BS_Error)
+	{
+		TSharedRef<FJsonObject> DiagObj = MakeShared<FJsonObject>();
+		DiagObj->SetStringField(TEXT("severity"), TEXT("error"));
+		DiagObj->SetStringField(TEXT("message"),
+			TEXT("Blueprint has compile errors. Open in editor for details, or use /api/validate-blueprint."));
+		DiagnosticsArray.Add(MakeShared<FJsonValueObject>(DiagObj));
+	}
+#else
+	// UE 5.4-5.5: ErrorsFromLastCompile is available
+	for (const auto& CompileError : BP->ErrorsFromLastCompile)
+	{
+		TSharedRef<FJsonObject> DiagObj = MakeShared<FJsonObject>();
+		DiagObj->SetStringField(TEXT("message"), CompileError.ToString());
+		DiagnosticsArray.Add(MakeShared<FJsonValueObject>(DiagObj));
+	}
+#endif
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSaved);
+	Result->SetBoolField(TEXT("success"), bSaved && BP->Status != BS_Error);
 	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("status"),
-		BP->Status == BS_Error ? TEXT("error") :
-		BP->Status == BS_UpToDate ? TEXT("up_to_date") :
-		BP->Status == BS_Dirty ? TEXT("dirty") : TEXT("unknown"));
+	Result->SetStringField(TEXT("status"), StatusStr);
 	Result->SetBoolField(TEXT("saved"), bSaved);
+	Result->SetArrayField(TEXT("diagnostics"), DiagnosticsArray);
 	return JsonToString(Result);
 }
 

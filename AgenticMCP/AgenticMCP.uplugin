@@ -2,7 +2,7 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "1.0.0",
-	"FriendlyName": "Manus MCP",
+	"FriendlyName": "AgenticMCP",
 	"Description": "MCP server for AI-driven Blueprint manipulation, actor management, and level editing in UE5",
 	"Category": "Editor",
 	"CreatedBy": "Aniket Bhatt",

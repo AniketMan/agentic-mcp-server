@@ -14,6 +14,8 @@
 #include "Engine/LevelScriptBlueprint.h"
 #include "Editor.h"
 #include "EditorLevelUtils.h"
+#include "Engine/LevelStreamingDynamic.h"
+#include "Runtime/Launch/Resources/Version.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
@@ -156,8 +158,19 @@ FString FAgenticMCPServer::HandleLoadLevel(const FString& Body)
 	}
 
 	// Add the sublevel via editor utilities
-	ULevelStreaming* NewLevel = EditorLevelUtils::AddLevelToWorld(
+	ULevelStreaming* NewLevel = nullptr;
+
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+	// UE 5.6+ uses struct-based API
+	UEditorLevelUtils::FAddLevelToWorldParams AddParams;
+	AddParams.LevelPackageName = *LevelPath;
+	AddParams.LevelStreamingClass = ULevelStreamingDynamic::StaticClass();
+	NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
+#else
+	// UE 5.4-5.5 uses the 3-param overload
+	NewLevel = EditorLevelUtils::AddLevelToWorld(
 		World, *LevelPath, ULevelStreamingDynamic::StaticClass());
+#endif
 
 	if (!NewLevel)
 	{
