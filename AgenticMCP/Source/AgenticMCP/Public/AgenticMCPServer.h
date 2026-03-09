@@ -183,6 +183,9 @@ private:
 	FString HandleSetViewport(const FString& Body);
 	FString HandleWaitReady(const FString& Body);
 	FString HandleResolveRef(const FString& Body);
+	FString HandleGetCamera(const FString& Body);
+	FString HandleListViewports(const FString& Body);
+	FString HandleGetSelection(const FString& Body);
 
 	// ---- Debug Visualization ----
 	FString HandleDrawDebug(const FString& Body);

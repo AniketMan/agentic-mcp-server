@@ -20,9 +20,12 @@
 #include "Components/SceneComponent.h"
 #include "EngineUtils.h"
 #include "Editor.h"
+#include "Selection.h"
 #include "EditorViewportClient.h"
 #include "LevelEditorViewport.h"
 #include "LevelEditor.h"
+#include "ILevelEditor.h"
+#include "SLevelViewport.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
@@ -53,17 +56,11 @@ static double LastScreenshotTime = 0.0;
 static const double ScreenshotCooldownSeconds = 0.5;
 
 // ============================================================
-// Helper: Get the current editor world
+// Helper macro: Get the current editor world
+// (Using macro to avoid duplicate static function in unity build)
 // ============================================================
 
-static UWorld* GetEditorWorld()
-{
-	if (GEditor)
-	{
-		return GEditor->GetEditorWorldContext().World();
-	}
-	return nullptr;
-}
+#define GET_EDITOR_WORLD() (GEditor ? GEditor->GetEditorWorldContext().World() : nullptr)
 
 // ============================================================
 // Helper: Clear and rebuild ref registry
@@ -150,11 +147,15 @@ static FLevelEditorViewportClient* GetActiveViewportClient()
 	if (!GEditor) return nullptr;
 
 	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
-	TSharedPtr<ILevelViewport> ActiveViewport = LevelEditorModule.GetFirstActiveViewport();
+	TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor();
 
-	if (ActiveViewport.IsValid())
+	if (LevelEditor.IsValid())
 	{
-		return &ActiveViewport->GetLevelViewportClient();
+		TSharedPtr<SLevelViewport> ActiveViewport = LevelEditor->GetActiveViewportInterface();
+		if (ActiveViewport.IsValid())
+		{
+			return &ActiveViewport->GetLevelViewportClient();
+		}
 	}
 
 	return nullptr;
@@ -168,7 +169,7 @@ static FLevelEditorViewportClient* GetActiveViewportClient()
 
 FString FAgenticMCPServer::HandleSceneSnapshot(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -373,48 +374,16 @@ FString FAgenticMCPServer::HandleScreenshot(const FString& Body)
 		return MakeErrorJson(TEXT("Viewport has invalid size. Is the editor minimized?"));
 	}
 
-	// Use Unreal's built-in screenshot utility via FHighResScreenshotConfig
-	// This uses the proper render pipeline and doesn't directly read the framebuffer
-	FHighResScreenshotConfig& Config = GetHighResScreenshotConfig();
-
-	// Calculate resolution multiplier to match target size while maintaining proper rendering
-	float ResolutionMultiplier = FMath::Min(
-		(float)TargetWidth / (float)ViewportSize.X,
-		(float)TargetHeight / (float)ViewportSize.Y
-	);
-	ResolutionMultiplier = FMath::Max(0.1f, FMath::Min(1.0f, ResolutionMultiplier));
-
-	// Store original config
-	float OriginalMultiplier = Config.ResolutionMultiplier;
-	bool bOriginalHDR = Config.bCaptureHDR;
-
-	// Configure for our capture
-	Config.ResolutionMultiplier = ResolutionMultiplier;
-	Config.bCaptureHDR = false;
-
-	// Force viewport redraw with proper frame sync
+	// Force a draw cycle to ensure the viewport has valid content
 	ViewportClient->Invalidate();
-
-	// Use FRenderTarget::ReadPixels through the scene capture - this is GPU-efficient
-	// because it reads after the render pipeline completes, not directly from framebuffer
 	FlushRenderingCommands();
 
+	// Pre-allocate the bitmap array - ReadPixels requires the array to be sized correctly
 	TArray<FColor> Bitmap;
-	FIntRect CaptureRect(0, 0, ViewportSize.X, ViewportSize.Y);
+	Bitmap.SetNumUninitialized(ViewportSize.X * ViewportSize.Y);
 
-	// Use GetRawData for proper GPU synchronization - reads from back buffer after present
-	bool bSuccess = Viewport->ReadPixelsPtr(Bitmap.GetData(), FReadSurfaceDataFlags(), CaptureRect);
-
-	// Fallback to standard ReadPixels if ReadPixelsPtr failed
-	if (!bSuccess)
-	{
-		Bitmap.Reset();
-		bSuccess = Viewport->ReadPixels(Bitmap, FReadSurfaceDataFlags(), CaptureRect);
-	}
-
-	// Restore config
-	Config.ResolutionMultiplier = OriginalMultiplier;
-	Config.bCaptureHDR = bOriginalHDR;
+	// Use the simple ReadPixels overload that's safer for editor viewports
+	bool bSuccess = Viewport->ReadPixels(Bitmap);
 
 	if (!bSuccess || Bitmap.Num() == 0)
 	{
@@ -509,7 +478,7 @@ FString FAgenticMCPServer::HandleScreenshot(const FString& Body)
 
 FString FAgenticMCPServer::HandleFocusActor(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -557,7 +526,7 @@ FString FAgenticMCPServer::HandleFocusActor(const FString& Body)
 
 FString FAgenticMCPServer::HandleSelectActor(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -823,7 +792,7 @@ static FColor ParseColor(const FString& ColorStr)
 
 FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -991,7 +960,7 @@ FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
 
 FString FAgenticMCPServer::HandleClearDebug(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -1334,7 +1303,7 @@ static TMap<FString, FSceneStateSnapshot> SavedSnapshots;
 
 FString FAgenticMCPServer::HandleSaveState(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -1380,7 +1349,7 @@ FString FAgenticMCPServer::HandleSaveState(const FString& Body)
 
 FString FAgenticMCPServer::HandleDiffState(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -1421,42 +1390,42 @@ FString FAgenticMCPServer::HandleDiffState(const FString& Body)
 	FString DiffYaml;
 
 	// Find added actors
-	for (const FString& Name : CurrentActors)
+	for (const FString& CurrentName : CurrentActors)
 	{
-		if (!Snapshot->ActorNames.Contains(Name))
+		if (!Snapshot->ActorNames.Contains(CurrentName))
 		{
 			TSharedRef<FJsonObject> AddedJson = MakeShared<FJsonObject>();
-			AddedJson->SetStringField(TEXT("name"), Name);
+			AddedJson->SetStringField(TEXT("name"), CurrentName);
 			AddedArray.Add(MakeShared<FJsonValueObject>(AddedJson));
-			DiffYaml += FString::Printf(TEXT("+ ADDED: %s\n"), *Name);
+			DiffYaml += FString::Printf(TEXT("+ ADDED: %s\n"), *CurrentName);
 		}
 	}
 
 	// Find removed actors
-	for (const FString& Name : Snapshot->ActorNames)
+	for (const FString& SnapshotName : Snapshot->ActorNames)
 	{
-		if (!CurrentActors.Contains(Name))
+		if (!CurrentActors.Contains(SnapshotName))
 		{
 			TSharedRef<FJsonObject> RemovedJson = MakeShared<FJsonObject>();
-			RemovedJson->SetStringField(TEXT("name"), Name);
-			RemovedJson->SetStringField(TEXT("class"), Snapshot->ActorClasses.FindRef(Name));
+			RemovedJson->SetStringField(TEXT("name"), SnapshotName);
+			RemovedJson->SetStringField(TEXT("class"), Snapshot->ActorClasses.FindRef(SnapshotName));
 			RemovedArray.Add(MakeShared<FJsonValueObject>(RemovedJson));
-			DiffYaml += FString::Printf(TEXT("- REMOVED: %s\n"), *Name);
+			DiffYaml += FString::Printf(TEXT("- REMOVED: %s\n"), *SnapshotName);
 		}
 	}
 
 	// Find modified actors
-	for (const FString& Name : CurrentActors)
+	for (const FString& ActorName : CurrentActors)
 	{
-		if (!Snapshot->ActorNames.Contains(Name)) continue;
+		if (!Snapshot->ActorNames.Contains(ActorName)) continue;
 
-		FTransform* OldTransform = Snapshot->ActorTransforms.Find(Name);
-		FTransform* NewTransform = CurrentTransforms.Find(Name);
+		FTransform* OldTransform = Snapshot->ActorTransforms.Find(ActorName);
+		FTransform* NewTransform = CurrentTransforms.Find(ActorName);
 
 		if (OldTransform && NewTransform && !OldTransform->Equals(*NewTransform, 0.1f))
 		{
 			TSharedRef<FJsonObject> ModJson = MakeShared<FJsonObject>();
-			ModJson->SetStringField(TEXT("name"), Name);
+			ModJson->SetStringField(TEXT("name"), ActorName);
 
 			FVector OldLoc = OldTransform->GetLocation();
 			FVector NewLoc = NewTransform->GetLocation();
@@ -1495,12 +1464,12 @@ FString FAgenticMCPServer::HandleDiffState(const FString& Body)
 			if (bLocationChanged)
 			{
 				DiffYaml += FString::Printf(TEXT("~ MOVED: %s (%.0f,%.0f,%.0f) -> (%.0f,%.0f,%.0f)\n"),
-					*Name, OldLoc.X, OldLoc.Y, OldLoc.Z, NewLoc.X, NewLoc.Y, NewLoc.Z);
+					*ActorName, OldLoc.X, OldLoc.Y, OldLoc.Z, NewLoc.X, NewLoc.Y, NewLoc.Z);
 			}
 			if (bRotationChanged)
 			{
 				DiffYaml += FString::Printf(TEXT("~ ROTATED: %s (%.0f,%.0f,%.0f) -> (%.0f,%.0f,%.0f)\n"),
-					*Name, OldRot.Pitch, OldRot.Yaw, OldRot.Roll, NewRot.Pitch, NewRot.Yaw, NewRot.Roll);
+					*ActorName, OldRot.Pitch, OldRot.Yaw, OldRot.Roll, NewRot.Pitch, NewRot.Yaw, NewRot.Roll);
 			}
 		}
 	}
@@ -1527,7 +1496,7 @@ FString FAgenticMCPServer::HandleDiffState(const FString& Body)
 
 FString FAgenticMCPServer::HandleRestoreState(const FString& Body)
 {
-	UWorld* World = GetEditorWorld();
+	UWorld* World = GET_EDITOR_WORLD();
 	if (!World)
 	{
 		return MakeErrorJson(TEXT("No editor world available."));
@@ -1600,5 +1569,162 @@ FString FAgenticMCPServer::HandleListStates(const FString& Body)
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetNumberField(TEXT("count"), StatesArray.Num());
 	Result->SetArrayField(TEXT("states"), StatesArray);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleGetCamera
+// POST /api/get-camera { }
+// Returns current editor viewport camera position and rotation
+// ============================================================
+
+FString FAgenticMCPServer::HandleGetCamera(const FString& Body)
+{
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+	TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor();
+	if (!LevelEditor.IsValid())
+	{
+		return MakeErrorJson(TEXT("No level editor available."));
+	}
+
+	TSharedPtr<SLevelViewport> ActiveViewport = LevelEditor->GetActiveViewportInterface();
+	if (!ActiveViewport.IsValid())
+	{
+		return MakeErrorJson(TEXT("No active viewport available."));
+	}
+
+	FLevelEditorViewportClient& ViewportClient = ActiveViewport->GetLevelViewportClient();
+
+	FVector Location = ViewportClient.GetViewLocation();
+	FRotator Rotation = ViewportClient.GetViewRotation();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetNumberField(TEXT("x"), Location.X);
+	Result->SetNumberField(TEXT("y"), Location.Y);
+	Result->SetNumberField(TEXT("z"), Location.Z);
+	Result->SetNumberField(TEXT("pitch"), Rotation.Pitch);
+	Result->SetNumberField(TEXT("yaw"), Rotation.Yaw);
+	Result->SetNumberField(TEXT("roll"), Rotation.Roll);
+	Result->SetNumberField(TEXT("fov"), ViewportClient.ViewFOV);
+	Result->SetStringField(TEXT("viewMode"), ViewportClient.IsRealtime() ? TEXT("Realtime") : TEXT("Static"));
+
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleListViewports
+// POST /api/list-viewports { }
+// Returns list of all available editor viewports
+// ============================================================
+
+FString FAgenticMCPServer::HandleListViewports(const FString& Body)
+{
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>(TEXT("LevelEditor"));
+	TSharedPtr<ILevelEditor> LevelEditor = LevelEditorModule.GetFirstLevelEditor();
+	if (!LevelEditor.IsValid())
+	{
+		return MakeErrorJson(TEXT("No level editor available."));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> ViewportsArray;
+
+	// Get all viewports from the level editor
+	const TArray<TSharedPtr<SLevelViewport>>& Viewports = LevelEditor->GetViewports();
+
+	for (int32 i = 0; i < Viewports.Num(); ++i)
+	{
+		TSharedPtr<SLevelViewport> Viewport = Viewports[i];
+		if (!Viewport.IsValid()) continue;
+
+		FLevelEditorViewportClient& Client = Viewport->GetLevelViewportClient();
+		FVector Location = Client.GetViewLocation();
+		FRotator Rotation = Client.GetViewRotation();
+
+		TSharedRef<FJsonObject> VpJson = MakeShared<FJsonObject>();
+		VpJson->SetNumberField(TEXT("index"), i);
+		VpJson->SetBoolField(TEXT("isActive"), Viewport == LevelEditor->GetActiveViewportInterface());
+		VpJson->SetBoolField(TEXT("isRealtime"), Client.IsRealtime());
+		VpJson->SetNumberField(TEXT("x"), Location.X);
+		VpJson->SetNumberField(TEXT("y"), Location.Y);
+		VpJson->SetNumberField(TEXT("z"), Location.Z);
+		VpJson->SetNumberField(TEXT("pitch"), Rotation.Pitch);
+		VpJson->SetNumberField(TEXT("yaw"), Rotation.Yaw);
+		VpJson->SetNumberField(TEXT("roll"), Rotation.Roll);
+		VpJson->SetNumberField(TEXT("fov"), Client.ViewFOV);
+
+		// View type (perspective, top, front, etc.)
+		FString ViewTypeName;
+		switch (Client.GetViewportType())
+		{
+			case LVT_Perspective: ViewTypeName = TEXT("Perspective"); break;
+			case LVT_OrthoXY: ViewTypeName = TEXT("Top"); break;
+			case LVT_OrthoXZ: ViewTypeName = TEXT("Front"); break;
+			case LVT_OrthoYZ: ViewTypeName = TEXT("Left"); break;
+			case LVT_OrthoNegativeXY: ViewTypeName = TEXT("Bottom"); break;
+			case LVT_OrthoNegativeXZ: ViewTypeName = TEXT("Back"); break;
+			case LVT_OrthoNegativeYZ: ViewTypeName = TEXT("Right"); break;
+			default: ViewTypeName = TEXT("Unknown"); break;
+		}
+		VpJson->SetStringField(TEXT("viewType"), ViewTypeName);
+
+		ViewportsArray.Add(MakeShared<FJsonValueObject>(VpJson));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetNumberField(TEXT("count"), ViewportsArray.Num());
+	Result->SetArrayField(TEXT("viewports"), ViewportsArray);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleGetSelection
+// POST /api/get-selection { }
+// Returns currently selected actors in the editor
+// ============================================================
+
+FString FAgenticMCPServer::HandleGetSelection(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("No editor available."));
+	}
+
+	USelection* Selection = GEditor->GetSelectedActors();
+	if (!Selection)
+	{
+		return MakeErrorJson(TEXT("No selection available."));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> SelectedArray;
+
+	for (FSelectionIterator It(*Selection); It; ++It)
+	{
+		AActor* Actor = Cast<AActor>(*It);
+		if (!Actor) continue;
+
+		TSharedRef<FJsonObject> ActorJson = MakeShared<FJsonObject>();
+		ActorJson->SetStringField(TEXT("name"), Actor->GetName());
+		ActorJson->SetStringField(TEXT("label"), Actor->GetActorLabel());
+		ActorJson->SetStringField(TEXT("class"), Actor->GetClass()->GetName());
+
+		FVector Location = Actor->GetActorLocation();
+		FRotator Rotation = Actor->GetActorRotation();
+
+		ActorJson->SetNumberField(TEXT("x"), Location.X);
+		ActorJson->SetNumberField(TEXT("y"), Location.Y);
+		ActorJson->SetNumberField(TEXT("z"), Location.Z);
+		ActorJson->SetNumberField(TEXT("pitch"), Rotation.Pitch);
+		ActorJson->SetNumberField(TEXT("yaw"), Rotation.Yaw);
+		ActorJson->SetNumberField(TEXT("roll"), Rotation.Roll);
+
+		SelectedArray.Add(MakeShared<FJsonValueObject>(ActorJson));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetNumberField(TEXT("count"), SelectedArray.Num());
+	Result->SetArrayField(TEXT("selected"), SelectedArray);
 	return JsonToString(Result);
 }

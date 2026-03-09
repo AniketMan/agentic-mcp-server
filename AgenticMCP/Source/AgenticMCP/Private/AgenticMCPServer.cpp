@@ -867,6 +867,10 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSetActorTransform(Body);
 	});
+	HandlerMap.Add(TEXT("moveActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetActorTransform(Body);  // moveActor is alias for setActorTransform
+	});
 
 	// ---- Level Management ----
 	HandlerMap.Add(TEXT("listLevels"), [this](const TMap<FString, FString>& Params, const FString& Body)
@@ -924,6 +928,18 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("resolveRef"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
 		return HandleResolveRef(Body);
+	});
+	HandlerMap.Add(TEXT("getCamera"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetCamera(Body);
+	});
+	HandlerMap.Add(TEXT("listViewports"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleListViewports(Body);
+	});
+	HandlerMap.Add(TEXT("getSelection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetSelection(Body);
 	});
 
 	// ---- Debug Visualization ----
@@ -1157,6 +1173,114 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("snapshotGraph")));
 	Router->BindRoute(FHttpPath(TEXT("/api/restore-graph")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("restoreGraph")));
+
+	// Visual Agent / Automation (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/scene-snapshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("sceneSnapshot")));
+	Router->BindRoute(FHttpPath(TEXT("/api/screenshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("screenshot")));
+	Router->BindRoute(FHttpPath(TEXT("/api/focus-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("focusActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/select-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("selectActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/set-viewport")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("setViewport")));
+	Router->BindRoute(FHttpPath(TEXT("/api/wait-ready")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("waitReady")));
+	Router->BindRoute(FHttpPath(TEXT("/api/resolve-ref")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("resolveRef")));
+	Router->BindRoute(FHttpPath(TEXT("/api/move-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("moveActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-camera")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("getCamera")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-viewports")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listViewports")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-selection")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("getSelection")));
+
+	// Debug Drawing (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/draw-debug")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("drawDebug")));
+	Router->BindRoute(FHttpPath(TEXT("/api/clear-debug")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("clearDebug")));
+
+	// Blueprint Snapshot (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/blueprint-snapshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("blueprintSnapshot")));
+
+	// Transaction/Undo (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/begin-transaction")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("beginTransaction")));
+	Router->BindRoute(FHttpPath(TEXT("/api/end-transaction")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("endTransaction")));
+	Router->BindRoute(FHttpPath(TEXT("/api/undo")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("undo")));
+	Router->BindRoute(FHttpPath(TEXT("/api/redo")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("redo")));
+
+	// State Management (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/save-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("saveState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/diff-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("diffState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/restore-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("restoreState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-states")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listStates")));
+
+	// Visual Agent / Automation (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/scene-snapshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("sceneSnapshot")));
+	Router->BindRoute(FHttpPath(TEXT("/api/screenshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("screenshot")));
+	Router->BindRoute(FHttpPath(TEXT("/api/focus-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("focusActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/select-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("selectActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/set-viewport")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("setViewport")));
+	Router->BindRoute(FHttpPath(TEXT("/api/wait-ready")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("waitReady")));
+	Router->BindRoute(FHttpPath(TEXT("/api/resolve-ref")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("resolveRef")));
+	Router->BindRoute(FHttpPath(TEXT("/api/move-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("moveActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-camera")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("getCamera")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-viewports")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listViewports")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-selection")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("getSelection")));
+
+	// Debug Drawing (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/draw-debug")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("drawDebug")));
+	Router->BindRoute(FHttpPath(TEXT("/api/clear-debug")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("clearDebug")));
+
+	// Blueprint Snapshot (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/blueprint-snapshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("blueprintSnapshot")));
+
+	// Transaction/Undo (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/begin-transaction")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("beginTransaction")));
+	Router->BindRoute(FHttpPath(TEXT("/api/end-transaction")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("endTransaction")));
+	Router->BindRoute(FHttpPath(TEXT("/api/undo")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("undo")));
+	Router->BindRoute(FHttpPath(TEXT("/api/redo")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("redo")));
+
+	// State Management (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/save-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("saveState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/diff-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("diffState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/restore-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("restoreState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-states")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listStates")));
 
 	// ---- Start listening ----
 	HttpModule.StartAllListeners();

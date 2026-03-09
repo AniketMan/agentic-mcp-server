@@ -58,7 +58,7 @@ Regenerate project files and build. The plugin is editor-only and auto-starts wh
 Verify in the Output Log:
 
 ```
-AgenticMCP: HTTP server started on port 3000
+AgenticMCP: HTTP server started on port 9847 (editor mode)
 ```
 
 ### 2. MCP Bridge (Node.js)
@@ -81,7 +81,7 @@ Add to your MCP config (`claude_desktop_config.json` or project `.mcp.json`):
       "command": "node",
       "args": ["/path/to/AgenticMCP/Tools/index.js"],
       "env": {
-        "UNREAL_MCP_URL": "http://localhost:3000",
+        "UNREAL_MCP_URL": "http://localhost:9847",
         "AGENTIC_FALLBACK_ENABLED": "true"
       }
     }
@@ -108,7 +108,7 @@ Add to `.cursor/mcp.json`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UNREAL_MCP_URL` | `http://localhost:3000` | C++ plugin HTTP endpoint |
+| `UNREAL_MCP_URL` | `http://localhost:9847` | C++ plugin HTTP endpoint |
 | `MCP_REQUEST_TIMEOUT_MS` | `30000` | Per-request HTTP timeout (ms) |
 | `MCP_ASYNC_ENABLED` | `true` | Enable async task queue |
 | `MCP_ASYNC_TIMEOUT_MS` | `300000` | Async operation timeout (ms) |
@@ -119,7 +119,9 @@ Add to `.cursor/mcp.json`:
 
 ## HTTP API
 
-All live editor endpoints are at `http://localhost:3000/api/<endpoint>`.
+All live editor endpoints are at `http://localhost:9847/api/<endpoint>`.
+
+> **Note**: Port 9847 is the default for the editor plugin. Port 3000 is reserved for DevmateMCP.
 
 ### Health and Lifecycle
 
@@ -183,6 +185,226 @@ All live editor endpoints are at `http://localhost:3000/api/<endpoint>`.
 | `/api/load-level` | POST | Load a sublevel |
 | `/api/unload-level` | POST | Unload a sublevel |
 | `/api/get-level-blueprint` | POST | Get level blueprint |
+
+### Visual Agent / Automation
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/screenshot` | POST | Capture viewport screenshot (base64 JPEG) |
+| `/api/scene-snapshot` | POST | Get hierarchical scene tree with short refs |
+| `/api/focus-actor` | POST | Move editor camera to focus on an actor |
+| `/api/select-actor` | POST | Select actor(s) in the editor |
+| `/api/set-viewport` | POST | Set camera position and rotation |
+| `/api/move-actor` | POST | Move/transform an actor |
+| `/api/get-camera` | POST | Get current viewport camera position, rotation, FOV |
+| `/api/list-viewports` | POST | List all editor viewports with positions and types |
+| `/api/get-selection` | POST | Get currently selected actors with transforms |
+| `/api/wait-ready` | POST | Wait for assets/compile/render to complete |
+| `/api/resolve-ref` | POST | Resolve a short ref (a0, a1.c0) to actor/component |
+| `/api/draw-debug` | POST | Draw debug shapes in viewport |
+| `/api/clear-debug` | POST | Clear debug drawings |
+
+#### get-camera
+
+Returns the current editor viewport camera position, rotation, and settings.
+
+**Request:** `POST /api/get-camera`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "x": -888.39,
+  "y": 583.01,
+  "z": 237.47,
+  "pitch": -3.2,
+  "yaw": -20.2,
+  "roll": 0,
+  "fov": 90,
+  "viewMode": "Static"
+}
+```
+
+#### list-viewports
+
+Returns all available editor viewports with their positions and view types.
+
+**Request:** `POST /api/list-viewports`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 4,
+  "viewports": [
+    {
+      "index": 0,
+      "isActive": false,
+      "isRealtime": false,
+      "x": -1215.38,
+      "y": 18.71,
+      "z": 285.17,
+      "pitch": 0,
+      "yaw": 0,
+      "roll": 0,
+      "fov": 90,
+      "viewType": "Right"
+    },
+    {
+      "index": 1,
+      "isActive": true,
+      "isRealtime": false,
+      "viewType": "Perspective"
+    }
+  ]
+}
+```
+
+#### get-selection
+
+Returns the currently selected actors in the editor with their transforms.
+
+**Request:** `POST /api/get-selection`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 1,
+  "selected": [
+    {
+      "name": "1M_Cube10_0",
+      "label": "Table",
+      "class": "StaticMeshActor",
+      "x": 193.41,
+      "y": 262.10,
+      "z": 0,
+      "pitch": 0,
+      "yaw": 50.0,
+      "roll": 0
+    }
+  ]
+}
+```
+
+### Visual Agent / Automation
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/screenshot` | POST | Capture viewport screenshot (base64 JPEG) |
+| `/api/scene-snapshot` | POST | Get hierarchical scene tree with short refs |
+| `/api/focus-actor` | POST | Move editor camera to focus on an actor |
+| `/api/select-actor` | POST | Select actor(s) in the editor |
+| `/api/set-viewport` | POST | Set camera position and rotation |
+| `/api/move-actor` | POST | Move/transform an actor |
+| `/api/get-camera` | POST | Get current viewport camera position, rotation, FOV |
+| `/api/list-viewports` | POST | List all editor viewports with positions and types |
+| `/api/get-selection` | POST | Get currently selected actors with transforms |
+| `/api/wait-ready` | POST | Wait for assets/compile/render to complete |
+| `/api/resolve-ref` | POST | Resolve a short ref (a0, a1.c0) to actor/component |
+| `/api/draw-debug` | POST | Draw debug shapes in viewport |
+| `/api/clear-debug` | POST | Clear debug drawings |
+
+#### get-camera
+
+Returns the current editor viewport camera position, rotation, and settings.
+
+**Request:** `POST /api/get-camera`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "x": -888.39,
+  "y": 583.01,
+  "z": 237.47,
+  "pitch": -3.2,
+  "yaw": -20.2,
+  "roll": 0,
+  "fov": 90,
+  "viewMode": "Static"
+}
+```
+
+#### list-viewports
+
+Returns all available editor viewports with their positions and view types.
+
+**Request:** `POST /api/list-viewports`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 4,
+  "viewports": [
+    {
+      "index": 0,
+      "isActive": false,
+      "isRealtime": false,
+      "x": -1215.38,
+      "y": 18.71,
+      "z": 285.17,
+      "pitch": 0,
+      "yaw": 0,
+      "roll": 0,
+      "fov": 90,
+      "viewType": "Right"
+    },
+    {
+      "index": 1,
+      "isActive": true,
+      "isRealtime": false,
+      "viewType": "Perspective"
+    }
+  ]
+}
+```
+
+#### get-selection
+
+Returns the currently selected actors in the editor with their transforms.
+
+**Request:** `POST /api/get-selection`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 1,
+  "selected": [
+    {
+      "name": "1M_Cube10_0",
+      "label": "Table",
+      "class": "StaticMeshActor",
+      "x": 193.41,
+      "y": 262.10,
+      "z": 0,
+      "pitch": 0,
+      "yaw": 50.0,
+      "roll": 0
+    }
+  ]
+}
+```
 
 ### Validation and Safety
 
