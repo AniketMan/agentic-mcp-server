@@ -175,6 +175,15 @@ private:
 	FString HandleSnapshotGraph(const FString& Body);
 	FString HandleRestoreGraph(const FString& Body);
 
+	// ---- VisualAgent automation handlers (Handlers_VisualAgent.cpp) ----
+	FString HandleSceneSnapshot(const FString& Body);
+	FString HandleScreenshot(const FString& Body);
+	FString HandleFocusActor(const FString& Body);
+	FString HandleSelectActor(const FString& Body);
+	FString HandleSetViewport(const FString& Body);
+	FString HandleWaitReady(const FString& Body);
+	FString HandleResolveRef(const FString& Body);
+
 	// ============================================================
 	// Serialization helpers
 	// ============================================================

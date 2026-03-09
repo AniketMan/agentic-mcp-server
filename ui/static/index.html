@@ -2301,7 +2301,7 @@ async function renderProject(c) {
 /* =========================================================================
    Helpers
    ========================================================================= */
-function esc(s) { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s) { if (s == null) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 function trunc(s, n) { return s && s.length > n ? s.slice(0, n - 3) + '...' : (s || ''); }
 function fmtBytes(b) {
   if (!b) return '0 B';

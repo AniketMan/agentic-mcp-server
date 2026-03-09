@@ -679,7 +679,13 @@ class K2NodeInjector:
         class_name = parts[1]    # "K2Node_CustomEvent"
 
         # Find or add the class import
-        class_import_idx = self.af.find_or_add_import(package_path, class_name)
+        # Signature: find_or_add_import(class_package, class_name, object_name, outer_index=0)
+        class_import_idx = self.af.find_or_add_import(
+            class_package=package_path,
+            class_name="Class",  # The class of the import is "Class"
+            object_name=class_name,
+            outer_index=0
+        )
 
         # Find the EventGraph export to use as outer
         # The EventGraph is typically a child of the LevelScriptBlueprint
@@ -688,11 +694,15 @@ class K2NodeInjector:
         outer_idx = self._find_event_graph_outer()
 
         # Create the export
-        export_idx = self.af.add_export(
-            class_import_idx=class_import_idx,
-            outer_export_idx=outer_idx,
+        # Signature: add_export(object_name, class_index, outer_index=0, template_index=0, object_flags=...)
+        export_pkg_idx = self.af.add_export(
             object_name=node['name'],
+            class_index=class_import_idx,
+            outer_index=outer_idx,
+            template_index=0,
         )
+        # add_export returns FPackageIndex (1-based), convert to 0-based export index
+        export_idx = export_pkg_idx - 1
 
         # Set tagged properties (NodePosX, NodePosY, NodeGuid, etc.)
         # These go into the export's Data[] array (handled by UAssetAPI)

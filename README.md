@@ -8,16 +8,17 @@
 
 1. [Architecture Overview](#architecture-overview)
 2. [Quick Start](#quick-start)
-3. [Component Reference](#component-reference)
-4. [API Reference](#api-reference)
-5. [Script Generator Reference](#script-generator-reference)
-6. [JarvisEditor C++ Plugin](#jarviseditor-c-plugin)
-7. [Project Scanner Reference](#project-scanner-reference)
-8. [Plugin Validator Reference](#plugin-validator-reference)
-9. [Dashboard Views](#dashboard-views)
-10. [K2 Node Name Resolution](#k2-node-name-resolution)
-11. [UE 5.6 Compatibility](#ue-56-compatibility)
-12. [Troubleshooting](#troubleshooting)
+3. [VisualAgent CLI](#visualagent-cli)
+4. [Component Reference](#component-reference)
+5. [API Reference](#api-reference)
+6. [Script Generator Reference](#script-generator-reference)
+7. [JarvisEditor C++ Plugin](#jarviseditor-c-plugin)
+8. [Project Scanner Reference](#project-scanner-reference)
+9. [Plugin Validator Reference](#plugin-validator-reference)
+10. [Dashboard Views](#dashboard-views)
+11. [K2 Node Name Resolution](#k2-node-name-resolution)
+12. [UE 5.6 Compatibility](#ue-56-compatibility)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -127,6 +128,62 @@ curl -X POST http://localhost:8080/api/load-multiple \
 
 ---
 
+## VisualAgent CLI
+
+VisualAgent is a unified CLI tool for visual automation of Unreal Engine 5, similar to Playwright for web browsers. It provides scene hierarchy snapshots with short refs (like accessibility trees), on-demand viewport screenshots, and a rich command vocabulary for AI agents.
+
+### Key Features
+
+- **Scene Snapshots**: Hierarchical actor tree with short refs (`a0`, `a1.c0`) like accessibility trees
+- **On-Demand Screenshots**: GPU-friendly design - screenshots only when explicitly requested
+- **Auto-Screenshot Mode**: Toggle automatic screenshots after visual actions (spawn, move, rotate, delete, camera, focus)
+- **Recording System**: Record and replay automation sessions
+- **Short Refs**: Use `a0`, `a1.c2` instead of full actor names
+
+### Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `snapshot` | Get scene hierarchy with short refs | `snapshot --classFilter=Light` |
+| `screenshot` | Capture viewport screenshot | `screenshot --format=png --width=1920` |
+| `auto-screenshot` | Toggle auto-screenshot mode | `auto-screenshot on` |
+| `focus` | Move camera to actor | `focus a0` |
+| `select` | Select actor in editor | `select a1 --add` |
+| `spawn` | Spawn new actor | `spawn PointLight 100 200 300 --label="MyLight"` |
+| `move` | Move actor to position | `move a0 500 0 100` |
+| `rotate` | Rotate actor | `rotate a0 0 45 0` |
+| `delete` | Delete actor | `delete a3` |
+| `camera` | Set viewport camera | `camera 0 0 500 -45 0 0` |
+| `query` | Query actors by class | `query StaticMeshActor` |
+| `wait` | Wait for condition | `wait assets` |
+| `ref` | Resolve short ref to name | `ref a0` |
+| `record` | Recording control | `record start`, `record stop`, `record play` |
+| `help` | Show help | `help` |
+
+### Screenshot Behavior
+
+Screenshots are **off by default** to be GPU-friendly:
+
+1. **Explicit**: Use `screenshot` command to capture viewport
+2. **Per-Command**: Add `--screenshot` flag to any command
+3. **Auto Mode**: Enable with `auto-screenshot on` - captures after visual actions (spawn, move, rotate, delete, camera, focus, navigate)
+
+### C++ Backend Endpoints
+
+VisualAgent is powered by these C++ handlers in `Handlers_VisualAgent.cpp`:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/scene-snapshot` | Get hierarchical scene tree with short refs |
+| `/api/screenshot` | Capture viewport using UE's built-in screenshot tools |
+| `/api/focus-actor` | Move editor camera to focus on actor |
+| `/api/select-actor` | Select actor(s) in editor |
+| `/api/set-viewport` | Set camera position and rotation |
+| `/api/wait-ready` | Wait for assets/compile/render to complete |
+| `/api/resolve-ref` | Resolve short ref to actor/component name |
+
+---
+
 ## Component Reference
 
 ### File Inventory
@@ -140,9 +197,15 @@ curl -X POST http://localhost:8080/api/load-multiple \
 | `core/plugin_validator.py` | ~710 | `.uplugin` descriptor validation with 6-phase checks, scoring, and actionable suggestions. |
 | `core/project_scanner.py` | ~815 | Full project scanning — `.uproject` parsing, asset registry, level scanning, dependency resolution, source code analysis, config extraction. |
 | `core/script_generator.py` | ~1410 | Generates runnable `unreal` Python scripts across 10 domains and 45+ operations. |
+| `core/security.py` | ~250 | Input validation, path traversal prevention, XSS sanitization for server endpoints. |
+| `core/cache.py` | ~200 | LRU caching with TTL support for asset parsing results. |
+| `core/perforce.py` | ~300 | Perforce integration for source control operations. |
 | `core/cli.py` | ~150 | Command-line interface for direct operation. |
 | `ui/server.py` | ~600 | Flask REST API server with 25+ endpoints. |
 | `ui/static/index.html` | ~2200 | Single-page dashboard application with 10 views. |
+| `AgenticMCP/Tools/visual-agent.js` | ~590 | VisualAgent unified CLI tool for visual automation. |
+| `AgenticMCP/Tools/index.js` | ~300 | MCP server with tool registration and routing. |
+| `AgenticMCP/Source/.../Handlers_VisualAgent.cpp` | ~770 | C++ handlers for VisualAgent scene snapshot, screenshot, camera control. |
 | `ue_plugin/JarvisEditor/` | ~900 | C++ editor plugin for Blueprint graph manipulation (12 functions). |
 | `setup.sh` | ~80 | Bootstrap script for automated environment setup. |
 | `run_dashboard.py` | ~30 | Server launcher script. |

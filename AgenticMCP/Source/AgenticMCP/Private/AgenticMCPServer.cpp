@@ -895,6 +895,36 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleRestoreGraph(Body);
 	});
+
+	// ---- VisualAgent Automation ----
+	HandlerMap.Add(TEXT("sceneSnapshot"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSceneSnapshot(Body);
+	});
+	HandlerMap.Add(TEXT("screenshot"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleScreenshot(Body);
+	});
+	HandlerMap.Add(TEXT("focusActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleFocusActor(Body);
+	});
+	HandlerMap.Add(TEXT("selectActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSelectActor(Body);
+	});
+	HandlerMap.Add(TEXT("setViewport"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetViewport(Body);
+	});
+	HandlerMap.Add(TEXT("waitReady"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleWaitReady(Body);
+	});
+	HandlerMap.Add(TEXT("resolveRef"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleResolveRef(Body);
+	});
 }
 
 // ============================================================

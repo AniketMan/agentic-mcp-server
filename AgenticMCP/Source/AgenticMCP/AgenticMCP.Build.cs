@@ -35,7 +35,8 @@ public class AgenticMCP : ModuleRules
 			"EditorSubsystem",    // UEditorSubsystem base class
 			"LevelEditor",        // Level management APIs
 			"Landscape",          // Landscape actor support
-			"RHI"                 // Render hardware interface (for nullrhi commandlet)
+			"RHI",                // Render hardware interface (for nullrhi commandlet)
+			"ImageWrapper"        // PNG/JPEG compression for screenshots
 		});
 	}
 }

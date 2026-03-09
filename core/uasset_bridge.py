@@ -936,7 +936,9 @@ class AssetFile:
 
     def save(self, output_path: Optional[str] = None,
              create_backup: bool = True,
-             validate_first: bool = True) -> Path:
+             validate_first: bool = True,
+             allowed_base: Optional[str] = None,
+             p4_checkout: bool = True) -> Path:
         """
         Save the modified asset to disk.
 
@@ -944,13 +946,19 @@ class AssetFile:
             output_path:    Where to save. If None, overwrites the original.
             create_backup:  If True, backs up the original before overwriting.
             validate_first: If True, runs validate() and raises on ERROR-level issues.
+            allowed_base:   Base directory for path validation. If None, uses
+                           the original file's directory.
+            p4_checkout:    If True, automatically checkout from Perforce if needed.
 
         Returns:
             Path to the saved file.
 
         Raises:
             AssetValidationError if validate_first=True and errors are found.
+            PathTraversalError if output_path is outside allowed_base.
         """
+        from .security import validate_output_path, ALLOWED_ASSET_EXTENSIONS, PathTraversalError
+
         # Pre-save validation
         if validate_first:
             issues = self.validate()
@@ -965,8 +973,27 @@ class AssetFile:
             output_path = str(self.filepath)
             if create_backup:
                 self.backup()
+            out = Path(output_path).resolve()
+        else:
+            # Validate output path to prevent path traversal
+            base = allowed_base if allowed_base else str(self.filepath.parent)
+            out = validate_output_path(
+                output_path,
+                allowed_base=base,
+                allowed_extensions=ALLOWED_ASSET_EXTENSIONS
+            )
+            if create_backup and out == self.filepath:
+                self.backup()
 
-        out = Path(output_path).resolve()
+        # Perforce checkout if needed
+        if p4_checkout:
+            try:
+                from .perforce import checkout_for_edit
+                checkout_for_edit(out)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"P4 checkout skipped: {e}")
+
         try:
             self._asset.Write(str(out))
         except Exception as e:

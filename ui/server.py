@@ -11,23 +11,116 @@ Provides a REST API and serves the web UI for:
 
 All endpoints return JSON. The frontend is a single-page app
 served from static files.
+
+SECURITY:
+  - Path validation prevents directory traversal
+  - Stack traces are logged, not exposed to clients
+  - Security headers are added to all responses
 """
 
 import os
 import sys
 import json
-import traceback
+import logging
 from pathlib import Path
+from functools import wraps
 from flask import Flask, jsonify, request, send_from_directory, abort
 
 # Ensure core module is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Security Utilities
+# =============================================================================
+
+class PathValidationError(Exception):
+    """Raised when path validation fails."""
+    pass
+
+
+def validate_file_path(user_path: str, allowed_base: str = None,
+                       allowed_extensions: set = None) -> Path:
+    """
+    Validate a user-provided file path.
+
+    Args:
+        user_path: User-provided path string
+        allowed_base: Base directory that paths must be under (optional)
+        allowed_extensions: Set of allowed extensions (e.g., {'.umap', '.uasset'})
+
+    Returns:
+        Validated Path object
+
+    Raises:
+        PathValidationError: If validation fails
+    """
+    if not user_path:
+        raise PathValidationError("Path is required")
+
+    # Normalize and check for traversal
+    if '..' in user_path:
+        logger.warning(f"Path traversal attempt: {user_path}")
+        raise PathValidationError("Path traversal not allowed")
+
+    try:
+        resolved = Path(user_path).resolve()
+    except Exception as e:
+        raise PathValidationError(f"Invalid path: {e}")
+
+    # Check base directory constraint
+    if allowed_base:
+        base_resolved = Path(allowed_base).resolve()
+        try:
+            resolved.relative_to(base_resolved)
+        except ValueError:
+            logger.warning(f"Path outside allowed base: {resolved}")
+            raise PathValidationError("Path outside allowed directory")
+
+    # Check extension
+    if allowed_extensions:
+        ext = resolved.suffix.lower()
+        if ext not in allowed_extensions:
+            raise PathValidationError(f"Extension '{ext}' not allowed")
+
+    return resolved
+
+
+def safe_error_response(error_msg: str, status_code: int = 500):
+    """Create a safe error response without exposing internal details."""
+    return jsonify({"error": error_msg}), status_code
+
+
+def handle_errors(f):
+    """Decorator to handle exceptions and return safe error responses."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except PathValidationError as e:
+            return safe_error_response(str(e), 400)
+        except FileNotFoundError as e:
+            return safe_error_response("File not found", 404)
+        except ValueError as e:
+            return safe_error_response(str(e), 400)
+        except Exception as e:
+            # Log the full traceback server-side
+            logger.exception(f"Error in {f.__name__}: {e}")
+            # Return generic error to client
+            return safe_error_response("Internal server error", 500)
+    return decorated
+
+
+ALLOWED_ASSET_EXTENSIONS = {'.umap', '.uasset', '.uexp'}
+
 
 def create_app(filepath: str = None, engine_version: str = "5.6"):
     """
     Create and configure the Flask application.
-    
+
     Args:
         filepath: Path to the .uasset/.umap file to edit
         engine_version: UE version string
@@ -37,6 +130,12 @@ def create_app(filepath: str = None, engine_version: str = "5.6"):
         static_folder=str(Path(__file__).parent / "static"),
         static_url_path="/static"
     )
+
+    # Security: Set secret key for sessions (even if not using sessions)
+    app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(32))
+
+    # Security: Disable debug mode in production
+    app.debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
     # Store state
     app.config["ASSET_FILE"] = None
@@ -48,6 +147,16 @@ def create_app(filepath: str = None, engine_version: str = "5.6"):
     app.config["LOADED_LEVELS"] = {}  # filepath -> {asset, editor, inspector, summary}
     # Plugin validation state
     app.config["LOADED_PLUGINS"] = {}  # path -> PluginReport dict
+
+    # Security: Add security headers to all responses
+    @app.after_request
+    def add_security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
+        return response
 
     if filepath:
         _load_asset(app, filepath, engine_version)
@@ -728,7 +837,7 @@ def create_app(filepath: str = None, engine_version: str = "5.6"):
         """[LOCAL-ONLY] Generate a UE5.6 Python script for a given operation.
         WARNING: This endpoint is for Workflow B only. Manus agents must use
         the /api/write/* endpoints for direct binary editing instead.
-        
+
         Body: {"domain": "actors", "method": "spawn", "params": {"actor_class": "StaticMeshActor"}}
         OR:   {"operation": "actors.spawn", "params": {"actor_class": "StaticMeshActor"}}
         """

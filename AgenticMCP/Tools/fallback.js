@@ -15,7 +15,7 @@
 
 import { execFile } from "child_process";
 import { existsSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, resolve, normalize, isAbsolute } from "path";
 import { fileURLToPath } from "url";
 import { log } from "./lib.js";
 
@@ -24,6 +24,76 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Path to the Python core module (relative to AgenticMCP/Tools/)
 const CORE_DIR = join(__dirname, "..", "..", "core");
 const CLI_PATH = join(CORE_DIR, "cli.py");
+
+// ---------------------------------------------------------------------------
+// Security: Path validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate and sanitize a user-provided path.
+ * Prevents path traversal attacks and ensures paths are within allowed boundaries.
+ *
+ * @param {string} userPath - User-provided path
+ * @param {string} allowedRoot - Root directory that paths must be under
+ * @returns {string} - Validated absolute path
+ * @throws {Error} - If path is invalid or outside allowed directory
+ */
+function validatePath(userPath, allowedRoot) {
+  if (!userPath || typeof userPath !== "string") {
+    throw new Error("Path is required and must be a string");
+  }
+
+  // Normalize to prevent ../ traversal
+  const normalized = normalize(userPath);
+
+  // Check for explicit path traversal attempts
+  if (normalized.includes("..")) {
+    log.error("Path traversal attempt blocked", { path: userPath });
+    throw new Error("Path traversal not allowed");
+  }
+
+  // Resolve to absolute path
+  let resolved;
+  if (isAbsolute(normalized)) {
+    resolved = normalize(normalized);
+  } else if (allowedRoot) {
+    resolved = resolve(allowedRoot, normalized);
+  } else {
+    throw new Error("Relative paths require an allowed root directory");
+  }
+
+  // Ensure path is under allowed root
+  if (allowedRoot) {
+    const resolvedRoot = resolve(allowedRoot);
+    if (!resolved.startsWith(resolvedRoot)) {
+      log.error("Path outside allowed directory", {
+        path: resolved,
+        allowed: resolvedRoot
+      });
+      throw new Error(`Path must be under ${resolvedRoot}`);
+    }
+  }
+
+  return resolved;
+}
+
+/**
+ * Validate that a path has an allowed extension.
+ *
+ * @param {string} filePath - Path to validate
+ * @param {string[]} allowedExtensions - List of allowed extensions (e.g., [".umap", ".uasset"])
+ * @throws {Error} - If extension is not allowed
+ */
+function validateExtension(filePath, allowedExtensions) {
+  const ext = filePath.toLowerCase().split(".").pop();
+  const normalizedExt = "." + ext;
+
+  if (!allowedExtensions.includes(normalizedExt)) {
+    throw new Error(`File extension '${normalizedExt}' not allowed. Allowed: ${allowedExtensions.join(", ")}`);
+  }
+}
+
+const ALLOWED_ASSET_EXTENSIONS = [".umap", ".uasset", ".uexp"];
 
 // ---------------------------------------------------------------------------
 // Fallback tool definitions
@@ -204,8 +274,18 @@ export async function executeFallbackTool(toolName, args, projectRoot) {
     };
   }
 
-  // Map tool names to CLI commands
-  const cliArgs = mapToolToCLIArgs(toolName, args);
+  // Map tool names to CLI commands with path validation
+  let cliArgs;
+  try {
+    cliArgs = mapToolToCLIArgs(toolName, args, projectRoot);
+  } catch (error) {
+    log.error("Path validation failed", { tool: toolName, error: error.message });
+    return {
+      success: false,
+      message: `Security validation failed: ${error.message}`,
+    };
+  }
+
   if (!cliArgs) {
     return {
       success: false,
@@ -249,39 +329,83 @@ export async function executeFallbackTool(toolName, args, projectRoot) {
  * Convert tool name and arguments to CLI command arguments.
  * @param {string} toolName - Tool name
  * @param {object} args - Tool arguments
+ * @param {string} projectRoot - Project root for path validation
  * @returns {string[]|null} CLI arguments array, or null if mapping fails
  */
-function mapToolToCLIArgs(toolName, args) {
-  switch (toolName) {
-    case "offline_list_levels":
-      return ["scan", args.contentPath || "."];
+function mapToolToCLIArgs(toolName, args, projectRoot) {
+  // Validate paths for all tools that accept file paths
+  const validateAndResolvePath = (pathArg, requireExtension = true) => {
+    const validated = validatePath(pathArg, projectRoot || "/");
+    if (requireExtension) {
+      validateExtension(validated, ALLOWED_ASSET_EXTENSIONS);
+    }
+    return validated;
+  };
 
-    case "offline_list_actors":
+  switch (toolName) {
+    case "offline_list_levels": {
+      const contentPath = args.contentPath
+        ? validatePath(args.contentPath, projectRoot || "/")
+        : ".";
+      return ["scan", contentPath];
+    }
+
+    case "offline_list_actors": {
+      const umapPath = validateAndResolvePath(args.umapPath);
       return [
         "actors",
-        args.umapPath,
+        umapPath,
         ...(args.classFilter ? ["--filter", args.classFilter] : []),
       ];
+    }
 
-    case "offline_get_actor":
-      return ["props", args.umapPath, args.actorName];
+    case "offline_get_actor": {
+      const umapPath = validateAndResolvePath(args.umapPath);
+      // Sanitize actor name - only allow alphanumeric, underscore, hyphen
+      const actorName = args.actorName?.replace(/[^a-zA-Z0-9_\-]/g, "");
+      if (!actorName) {
+        throw new Error("Invalid actor name");
+      }
+      return ["props", umapPath, actorName];
+    }
 
-    case "offline_get_graph":
+    case "offline_get_graph": {
+      const umapPath = validateAndResolvePath(args.umapPath);
       return [
         "functions",
-        args.umapPath,
+        umapPath,
         ...(args.graphName ? ["--graph", args.graphName] : []),
       ];
+    }
 
-    case "offline_level_info":
-      return ["info", args.umapPath];
+    case "offline_level_info": {
+      const umapPath = validateAndResolvePath(args.umapPath);
+      return ["info", umapPath];
+    }
 
-    case "offline_generate_paste_text":
+    case "offline_generate_paste_text": {
+      // Validate pattern is a known value
+      const allowedPatterns = ["teleport_listener", "story_step_broadcast", "begin_play_chain", "multigate"];
+      if (!allowedPatterns.includes(args.pattern)) {
+        throw new Error(`Unknown pattern: ${args.pattern}. Allowed: ${allowedPatterns.join(", ")}`);
+      }
+
+      // Sanitize params - limit depth and size to prevent DoS
+      let paramsStr = null;
+      if (args.params) {
+        const paramsJson = JSON.stringify(args.params);
+        if (paramsJson.length > 10000) {
+          throw new Error("Params too large (max 10KB)");
+        }
+        paramsStr = paramsJson;
+      }
+
       return [
         "paste-text",
         args.pattern,
-        ...(args.params ? ["--params", JSON.stringify(args.params)] : []),
+        ...(paramsStr ? ["--params", paramsStr] : []),
       ];
+    }
 
     default:
       return null;

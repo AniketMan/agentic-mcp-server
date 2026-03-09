@@ -13,7 +13,183 @@ export const log = {
   info: (msg, data) => console.error(`[INFO] ${msg}`, data ? JSON.stringify(data) : ""),
   error: (msg, data) => console.error(`[ERROR] ${msg}`, data ? JSON.stringify(data) : ""),
   debug: (msg, data) => process.env.DEBUG && console.error(`[DEBUG] ${msg}`, data ? JSON.stringify(data) : ""),
+  warn: (msg, data) => console.error(`[WARN] ${msg}`, data ? JSON.stringify(data) : ""),
 };
+
+// ---------------------------------------------------------------------------
+// Retry and Reconnection Configuration
+// ---------------------------------------------------------------------------
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+  jitterFactor: 0.1,
+};
+
+/**
+ * Calculate delay with exponential backoff and jitter
+ * @param {number} attempt - Current attempt number (0-indexed)
+ * @param {object} config - Retry configuration
+ */
+function calculateBackoff(attempt, config = RETRY_CONFIG) {
+  const baseDelay = Math.min(
+    config.initialDelayMs * Math.pow(config.backoffMultiplier, attempt),
+    config.maxDelayMs
+  );
+  const jitter = baseDelay * config.jitterFactor * (Math.random() * 2 - 1);
+  return Math.floor(baseDelay + jitter);
+}
+
+/**
+ * Retry a function with exponential backoff
+ * @param {function} fn - Async function to retry
+ * @param {object} options - Retry options
+ * @param {number} options.maxRetries - Maximum retry attempts
+ * @param {function} options.shouldRetry - Function to determine if error is retryable
+ * @param {function} options.onRetry - Callback on each retry
+ */
+export async function withRetry(fn, options = {}) {
+  const {
+    maxRetries = RETRY_CONFIG.maxRetries,
+    shouldRetry = (error) => isRetryableError(error),
+    onRetry = null,
+  } = options;
+
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= maxRetries || !shouldRetry(error)) {
+        throw error;
+      }
+
+      const delayMs = calculateBackoff(attempt);
+      log.debug("Retrying after error", {
+        attempt: attempt + 1,
+        maxRetries,
+        delayMs,
+        error: error.message,
+      });
+
+      if (onRetry) {
+        onRetry({ attempt: attempt + 1, error, delayMs });
+      }
+
+      await sleep(delayMs);
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Check if an error is retryable (transient network issues)
+ * @param {Error} error - The error to check
+ */
+export function isRetryableError(error) {
+  if (error.name === "AbortError") return true;
+  if (error.code === "ECONNREFUSED") return true;
+  if (error.code === "ECONNRESET") return true;
+  if (error.code === "ETIMEDOUT") return true;
+  if (error.code === "ENOTFOUND") return false;
+  if (error.message?.includes("fetch failed")) return true;
+  if (error.message?.includes("network")) return true;
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Connection Health Manager
+// ---------------------------------------------------------------------------
+class ConnectionManager {
+  constructor() {
+    this.connected = false;
+    this.lastCheck = 0;
+    this.consecutiveFailures = 0;
+    this.healthCheckIntervalMs = 30000;
+    this.healthCheckTimer = null;
+    this.listeners = new Set();
+  }
+
+  onConnectionChange(callback) {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  notifyListeners(connected, reason) {
+    for (const listener of this.listeners) {
+      try {
+        listener({ connected, reason });
+      } catch (e) {
+        log.error("Connection listener error", { error: e.message });
+      }
+    }
+  }
+
+  updateStatus(connected, reason = null) {
+    const wasConnected = this.connected;
+    this.connected = connected;
+    this.lastCheck = Date.now();
+
+    if (connected) {
+      this.consecutiveFailures = 0;
+    } else {
+      this.consecutiveFailures++;
+    }
+
+    if (wasConnected !== connected) {
+      log.info("Connection status changed", {
+        connected,
+        reason,
+        consecutiveFailures: this.consecutiveFailures
+      });
+      this.notifyListeners(connected, reason);
+    }
+  }
+
+  shouldAttemptReconnect() {
+    if (this.consecutiveFailures >= 10) {
+      return false;
+    }
+    return true;
+  }
+
+  startHealthCheck(checkFn, intervalMs = 30000) {
+    this.healthCheckIntervalMs = intervalMs;
+    this.stopHealthCheck();
+
+    this.healthCheckTimer = setInterval(async () => {
+      try {
+        const result = await checkFn();
+        this.updateStatus(result.connected, result.reason);
+      } catch (error) {
+        this.updateStatus(false, error.message);
+      }
+    }, intervalMs);
+
+    log.debug("Health check started", { intervalMs });
+  }
+
+  stopHealthCheck() {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
+  }
+
+  getStatus() {
+    return {
+      connected: this.connected,
+      lastCheck: this.lastCheck,
+      consecutiveFailures: this.consecutiveFailures,
+      shouldReconnect: this.shouldAttemptReconnect(),
+    };
+  }
+}
+
+export const connectionManager = new ConnectionManager();
 
 /**
  * Fetch with timeout using AbortController
@@ -37,38 +213,54 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 }
 
 /**
- * Fetch tools from the Unreal HTTP server
+ * Fetch tools from the Unreal HTTP server with retry support
  * @param {string} baseUrl - Unreal MCP server base URL
  * @param {number} timeoutMs - request timeout in milliseconds
  */
 export async function fetchUnrealTools(baseUrl, timeoutMs) {
-  try {
+  const execute = async () => {
     const response = await fetchWithTimeout(`${baseUrl}/mcp/tools`, {}, timeoutMs);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     const data = await response.json();
+    connectionManager.updateStatus(true);
     return data.tools || [];
+  };
+
+  try {
+    return await withRetry(execute, {
+      maxRetries: 2,
+      onRetry: ({ attempt, delayMs }) => {
+        log.warn("Retrying tools fetch", { attempt, delayMs });
+      },
+    });
   } catch (error) {
     if (error.name === "AbortError") {
       log.error("Request timeout fetching tools", { url: `${baseUrl}/mcp/tools` });
     } else {
       log.error("Failed to fetch tools from Unreal", { error: error.message });
     }
+    connectionManager.updateStatus(false, error.message);
     return [];
   }
 }
 
 /**
- * Execute a tool via the Unreal HTTP server
+ * Execute a tool via the Unreal HTTP server with retry support
  * @param {string} baseUrl - Unreal MCP server base URL
  * @param {number} timeoutMs - request timeout in milliseconds
  * @param {string} toolName - name of the tool to execute
  * @param {object} args - tool arguments
+ * @param {object} options - additional options
+ * @param {boolean} options.retry - enable retry with backoff (default: true)
+ * @param {number} options.maxRetries - max retry attempts (default: 3)
  */
-export async function executeUnrealTool(baseUrl, timeoutMs, toolName, args) {
+export async function executeUnrealTool(baseUrl, timeoutMs, toolName, args, options = {}) {
+  const { retry = true, maxRetries = 3 } = options;
   const url = `${baseUrl}/mcp/tool/${toolName}`;
-  try {
+
+  const execute = async () => {
     const response = await fetchWithTimeout(url, {
       method: "POST",
       headers: {
@@ -79,12 +271,29 @@ export async function executeUnrealTool(baseUrl, timeoutMs, toolName, args) {
 
     const data = await response.json();
     log.debug("Tool executed", { tool: toolName, success: data.success });
+
+    connectionManager.updateStatus(true);
     return data;
+  };
+
+  try {
+    if (retry) {
+      return await withRetry(execute, {
+        maxRetries,
+        onRetry: ({ attempt, delayMs }) => {
+          log.warn("Retrying tool execution", { tool: toolName, attempt, delayMs });
+        },
+      });
+    }
+    return await execute();
   } catch (error) {
     const errorMessage = error.name === "AbortError"
       ? `Request timeout after ${timeoutMs}ms`
       : error.message;
+
+    connectionManager.updateStatus(false, errorMessage);
     log.error("Tool execution failed", { tool: toolName, error: errorMessage });
+
     return {
       success: false,
       message: `Failed to execute tool: ${errorMessage}`,
@@ -93,20 +302,32 @@ export async function executeUnrealTool(baseUrl, timeoutMs, toolName, args) {
 }
 
 /**
- * Check if Unreal Editor is running with the plugin
+ * Check if Unreal Editor is running with the plugin (with retry for transient failures)
  * @param {string} baseUrl - Unreal MCP server base URL
  * @param {number} timeoutMs - request timeout in milliseconds
  */
 export async function checkUnrealConnection(baseUrl, timeoutMs) {
-  try {
+  const execute = async () => {
     const response = await fetchWithTimeout(`${baseUrl}/mcp/status`, {}, timeoutMs);
     if (response.ok) {
       const data = await response.json();
+      connectionManager.updateStatus(true);
       return { connected: true, ...data };
     }
-    return { connected: false, reason: `HTTP ${response.status}` };
+    throw new Error(`HTTP ${response.status}`);
+  };
+
+  try {
+    return await withRetry(execute, {
+      maxRetries: 2,
+      shouldRetry: (error) => {
+        if (error.code === "ECONNREFUSED") return false;
+        return isRetryableError(error);
+      },
+    });
   } catch (error) {
     const reason = error.name === "AbortError" ? "timeout" : error.message;
+    connectionManager.updateStatus(false, reason);
     return { connected: false, reason };
   }
 }

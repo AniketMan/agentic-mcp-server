@@ -50,6 +50,7 @@ import {
   checkUnrealConnection as _checkUnrealConnection,
   convertToMCPSchema,
   convertAnnotations,
+  connectionManager,
 } from "./lib.js";
 
 // Offline fallback via Python binary injector
@@ -58,6 +59,12 @@ import {
   executeFallbackTool,
   FALLBACK_TOOLS,
 } from "./fallback.js";
+
+// VisualAgent unified CLI tool
+import {
+  VISUALAGENT_TOOL_DEFINITION,
+  executeVisualAgentCommand,
+} from "./visual-agent.js";
 
 // ---------------------------------------------------------------------------
 // Configuration with defaults
@@ -182,6 +189,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     },
   });
 
+  // VisualAgent unified CLI tool (only when editor is connected)
+  if (editorConnected) {
+    mcpTools.push({
+      name: `unreal_${VISUALAGENT_TOOL_DEFINITION.name}`,
+      description: VISUALAGENT_TOOL_DEFINITION.description,
+      inputSchema: VISUALAGENT_TOOL_DEFINITION.inputSchema,
+      annotations: VISUALAGENT_TOOL_DEFINITION.annotations,
+    });
+  }
+
   log.info("Tools listed", {
     count: mcpTools.length,
     editorConnected,
@@ -216,6 +233,56 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   const toolName = name.substring(7); // strip "unreal_" prefix
+
+  // ---- VisualAgent unified CLI ----
+  if (toolName === "cli") {
+    if (!editorConnected) {
+      return {
+        content: [{ type: "text", text: "unreal_cli requires Unreal Editor to be connected." }],
+        isError: true,
+      };
+    }
+
+    const commandStr = args?.command || "";
+
+    // Create HTTP client wrapper for VisualAgent commands
+    const httpClient = async (endpoint, params) => {
+      return await _executeUnrealTool(CONFIG.unrealMcpUrl, CONFIG.requestTimeoutMs, endpoint, params);
+    };
+
+    const result = await executeVisualAgentCommand(commandStr, httpClient, {
+      includeSnapshot: true,
+    });
+
+    // Build response content
+    const content = [];
+
+    // Main result text
+    let resultText = result.message || JSON.stringify(result, null, 2);
+    content.push({ type: "text", text: resultText });
+
+    // If screenshot was taken, include as image
+    if (result.data && result.mimeType) {
+      content.push({
+        type: "image",
+        data: result.data,
+        mimeType: result.mimeType,
+      });
+    }
+
+    // If scene snapshot was auto-appended, include it
+    if (result._sceneSnapshot) {
+      content.push({
+        type: "text",
+        text: `\n## Scene Snapshot (${result._actorCount} actors)\n\`\`\`yaml\n${result._sceneSnapshot}\`\`\``,
+      });
+    }
+
+    return {
+      content,
+      isError: result.success === false,
+    };
+  }
 
   // ---- Route to appropriate path ----
   let result;
@@ -421,6 +488,24 @@ async function handleStatusRequest() {
 // ---------------------------------------------------------------------------
 // Start the server
 // ---------------------------------------------------------------------------
+
+// Global error handlers for unhandled rejections and exceptions
+process.on('unhandledRejection', (reason, promise) => {
+  log.error('Unhandled Promise Rejection', {
+    reason: reason?.message || String(reason),
+    stack: reason?.stack
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  log.error('Uncaught Exception', {
+    error: error.message,
+    stack: error.stack
+  });
+  // Give time to flush logs before exiting
+  setTimeout(() => process.exit(1), 100);
+});
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -431,6 +516,29 @@ async function main() {
     ? `OK (${categories.length} categories loaded)`
     : "FAILED";
 
+  // Start health check monitoring
+  connectionManager.onConnectionChange(({ connected, reason }) => {
+    if (connected) {
+      log.info("Editor reconnected");
+      editorConnected = true;
+    } else {
+      log.warn("Editor disconnected", { reason });
+      editorConnected = false;
+    }
+  });
+
+  // Initial connection check
+  const initialStatus = await checkUnrealConnection();
+  editorConnected = initialStatus.connected;
+
+  // Start periodic health checks (every 30 seconds)
+  if (editorConnected) {
+    connectionManager.startHealthCheck(
+      () => _checkUnrealConnection(CONFIG.unrealMcpUrl, CONFIG.requestTimeoutMs),
+      30000
+    );
+  }
+
   log.info("AgenticMCP Server started", {
     version: "2.0.0",
     unrealUrl: CONFIG.unrealMcpUrl,
@@ -440,6 +548,8 @@ async function main() {
     projectRoot: CONFIG.projectRoot || "(auto-detect)",
     contextSystem: contextStatus,
     contextCategories: categories,
+    editorConnected,
+    reconnectionEnabled: true,
   });
 }
 

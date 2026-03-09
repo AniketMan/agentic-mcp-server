@@ -28,6 +28,10 @@ Modifying it incorrectly WILL crash the engine at runtime.
 This module provides safe, validated editing operations only.
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 import logging
@@ -90,27 +94,27 @@ class BlueprintGraph:
 def _name_to_display_string(name: str, is_bool: bool = False) -> str:
     """
     Python implementation of FName::NameToDisplayString from UE 5.6.
-    
+
     Converts internal C++ names to editor-visible display names:
       - "K2_BroadcastMessage" -> "Broadcast Message"
       - "BroadcastMessage" -> "Broadcast Message"
       - "bIsEnabled" -> "Is Enabled" (when is_bool=True)
       - "OnPlayerTeleported_Event_0" -> "On Player Teleported Event 0"
       - "GameplayMessageSubsystem" -> "Gameplay Message Subsystem"
-    
+
     This matches UE's behavior exactly for the cases we encounter.
     """
     if not name:
         return ""
-    
+
     # Strip K2_ prefix (UE convention for Blueprint-exposed C++ functions)
     if name.startswith("K2_"):
         name = name[3:]
-    
+
     # Strip bool "b" prefix when applicable
     if is_bool and len(name) > 1 and name[0] == 'b' and name[1].isupper():
         name = name[1:]
-    
+
     # Build display string character by character, matching UE's algorithm:
     # Insert spaces before uppercase letters that follow lowercase letters,
     # before uppercase letters followed by lowercase (in acronym sequences),
@@ -119,7 +123,7 @@ def _name_to_display_string(name: str, is_bool: bool = False) -> str:
     prev_was_upper = False
     prev_was_underscore = False
     prev_was_digit = False
-    
+
     for i, ch in enumerate(name):
         if ch == '_':
             # Replace underscore with space (skip consecutive)
@@ -129,7 +133,7 @@ def _name_to_display_string(name: str, is_bool: bool = False) -> str:
             prev_was_upper = False
             prev_was_digit = False
             continue
-        
+
         if ch.isupper():
             # Insert space before uppercase if:
             # - Previous was lowercase: "camelCase" -> "camel Case"
@@ -152,10 +156,10 @@ def _name_to_display_string(name: str, is_bool: bool = False) -> str:
         else:
             prev_was_upper = False
             prev_was_digit = False
-        
+
         prev_was_underscore = False
         result.append(ch)
-    
+
     return ''.join(result).strip()
 
 
@@ -247,13 +251,13 @@ OPCODE_CATEGORIES = {
 def _title_call_function(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_CallFunction::GetNodeTitle — K2Node_CallFunction.cpp:601
-    
+
     Uses FName::NameToDisplayString(MemberName) as the title.
     Strips K2_ prefix. Adds target class as context line.
     """
     member_name = props.get('_MemberName', '')
     member_parent = props.get('_MemberParent', '')
-    
+
     if member_name:
         # Apply UE's NameToDisplayString — this is what the editor shows
         display = _name_to_display_string(member_name)
@@ -262,7 +266,7 @@ def _title_call_function(obj_name: str, props: Dict, af: AssetFile) -> str:
             parent_display = _name_to_display_string(member_parent)
             return f"{display}\nTarget: {parent_display}"
         return display
-    
+
     # Fallback: derive from object_name
     return _name_from_object_name(obj_name, "K2Node_CallFunction", "Call Function")
 
@@ -270,13 +274,13 @@ def _title_call_function(obj_name: str, props: Dict, af: AssetFile) -> str:
 def _title_custom_event(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_CustomEvent::GetNodeTitle — K2Node_CustomEvent.cpp:194
-    
+
     Returns CustomFunctionName directly. Full title appends "Custom Event" below.
     """
     custom_name = props.get('CustomFunctionName', '')
     if custom_name:
         return f"{custom_name}\nCustom Event"
-    
+
     # Fallback: derive from object_name
     return _name_from_object_name(obj_name, "K2Node_CustomEvent", "Custom Event")
 
@@ -284,7 +288,7 @@ def _title_custom_event(obj_name: str, props: Dict, af: AssetFile) -> str:
 def _title_get_subsystem(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_GetSubsystem::GetNodeTitle — K2Node_GetSubsystem.cpp:112
-    
+
     Returns "Get {ClassName}" where ClassName = SubsystemClass->GetDisplayNameText().
     """
     # Try to resolve SubsystemClass from properties
@@ -292,19 +296,19 @@ def _title_get_subsystem(obj_name: str, props: Dict, af: AssetFile) -> str:
     if subsystem_class:
         display = _name_to_display_string(subsystem_class)
         return f"Get {display}"
-    
+
     # Try to extract from object_name context
     context = _extract_context_from_objname(obj_name, "K2Node_GetSubsystem")
     if context:
         return f"Get {context}"
-    
+
     return "Get Subsystem"
 
 
 def _title_dynamic_cast(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_DynamicCast::GetNodeTitle — K2Node_DynamicCast.cpp:156
-    
+
     Returns "Cast To {TargetName}" where TargetName = BP name (without _C) or class name.
     """
     target_type = props.get('_TargetType', '')
@@ -313,18 +317,18 @@ def _title_dynamic_cast(obj_name: str, props: Dict, af: AssetFile) -> str:
         if target_type.endswith('_C'):
             target_type = target_type[:-2]
         return f"Cast To {target_type}"
-    
+
     context = _extract_context_from_objname(obj_name, "K2Node_DynamicCast")
     if context:
         return f"Cast To {context}"
-    
+
     return "Cast"
 
 
 def _title_break_struct(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_BreakStruct::GetNodeTitle — K2Node_BreakStruct.cpp
-    
+
     Returns "Break {StructName}" where StructName = StructType->GetDisplayNameText().
     """
     struct_type = props.get('StructType', '')
@@ -337,7 +341,7 @@ def _title_break_struct(obj_name: str, props: Dict, af: AssetFile) -> str:
 def _title_make_struct(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_MakeStruct::GetNodeTitle — K2Node_MakeStruct.cpp
-    
+
     Returns "Make {StructName}" where StructName = StructType->GetDisplayNameText().
     """
     struct_type = props.get('StructType', '')
@@ -350,63 +354,63 @@ def _title_make_struct(obj_name: str, props: Dict, af: AssetFile) -> str:
 def _title_assign_delegate(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_AssignDelegate::GetNodeTitle — K2Node_AssignDelegate.cpp:35
-    
+
     Returns "Assign {DelegateName}" from DelegateReference property.
     """
     delegate_ref = props.get('DelegateReference', '')
     if delegate_ref:
         display = _name_to_display_string(delegate_ref)
         return f"Assign {display}"
-    
+
     context = _extract_context_from_objname(obj_name, "K2Node_AssignDelegate")
     if context:
         return f"Assign {context}"
-    
+
     return "Assign Delegate"
 
 
 def _title_async_action(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_BaseAsyncTask::GetNodeTitle — K2Node_BaseAsyncTask.cpp:72
-    
+
     Returns GetUserFacingFunctionName(FactoryFunction) which applies
     NameToDisplayString to the factory function name.
     """
     factory_fn = props.get('ProxyFactoryFunctionName', '')
     if factory_fn:
         return _name_to_display_string(factory_fn)
-    
+
     # Check if the class name itself contains the action name
     # e.g., K2Node_AsyncAction_ListenForGameplayMessages
     context = _extract_context_from_objname(obj_name, "K2Node_AsyncAction")
     if context:
         return context
-    
+
     return "Async Task"
 
 
 def _title_macro_instance(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_MacroInstance::GetNodeTitle — K2Node_MacroInstance.cpp:195
-    
+
     Returns NameToDisplayString(MacroGraph->GetName()).
     e.g., "ForLoop" -> "For Loop", "Gate" -> "Gate"
     """
     macro_name = props.get('_MacroGraphName', '')
     if macro_name:
         return _name_to_display_string(macro_name)
-    
+
     context = _extract_context_from_objname(obj_name, "K2Node_MacroInstance")
     if context:
         return _name_to_display_string(context)
-    
+
     return "Macro"
 
 
 def _title_literal(obj_name: str, props: Dict, af: AssetFile) -> str:
     """
     K2Node_Literal::GetNodeTitle — K2Node_Literal.cpp:148
-    
+
     Returns Actor->GetActorLabel() or ObjectRef->GetName() or "Unknown".
     """
     obj_ref = props.get('_ObjectRef', '')
@@ -473,7 +477,7 @@ DYNAMIC_TITLE_RESOLVERS = {
 def _extract_context_from_objname(object_name: str, class_name: str) -> str:
     """
     Extract scene/context info from a K2Node object name.
-    
+
     Examples:
       K2Node_CallFunction_Scene3_PitcherComplete_Broadcast -> "Scene3 Pitcher Complete Broadcast"
       K2Node_AsyncAction_ListenForGameplayMessages_1 -> "Listen For Gameplay Messages"
@@ -484,19 +488,19 @@ def _extract_context_from_objname(object_name: str, class_name: str) -> str:
         suffix = suffix[len(class_name):]
         if suffix.startswith("_"):
             suffix = suffix[1:]
-    
+
     # If suffix is just a number or empty, no context
     if not suffix or suffix.isdigit():
         return ""
-    
+
     # Split, remove trailing numbers
     parts = suffix.split("_")
     while parts and parts[-1].isdigit():
         parts.pop()
-    
+
     if not parts:
         return ""
-    
+
     # Join and apply CamelCase splitting
     cleaned = " ".join(parts)
     cleaned = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', cleaned)
@@ -517,10 +521,10 @@ def _name_from_object_name(obj_name: str, class_name: str, fallback: str) -> str
 class BlueprintInspector:
     """
     Inspects and edits Blueprint bytecode in UE 5.6 assets.
-    
+
     Works with both standalone Blueprint assets (.uasset) and
     level Blueprint logic embedded in .umap files.
-    
+
     Name resolution uses the exact same logic as UE's GetNodeTitle()
     methods, verified against the 5.6 C++ source. Each K2Node type
     has a dedicated title resolver that matches the editor display.
@@ -537,7 +541,7 @@ class BlueprintInspector:
     def _build_k2_node_cache(self):
         """
         Scan all exports for K2Node (EdGraph node) metadata.
-        
+
         For each K2Node, extracts properties needed for title resolution:
           - FunctionReference (MemberName, MemberParent) for CallFunction
           - CustomFunctionName for CustomEvent
@@ -547,29 +551,29 @@ class BlueprintInspector:
           - SubsystemClass for GetSubsystem
           - TargetType for DynamicCast
           - MacroGraphReference for MacroInstance
-        
+
         Then applies the correct GetNodeTitle() resolver for each type.
         """
         if self._k2_nodes is not None:
             return
-        
+
         self._k2_nodes = []
         self._k2_nodes_by_export = {}
-        
+
         for i, exp in enumerate(self.af.exports):
             class_name = self.af.get_export_class_name(exp)
-            
+
             # K2Node classes are imported (negative ClassIndex)
             if not class_name.startswith("K2Node") and class_name != "EdGraph":
                 continue
-            
+
             obj_name = self.af.get_export_name(exp)
-            
+
             # Extract properties from the export for title resolution
             props = {}
             pos_x = 0
             pos_y = 0
-            
+
             if isinstance(exp, NormalExport) and exp.Data is not None:
                 for k in range(exp.Data.Count):
                     prop = exp.Data[k]
@@ -607,10 +611,10 @@ class BlueprintInspector:
                             props['EventReference'] = str(prop.Value) if hasattr(prop, 'Value') else ''
                     except Exception as e:
                         logger.debug(f"Failed to extract property '{pname}' from K2Node export {i}: {e}")
-            
+
             # --- Resolve the editor-visible title ---
             node_type = class_name.replace("K2Node_", "")
-            
+
             # Check for exact class match in AsyncAction subclasses first
             # e.g., K2Node_AsyncAction_ListenForGameplayMessages
             if class_name.startswith("K2Node_AsyncAction_"):
@@ -624,17 +628,17 @@ class BlueprintInspector:
             else:
                 # Unknown K2Node type — apply NameToDisplayString to the type
                 readable = _name_to_display_string(node_type)
-            
+
             # For VariableGet/Set, try to append the variable name
             if class_name in ("K2Node_VariableGet", "K2Node_VariableSet"):
                 var_ref = props.get('_MemberName', '')
                 if var_ref:
                     action = "Get" if class_name == "K2Node_VariableGet" else "Set"
                     readable = f"{action} {_name_to_display_string(var_ref)}"
-            
+
             # Clean up internal props before storing
             display_props = {k: v for k, v in props.items() if not k.startswith('_')}
-            
+
             info = K2NodeInfo(
                 export_index=i,
                 class_name=class_name,
@@ -645,7 +649,7 @@ class BlueprintInspector:
                 pos_y=pos_y,
                 properties=display_props,
             )
-            
+
             self._k2_nodes.append(info)
             self._k2_nodes_by_export[i] = info
             logger.debug(f"K2Node export {i}: {class_name} -> '{readable}' at ({pos_x},{pos_y})")
@@ -671,10 +675,10 @@ class BlueprintInspector:
                         member_parent = _resolve_import_name(self.af, idx)
                     except (ValueError, IndexError):
                         pass
-        
+
         props['_MemberName'] = member_name
         props['_MemberParent'] = member_parent
-        
+
         if member_parent and member_name:
             props['FunctionReference'] = f"{member_parent}::{member_name}"
         elif member_name:
@@ -735,7 +739,7 @@ class BlueprintInspector:
     def _get_display_name(self, expr, opcode_name: str) -> str:
         """
         Generate a human-readable display name for a Kismet expression.
-        
+
         Resolution priority:
           1. StackNode -> resolved import/export name (for function calls)
              Then apply NameToDisplayString for editor-matching output.
@@ -753,7 +757,7 @@ class BlueprintInspector:
                     return _name_to_display_string(resolved)
             except Exception:
                 pass
-        
+
         # --- Layer 3: FunctionName (BindDelegate, etc.) ---
         if hasattr(expr, 'FunctionName'):
             try:
@@ -770,7 +774,7 @@ class BlueprintInspector:
                     return f"Bind: {_name_to_display_string(fn)}"
             except Exception:
                 pass
-        
+
         # --- Layer 3: VirtualFunctionName ---
         if hasattr(expr, 'VirtualFunctionName'):
             try:
@@ -779,7 +783,7 @@ class BlueprintInspector:
                     return _name_to_display_string(vfn)
             except Exception:
                 pass
-        
+
         # --- Literal values ---
         name = opcode_name.replace("EX_", "")
         try:
@@ -792,13 +796,13 @@ class BlueprintInspector:
                     return f"{_name_to_display_string(name)}: {vs}"
         except Exception:
             pass
-        
+
         return _name_to_display_string(name)
 
     def _extract_properties(self, expr) -> Dict:
         """Extract readable properties from a KismetExpression, with name resolution."""
         props = {}
-        
+
         # Resolve StackNode to actual name
         if hasattr(expr, 'StackNode'):
             try:
@@ -806,21 +810,21 @@ class BlueprintInspector:
                 props["StackNode"] = f"{expr.StackNode.Index} -> {resolved}" if resolved else str(expr.StackNode.Index)
             except Exception:
                 pass
-        
+
         # Resolve FunctionName
         if hasattr(expr, 'FunctionName'):
             try:
                 props["FunctionName"] = str(expr.FunctionName)
             except Exception:
                 pass
-        
+
         # Resolve VirtualFunctionName
         if hasattr(expr, 'VirtualFunctionName'):
             try:
                 props["VirtualFunctionName"] = str(expr.VirtualFunctionName)
             except Exception:
                 pass
-        
+
         # Other common fields
         for field_name in ["CodeOffset", "SkipCount"]:
             try:
@@ -829,7 +833,7 @@ class BlueprintInspector:
                     props[field_name] = str(val)
             except Exception:
                 pass
-        
+
         return props
 
     # ----- Graph Extraction -----
@@ -864,7 +868,7 @@ class BlueprintInspector:
         with resolved names from all three data layers.
         """
         self._build_k2_node_cache()
-        
+
         exp = self.af.get_export(export_index)
         name = self.af.get_export_name(exp)
 
@@ -929,7 +933,7 @@ class BlueprintInspector:
         """
         Convert a BlueprintGraph to a JSON-serializable dict
         suitable for the web UI graph editor.
-        
+
         Includes both bytecode nodes (with resolved names) and
         K2Node metadata (with positions for layout).
         """
@@ -974,7 +978,7 @@ class BlueprintInspector:
         """
         Modify a literal value in a Kismet expression.
         ONLY works for literal expressions (IntConst, FloatConst, StringConst, etc.).
-        
+
         WARNING: This modifies the in-memory representation. Call asset_file.save()
         to write changes to disk. Incorrect values WILL cause runtime crashes.
         """
