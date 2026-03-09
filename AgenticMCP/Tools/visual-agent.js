@@ -28,6 +28,28 @@
  *   wait <assets|compile|render>
  *   ref <ref>
  *   record start|stop|play|save|load|list [name]
+ *
+ * Debug Visualization:
+ *   draw-sphere <target|x y z> [radius] [--color=X] [--duration=N]
+ *   draw-line <start> <end> [--color=X] [--duration=N]
+ *   draw-text <target> <text> [--color=X] [--duration=N]
+ *   draw-box <target> [--color=X] [--duration=N]
+ *   clear-debug
+ *
+ * Blueprint Inspection:
+ *   blueprint <assetPath>        Get BP graph as YAML
+ *
+ * Undo/Redo:
+ *   begin-transaction [name]     Start undo group
+ *   end-transaction              Commit transaction
+ *   undo [count]                 Undo operation(s)
+ *   redo [count]                 Redo operation(s)
+ *
+ * Diff/Compare:
+ *   save-state [name]            Snapshot scene
+ *   diff [name]                  Compare to snapshot
+ *   restore [name]               Restore snapshot
+ *   list-states                  List snapshots
  */
 
 import { log } from "./lib.js";
@@ -254,6 +276,166 @@ async function executeNavigate(httpClient, args) {
 }
 
 // ============================================================
+// Debug Visualization Commands
+// ============================================================
+
+async function executeDrawSphere(httpClient, args, flags) {
+  if (args.length < 1) {
+    return { success: false, message: "Usage: draw-sphere <target|x y z> [radius] [--color=red] [--duration=5]" };
+  }
+
+  const params = {
+    type: "sphere",
+    color: flags.color || "white",
+    duration: parseFloat(flags.duration || "5"),
+    radius: parseFloat(flags.radius || "50"),
+  };
+
+  // Check if first arg is a ref or coordinates
+  if (args[0].match(/^a\d+/)) {
+    params.target = args[0];
+    if (args[1]) params.radius = parseFloat(args[1]);
+  } else if (args.length >= 3) {
+    params.x = parseFloat(args[0]);
+    params.y = parseFloat(args[1]);
+    params.z = parseFloat(args[2]);
+    if (args[3]) params.radius = parseFloat(args[3]);
+  } else {
+    return { success: false, message: "Usage: draw-sphere <target> [radius] OR draw-sphere <x> <y> <z> [radius]" };
+  }
+
+  return await httpClient("drawDebug", params);
+}
+
+async function executeDrawLine(httpClient, args, flags) {
+  if (args.length < 2) {
+    return { success: false, message: "Usage: draw-line <start> <end> [--color=green] [--duration=5]" };
+  }
+
+  const params = {
+    type: "line",
+    color: flags.color || "green",
+    duration: parseFloat(flags.duration || "5"),
+    thickness: parseFloat(flags.thickness || "2"),
+  };
+
+  // Check if using refs or coordinates
+  if (args[0].match(/^a\d+/) && args[1].match(/^a\d+/)) {
+    params.startTarget = args[0];
+    params.endTarget = args[1];
+  } else if (args.length >= 6) {
+    params.startX = parseFloat(args[0]);
+    params.startY = parseFloat(args[1]);
+    params.startZ = parseFloat(args[2]);
+    params.endX = parseFloat(args[3]);
+    params.endY = parseFloat(args[4]);
+    params.endZ = parseFloat(args[5]);
+  } else {
+    return { success: false, message: "Usage: draw-line <startRef> <endRef> OR draw-line <x1> <y1> <z1> <x2> <y2> <z2>" };
+  }
+
+  return await httpClient("drawDebug", params);
+}
+
+async function executeDrawText(httpClient, args, flags) {
+  if (args.length < 2) {
+    return { success: false, message: "Usage: draw-text <target> <text> [--color=white] [--duration=5]" };
+  }
+
+  const params = {
+    type: "text",
+    color: flags.color || "white",
+    duration: parseFloat(flags.duration || "5"),
+    scale: parseFloat(flags.scale || "1.5"),
+  };
+
+  if (args[0].match(/^a\d+/)) {
+    params.target = args[0];
+    params.text = args.slice(1).join(" ");
+  } else {
+    return { success: false, message: "Usage: draw-text <targetRef> <text>" };
+  }
+
+  return await httpClient("drawDebug", params);
+}
+
+async function executeDrawBox(httpClient, args, flags) {
+  if (args.length < 1) {
+    return { success: false, message: "Usage: draw-box <target> [--color=yellow] [--duration=5]" };
+  }
+
+  const params = {
+    type: "box",
+    target: args[0],
+    color: flags.color || "yellow",
+    duration: parseFloat(flags.duration || "5"),
+  };
+
+  return await httpClient("drawDebug", params);
+}
+
+async function executeClearDebug(httpClient) {
+  return await httpClient("clearDebug", {});
+}
+
+// ============================================================
+// Blueprint Graph Snapshot Commands
+// ============================================================
+
+async function executeBlueprint(httpClient, args, flags) {
+  if (args.length < 1) {
+    return { success: false, message: "Usage: blueprint <assetPath> (e.g., blueprint /Game/Blueprints/BP_Character)" };
+  }
+  return await httpClient("blueprintSnapshot", { asset: args[0] });
+}
+
+// ============================================================
+// Undo/Redo Transaction Commands
+// ============================================================
+
+async function executeBeginTransaction(httpClient, args) {
+  const name = args.length > 0 ? args.join(" ") : "VisualAgent Operation";
+  return await httpClient("beginTransaction", { name });
+}
+
+async function executeEndTransaction(httpClient) {
+  return await httpClient("endTransaction", {});
+}
+
+async function executeUndo(httpClient, args) {
+  const count = args.length > 0 ? parseInt(args[0], 10) : 1;
+  return await httpClient("undo", { count });
+}
+
+async function executeRedo(httpClient, args) {
+  const count = args.length > 0 ? parseInt(args[0], 10) : 1;
+  return await httpClient("redo", { count });
+}
+
+// ============================================================
+// Diff/Compare Mode Commands
+// ============================================================
+
+async function executeSaveState(httpClient, args) {
+  const name = args.length > 0 ? args[0] : "default";
+  return await httpClient("saveState", { name });
+}
+
+async function executeDiff(httpClient, args) {
+  const name = args.length > 0 ? args[0] : "default";
+  return await httpClient("diffState", { name });
+}
+
+async function executeRestore(httpClient, args) {
+  const name = args.length > 0 ? args[0] : "default";
+  return await httpClient("restoreState", { name });
+}
+
+async function executeListStates(httpClient) {
+  return await httpClient("listStates", {});
+}
+
+// ============================================================
 // Auto-Screenshot Toggle
 // ============================================================
 
@@ -427,9 +609,62 @@ async function executeVisualAgentCommand(commandStr, httpClient, options = {}) {
         result = await executeRef(httpClient, args);
         break;
       case "navigate":
-        result = await executeNavigate(httpClient, args);
-        break;
-      case "record":
+          result = await executeNavigate(httpClient, args);
+          break;
+
+        // ---- Debug Visualization ----
+        case "draw-sphere":
+          result = await executeDrawSphere(httpClient, args, flags);
+          break;
+        case "draw-line":
+          result = await executeDrawLine(httpClient, args, flags);
+          break;
+        case "draw-text":
+          result = await executeDrawText(httpClient, args, flags);
+          break;
+        case "draw-box":
+          result = await executeDrawBox(httpClient, args, flags);
+          break;
+        case "clear-debug":
+          result = await executeClearDebug(httpClient);
+          break;
+
+        // ---- Blueprint Graph Snapshot ----
+        case "blueprint":
+          result = await executeBlueprint(httpClient, args, flags);
+          break;
+
+        // ---- Undo/Redo Transactions ----
+        case "begin-transaction":
+        case "transaction":
+          result = await executeBeginTransaction(httpClient, args);
+          break;
+        case "end-transaction":
+        case "commit":
+          result = await executeEndTransaction(httpClient);
+          break;
+        case "undo":
+          result = await executeUndo(httpClient, args);
+          break;
+        case "redo":
+          result = await executeRedo(httpClient, args);
+          break;
+
+        // ---- Diff/Compare Mode ----
+        case "save-state":
+          result = await executeSaveState(httpClient, args);
+          break;
+        case "diff":
+          result = await executeDiff(httpClient, args);
+          break;
+        case "restore":
+          result = await executeRestore(httpClient, args);
+          break;
+        case "list-states":
+          result = await executeListStates(httpClient);
+          break;
+
+        case "record":
         const subCmd = args[0] || "";
         result = executeRecord(subCmd, args.slice(1));
         break;
@@ -518,6 +753,28 @@ function getHelpText() {
   camera <x> <y> <z> <pitch> <yaw> <roll>  Set viewport camera
   navigate <levelName>       Load level
 
+## Debug Visualization
+  draw-sphere <target|x y z> [radius] [--color=red] [--duration=5]
+  draw-line <start> <end> [--color=green] [--duration=5]
+  draw-text <target> <text> [--color=white] [--duration=5]
+  draw-box <target> [--color=yellow] [--duration=5]
+  clear-debug                Clear all debug draws
+
+## Blueprint Inspection
+  blueprint <assetPath>      Get Blueprint graph snapshot as YAML
+
+## Undo/Redo Transactions
+  begin-transaction [name]   Start undo transaction
+  end-transaction            End transaction (commit)
+  undo [count]               Undo last operation(s)
+  redo [count]               Redo undone operation(s)
+
+## Diff/Compare Mode
+  save-state [name]          Snapshot current scene state
+  diff [name]                Compare current to saved state
+  restore [name]             Restore scene to saved state
+  list-states                List all saved states
+
 ## Utility Commands
   wait <assets|compile|render>  Wait for condition
   ref <refId>                Resolve ref to actor name
@@ -536,9 +793,13 @@ function getHelpText() {
   spawn StaticMeshActor 100 200 0 --label="MyActor"
   move a3 500 0 100
   screenshot --format=png --width=1920
-  auto-screenshot on
-  record start
-  record stop
+  draw-sphere a0 100 --color=red
+  draw-line a0 a1 --color=green
+  begin-transaction "Move furniture"
+  save-state before
+  diff before
+  blueprint /Game/Blueprints/BP_Player
+  undo
 `.trim();
 }
 
@@ -565,6 +826,30 @@ COMMANDS:
 • camera <x> <y> <z> <pitch> <yaw> <roll> - Set viewport
 • navigate <level> - Load level
 • wait <assets|compile|render> - Wait for condition
+
+DEBUG VISUALIZATION:
+• draw-sphere <target> [radius] [--color=red] - Draw debug sphere
+• draw-line <start> <end> [--color=green] - Draw debug line
+• draw-text <target> <text> - Draw debug text label
+• draw-box <target> - Draw bounding box
+• clear-debug - Clear all debug draws
+
+BLUEPRINT INSPECTION:
+• blueprint <assetPath> - Get Blueprint graph as YAML
+
+UNDO/REDO:
+• begin-transaction [name] - Start undo group
+• end-transaction - Commit transaction
+• undo [count] - Undo operations
+• redo [count] - Redo operations
+
+DIFF/COMPARE:
+• save-state [name] - Snapshot scene state
+• diff [name] - Compare to saved state
+• restore [name] - Restore to saved state
+• list-states - List saved states
+
+RECORDING:
 • record start|stop|play|save|load|list - Recording
 
 Use 'help' for full documentation. Refs (a0, a1.c2) from snapshot can be used instead of actor names.`,

@@ -37,6 +37,7 @@
 #include "UnrealClient.h"
 #include "Slate/SceneViewport.h"
 #include "HighResScreenshot.h"
+#include "DrawDebugHelpers.h"
 
 // ============================================================
 // Ref Registry - Maps short refs to actors/components
@@ -762,5 +763,842 @@ FString FAgenticMCPServer::HandleResolveRef(const FString& Body)
 		}
 	}
 
+	return JsonToString(Result);
+}
+
+// ============================================================
+// DEBUG VISUALIZATION
+// ============================================================
+
+// Storage for debug draw requests - processed on game thread
+struct FDebugDrawRequest
+{
+	enum class EType { Sphere, Line, Text, Box, Clear };
+	EType Type;
+	FVector Location;
+	FVector EndLocation;  // For lines
+	float Radius;
+	FColor Color;
+	float Duration;
+	FString Text;
+	FString Id;  // For tracking/clearing specific draws
+};
+
+static TArray<FDebugDrawRequest> PendingDebugDraws;
+static TMap<FString, FDebugDrawRequest> PersistentDraws;
+static int32 DebugDrawCounter = 0;
+
+// Helper: Parse color from string
+static FColor ParseColor(const FString& ColorStr)
+{
+	FString Lower = ColorStr.ToLower();
+	if (Lower == TEXT("red")) return FColor::Red;
+	if (Lower == TEXT("green")) return FColor::Green;
+	if (Lower == TEXT("blue")) return FColor::Blue;
+	if (Lower == TEXT("yellow")) return FColor::Yellow;
+	if (Lower == TEXT("cyan")) return FColor::Cyan;
+	if (Lower == TEXT("magenta")) return FColor::Magenta;
+	if (Lower == TEXT("white")) return FColor::White;
+	if (Lower == TEXT("black")) return FColor::Black;
+	if (Lower == TEXT("orange")) return FColor::Orange;
+	if (Lower == TEXT("purple")) return FColor(128, 0, 128);
+
+	// Try hex color #RRGGBB
+	if (Lower.StartsWith(TEXT("#")) && Lower.Len() >= 7)
+	{
+		FString Hex = Lower.Mid(1);
+		int32 R = FParse::HexDigit(Hex[0]) * 16 + FParse::HexDigit(Hex[1]);
+		int32 G = FParse::HexDigit(Hex[2]) * 16 + FParse::HexDigit(Hex[3]);
+		int32 B = FParse::HexDigit(Hex[4]) * 16 + FParse::HexDigit(Hex[5]);
+		return FColor(R, G, B);
+	}
+
+	return FColor::White;
+}
+
+// ============================================================
+// HandleDrawDebug
+// POST /api/draw-debug { "type": "sphere", "target": "a0", "radius": 100, "color": "red", "duration": 5.0 }
+// ============================================================
+
+FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
+{
+	UWorld* World = GetEditorWorld();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world available."));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body."));
+	}
+
+	FString Type = Json->GetStringField(TEXT("type")).ToLower();
+	FString ColorStr = Json->HasField(TEXT("color")) ? Json->GetStringField(TEXT("color")) : TEXT("white");
+	float Duration = Json->HasField(TEXT("duration")) ? Json->GetNumberField(TEXT("duration")) : 5.0f;
+	FColor Color = ParseColor(ColorStr);
+
+	FString DrawId = FString::Printf(TEXT("draw_%d"), DebugDrawCounter++);
+
+	if (Type == TEXT("sphere"))
+	{
+		FVector Location;
+
+		// Get location from target actor or explicit coordinates
+		if (Json->HasField(TEXT("target")))
+		{
+			FString Target = Json->GetStringField(TEXT("target"));
+			AActor* Actor = FindActorByNameOrRef(World, Target);
+			if (!Actor)
+			{
+				return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *Target));
+			}
+			Location = Actor->GetActorLocation();
+		}
+		else
+		{
+			Location.X = Json->GetNumberField(TEXT("x"));
+			Location.Y = Json->GetNumberField(TEXT("y"));
+			Location.Z = Json->GetNumberField(TEXT("z"));
+		}
+
+		float Radius = Json->HasField(TEXT("radius")) ? Json->GetNumberField(TEXT("radius")) : 50.0f;
+
+		DrawDebugSphere(World, Location, Radius, 16, Color, false, Duration, 0, 2.0f);
+
+		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("id"), DrawId);
+		Result->SetStringField(TEXT("type"), TEXT("sphere"));
+		Result->SetNumberField(TEXT("x"), Location.X);
+		Result->SetNumberField(TEXT("y"), Location.Y);
+		Result->SetNumberField(TEXT("z"), Location.Z);
+		Result->SetNumberField(TEXT("radius"), Radius);
+		Result->SetNumberField(TEXT("duration"), Duration);
+		return JsonToString(Result);
+	}
+	else if (Type == TEXT("line"))
+	{
+		FVector Start, End;
+
+		// Get start/end from actors or coordinates
+		if (Json->HasField(TEXT("startTarget")))
+		{
+			AActor* Actor = FindActorByNameOrRef(World, Json->GetStringField(TEXT("startTarget")));
+			if (!Actor) return MakeErrorJson(TEXT("Start actor not found."));
+			Start = Actor->GetActorLocation();
+		}
+		else
+		{
+			Start.X = Json->GetNumberField(TEXT("startX"));
+			Start.Y = Json->GetNumberField(TEXT("startY"));
+			Start.Z = Json->GetNumberField(TEXT("startZ"));
+		}
+
+		if (Json->HasField(TEXT("endTarget")))
+		{
+			AActor* Actor = FindActorByNameOrRef(World, Json->GetStringField(TEXT("endTarget")));
+			if (!Actor) return MakeErrorJson(TEXT("End actor not found."));
+			End = Actor->GetActorLocation();
+		}
+		else
+		{
+			End.X = Json->GetNumberField(TEXT("endX"));
+			End.Y = Json->GetNumberField(TEXT("endY"));
+			End.Z = Json->GetNumberField(TEXT("endZ"));
+		}
+
+		float Thickness = Json->HasField(TEXT("thickness")) ? Json->GetNumberField(TEXT("thickness")) : 2.0f;
+		DrawDebugLine(World, Start, End, Color, false, Duration, 0, Thickness);
+
+		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("id"), DrawId);
+		Result->SetStringField(TEXT("type"), TEXT("line"));
+		return JsonToString(Result);
+	}
+	else if (Type == TEXT("text"))
+	{
+		FVector Location;
+		FString Text = Json->GetStringField(TEXT("text"));
+
+		if (Json->HasField(TEXT("target")))
+		{
+			AActor* Actor = FindActorByNameOrRef(World, Json->GetStringField(TEXT("target")));
+			if (!Actor) return MakeErrorJson(TEXT("Target actor not found."));
+			Location = Actor->GetActorLocation();
+			Location.Z += 100.0f;  // Offset above actor
+		}
+		else
+		{
+			Location.X = Json->GetNumberField(TEXT("x"));
+			Location.Y = Json->GetNumberField(TEXT("y"));
+			Location.Z = Json->GetNumberField(TEXT("z"));
+		}
+
+		float Scale = Json->HasField(TEXT("scale")) ? Json->GetNumberField(TEXT("scale")) : 1.5f;
+		DrawDebugString(World, Location, Text, nullptr, Color, Duration, false, Scale);
+
+		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("id"), DrawId);
+		Result->SetStringField(TEXT("type"), TEXT("text"));
+		Result->SetStringField(TEXT("text"), Text);
+		return JsonToString(Result);
+	}
+	else if (Type == TEXT("box"))
+	{
+		FVector Location;
+		FVector Extent;
+
+		if (Json->HasField(TEXT("target")))
+		{
+			AActor* Actor = FindActorByNameOrRef(World, Json->GetStringField(TEXT("target")));
+			if (!Actor) return MakeErrorJson(TEXT("Target actor not found."));
+
+			FVector Origin;
+			Actor->GetActorBounds(false, Origin, Extent);
+			Location = Origin;
+		}
+		else
+		{
+			Location.X = Json->GetNumberField(TEXT("x"));
+			Location.Y = Json->GetNumberField(TEXT("y"));
+			Location.Z = Json->GetNumberField(TEXT("z"));
+			Extent.X = Json->HasField(TEXT("extentX")) ? Json->GetNumberField(TEXT("extentX")) : 50.0f;
+			Extent.Y = Json->HasField(TEXT("extentY")) ? Json->GetNumberField(TEXT("extentY")) : 50.0f;
+			Extent.Z = Json->HasField(TEXT("extentZ")) ? Json->GetNumberField(TEXT("extentZ")) : 50.0f;
+		}
+
+		DrawDebugBox(World, Location, Extent, Color, false, Duration, 0, 2.0f);
+
+		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("id"), DrawId);
+		Result->SetStringField(TEXT("type"), TEXT("box"));
+		return JsonToString(Result);
+	}
+
+	return MakeErrorJson(FString::Printf(TEXT("Unknown draw type: %s. Use sphere, line, text, or box."), *Type));
+}
+
+// ============================================================
+// HandleClearDebug
+// POST /api/clear-debug { }
+// ============================================================
+
+FString FAgenticMCPServer::HandleClearDebug(const FString& Body)
+{
+	UWorld* World = GetEditorWorld();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world available."));
+	}
+
+	FlushPersistentDebugLines(World);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("message"), TEXT("Debug draws cleared."));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// BLUEPRINT GRAPH SNAPSHOT
+// ============================================================
+
+#include "Engine/Blueprint.h"
+#include "EdGraph/EdGraph.h"
+#include "EdGraph/EdGraphNode.h"
+#include "EdGraph/EdGraphPin.h"
+#include "K2Node.h"
+#include "K2Node_Event.h"
+#include "K2Node_CallFunction.h"
+#include "K2Node_VariableGet.h"
+#include "K2Node_VariableSet.h"
+#include "AssetRegistry/AssetData.h"
+
+// ============================================================
+// HandleBlueprintSnapshot
+// POST /api/blueprint-snapshot { "asset": "/Game/Blueprints/BP_Character" }
+// ============================================================
+
+FString FAgenticMCPServer::HandleBlueprintSnapshot(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body."));
+	}
+
+	FString AssetPath = Json->GetStringField(TEXT("asset"));
+	if (AssetPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'asset' parameter."));
+	}
+
+	// Load the Blueprint asset
+	UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *AssetPath);
+	if (!Blueprint)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Blueprint not found: %s"), *AssetPath));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> GraphsArray;
+	FString YamlSnapshot;
+
+	// Iterate all graphs in the Blueprint
+	for (UEdGraph* Graph : Blueprint->UbergraphPages)
+	{
+		if (!Graph) continue;
+
+		TSharedRef<FJsonObject> GraphJson = MakeShared<FJsonObject>();
+		GraphJson->SetStringField(TEXT("name"), Graph->GetName());
+		GraphJson->SetStringField(TEXT("type"), TEXT("EventGraph"));
+
+		TArray<TSharedPtr<FJsonValue>> NodesArray;
+		YamlSnapshot += FString::Printf(TEXT("Graph: %s\n"), *Graph->GetName());
+
+		int32 NodeIndex = 0;
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (!Node) continue;
+
+			FString NodeRef = FString::Printf(TEXT("n%d"), NodeIndex++);
+
+			TSharedRef<FJsonObject> NodeJson = MakeShared<FJsonObject>();
+			NodeJson->SetStringField(TEXT("ref"), NodeRef);
+			NodeJson->SetStringField(TEXT("class"), Node->GetClass()->GetName());
+			NodeJson->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+			NodeJson->SetNumberField(TEXT("posX"), Node->NodePosX);
+			NodeJson->SetNumberField(TEXT("posY"), Node->NodePosY);
+
+			// Get node-specific info
+			FString NodeType = TEXT("Unknown");
+			FString NodeDetails;
+
+			if (UK2Node_Event* EventNode = Cast<UK2Node_Event>(Node))
+			{
+				NodeType = TEXT("Event");
+				NodeDetails = EventNode->GetFunctionName().ToString();
+			}
+			else if (UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(Node))
+			{
+				NodeType = TEXT("Function");
+				NodeDetails = CallNode->GetFunctionName().ToString();
+			}
+			else if (UK2Node_VariableGet* GetNode = Cast<UK2Node_VariableGet>(Node))
+			{
+				NodeType = TEXT("GetVariable");
+				NodeDetails = GetNode->GetVarName().ToString();
+			}
+			else if (UK2Node_VariableSet* SetNode = Cast<UK2Node_VariableSet>(Node))
+			{
+				NodeType = TEXT("SetVariable");
+				NodeDetails = SetNode->GetVarName().ToString();
+			}
+
+			NodeJson->SetStringField(TEXT("nodeType"), NodeType);
+			if (!NodeDetails.IsEmpty())
+			{
+				NodeJson->SetStringField(TEXT("details"), NodeDetails);
+			}
+
+			// Get pins
+			TArray<TSharedPtr<FJsonValue>> PinsArray;
+			for (UEdGraphPin* Pin : Node->Pins)
+			{
+				if (!Pin) continue;
+
+				TSharedRef<FJsonObject> PinJson = MakeShared<FJsonObject>();
+				PinJson->SetStringField(TEXT("name"), Pin->PinName.ToString());
+				PinJson->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("In") : TEXT("Out"));
+				PinJson->SetStringField(TEXT("type"), Pin->PinType.PinCategory.ToString());
+
+				// Get connections
+				TArray<TSharedPtr<FJsonValue>> ConnectionsArray;
+				for (UEdGraphPin* LinkedPin : Pin->LinkedTo)
+				{
+					if (!LinkedPin || !LinkedPin->GetOwningNode()) continue;
+
+					TSharedRef<FJsonObject> ConnJson = MakeShared<FJsonObject>();
+					ConnJson->SetStringField(TEXT("node"), LinkedPin->GetOwningNode()->GetNodeTitle(ENodeTitleType::ListView).ToString());
+					ConnJson->SetStringField(TEXT("pin"), LinkedPin->PinName.ToString());
+					ConnectionsArray.Add(MakeShared<FJsonValueObject>(ConnJson));
+				}
+				if (ConnectionsArray.Num() > 0)
+				{
+					PinJson->SetArrayField(TEXT("connections"), ConnectionsArray);
+				}
+
+				PinsArray.Add(MakeShared<FJsonValueObject>(PinJson));
+			}
+			NodeJson->SetArrayField(TEXT("pins"), PinsArray);
+
+			NodesArray.Add(MakeShared<FJsonValueObject>(NodeJson));
+
+			// YAML line
+			YamlSnapshot += FString::Printf(TEXT("  - [%s] %s: %s\n"),
+				*NodeRef, *NodeType, *Node->GetNodeTitle(ENodeTitleType::ListView).ToString());
+		}
+
+		GraphJson->SetArrayField(TEXT("nodes"), NodesArray);
+		GraphsArray.Add(MakeShared<FJsonValueObject>(GraphJson));
+	}
+
+	// Also include function graphs
+	for (UEdGraph* Graph : Blueprint->FunctionGraphs)
+	{
+		if (!Graph) continue;
+
+		TSharedRef<FJsonObject> GraphJson = MakeShared<FJsonObject>();
+		GraphJson->SetStringField(TEXT("name"), Graph->GetName());
+		GraphJson->SetStringField(TEXT("type"), TEXT("Function"));
+		GraphJson->SetNumberField(TEXT("nodeCount"), Graph->Nodes.Num());
+
+		GraphsArray.Add(MakeShared<FJsonValueObject>(GraphJson));
+		YamlSnapshot += FString::Printf(TEXT("Function: %s (%d nodes)\n"), *Graph->GetName(), Graph->Nodes.Num());
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("blueprintName"), Blueprint->GetName());
+	Result->SetStringField(TEXT("blueprintClass"), Blueprint->GeneratedClass ? Blueprint->GeneratedClass->GetName() : TEXT("None"));
+	Result->SetStringField(TEXT("parentClass"), Blueprint->ParentClass ? Blueprint->ParentClass->GetName() : TEXT("None"));
+	Result->SetArrayField(TEXT("graphs"), GraphsArray);
+	Result->SetStringField(TEXT("yamlSnapshot"), YamlSnapshot);
+
+	return JsonToString(Result);
+}
+
+// ============================================================
+// UNDO/REDO TRANSACTIONS
+// ============================================================
+
+static bool bInTransaction = false;
+static FString CurrentTransactionName;
+
+// ============================================================
+// HandleBeginTransaction
+// POST /api/begin-transaction { "name": "Move furniture" }
+// ============================================================
+
+FString FAgenticMCPServer::HandleBeginTransaction(const FString& Body)
+{
+	if (bInTransaction)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Already in transaction: %s. End it first."), *CurrentTransactionName));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	FString Name = TEXT("AgenticMCP Operation");
+	if (Json.IsValid() && Json->HasField(TEXT("name")))
+	{
+		Name = Json->GetStringField(TEXT("name"));
+	}
+
+	GEditor->BeginTransaction(FText::FromString(Name));
+	bInTransaction = true;
+	CurrentTransactionName = Name;
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Transaction started: %s"), *Name));
+	Result->SetStringField(TEXT("transactionName"), Name);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleEndTransaction
+// POST /api/end-transaction { }
+// ============================================================
+
+FString FAgenticMCPServer::HandleEndTransaction(const FString& Body)
+{
+	if (!bInTransaction)
+	{
+		return MakeErrorJson(TEXT("No active transaction to end."));
+	}
+
+	GEditor->EndTransaction();
+	FString EndedName = CurrentTransactionName;
+	bInTransaction = false;
+	CurrentTransactionName.Empty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Transaction ended: %s"), *EndedName));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleUndo
+// POST /api/undo { "count": 1 }
+// ============================================================
+
+FString FAgenticMCPServer::HandleUndo(const FString& Body)
+{
+	if (bInTransaction)
+	{
+		return MakeErrorJson(TEXT("Cannot undo while in a transaction. End the transaction first."));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	int32 Count = 1;
+	if (Json.IsValid() && Json->HasField(TEXT("count")))
+	{
+		Count = FMath::Max(1, Json->GetIntegerField(TEXT("count")));
+	}
+
+	int32 UndoneCount = 0;
+	for (int32 i = 0; i < Count; i++)
+	{
+		if (GEditor->UndoTransaction())
+		{
+			UndoneCount++;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), UndoneCount > 0);
+	Result->SetNumberField(TEXT("undoneCount"), UndoneCount);
+	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Undone %d operation(s)"), UndoneCount));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleRedo
+// POST /api/redo { "count": 1 }
+// ============================================================
+
+FString FAgenticMCPServer::HandleRedo(const FString& Body)
+{
+	if (bInTransaction)
+	{
+		return MakeErrorJson(TEXT("Cannot redo while in a transaction. End the transaction first."));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	int32 Count = 1;
+	if (Json.IsValid() && Json->HasField(TEXT("count")))
+	{
+		Count = FMath::Max(1, Json->GetIntegerField(TEXT("count")));
+	}
+
+	int32 RedoneCount = 0;
+	for (int32 i = 0; i < Count; i++)
+	{
+		if (GEditor->RedoTransaction())
+		{
+			RedoneCount++;
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), RedoneCount > 0);
+	Result->SetNumberField(TEXT("redoneCount"), RedoneCount);
+	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Redone %d operation(s)"), RedoneCount));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// DIFF/COMPARE MODE
+// ============================================================
+
+// State snapshot storage
+struct FSceneStateSnapshot
+{
+	FString Name;
+	FDateTime Timestamp;
+	TMap<FString, FTransform> ActorTransforms;
+	TMap<FString, FString> ActorClasses;
+	TSet<FString> ActorNames;
+};
+
+static TMap<FString, FSceneStateSnapshot> SavedSnapshots;
+
+// ============================================================
+// HandleSaveState
+// POST /api/save-state { "name": "before" }
+// ============================================================
+
+FString FAgenticMCPServer::HandleSaveState(const FString& Body)
+{
+	UWorld* World = GetEditorWorld();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world available."));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	FString Name = TEXT("default");
+	if (Json.IsValid() && Json->HasField(TEXT("name")))
+	{
+		Name = Json->GetStringField(TEXT("name"));
+	}
+
+	FSceneStateSnapshot Snapshot;
+	Snapshot.Name = Name;
+	Snapshot.Timestamp = FDateTime::Now();
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Actor = *It;
+		if (!Actor) continue;
+
+		FString ActorName = Actor->GetName();
+		Snapshot.ActorNames.Add(ActorName);
+		Snapshot.ActorTransforms.Add(ActorName, Actor->GetActorTransform());
+		Snapshot.ActorClasses.Add(ActorName, Actor->GetClass()->GetName());
+	}
+
+	SavedSnapshots.Add(Name, Snapshot);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("name"), Name);
+	Result->SetNumberField(TEXT("actorCount"), Snapshot.ActorNames.Num());
+	Result->SetStringField(TEXT("timestamp"), Snapshot.Timestamp.ToString());
+	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Saved state '%s' with %d actors"), *Name, Snapshot.ActorNames.Num()));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleDiffState
+// POST /api/diff-state { "name": "before" }
+// ============================================================
+
+FString FAgenticMCPServer::HandleDiffState(const FString& Body)
+{
+	UWorld* World = GetEditorWorld();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world available."));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	FString Name = TEXT("default");
+	if (Json.IsValid() && Json->HasField(TEXT("name")))
+	{
+		Name = Json->GetStringField(TEXT("name"));
+	}
+
+	FSceneStateSnapshot* Snapshot = SavedSnapshots.Find(Name);
+	if (!Snapshot)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("No saved state found: %s"), *Name));
+	}
+
+	// Get current state
+	TSet<FString> CurrentActors;
+	TMap<FString, FTransform> CurrentTransforms;
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Actor = *It;
+		if (!Actor) continue;
+
+		FString ActorName = Actor->GetName();
+		CurrentActors.Add(ActorName);
+		CurrentTransforms.Add(ActorName, Actor->GetActorTransform());
+	}
+
+	// Compute diff
+	TArray<TSharedPtr<FJsonValue>> AddedArray;
+	TArray<TSharedPtr<FJsonValue>> RemovedArray;
+	TArray<TSharedPtr<FJsonValue>> ModifiedArray;
+
+	FString DiffYaml;
+
+	// Find added actors
+	for (const FString& Name : CurrentActors)
+	{
+		if (!Snapshot->ActorNames.Contains(Name))
+		{
+			TSharedRef<FJsonObject> AddedJson = MakeShared<FJsonObject>();
+			AddedJson->SetStringField(TEXT("name"), Name);
+			AddedArray.Add(MakeShared<FJsonValueObject>(AddedJson));
+			DiffYaml += FString::Printf(TEXT("+ ADDED: %s\n"), *Name);
+		}
+	}
+
+	// Find removed actors
+	for (const FString& Name : Snapshot->ActorNames)
+	{
+		if (!CurrentActors.Contains(Name))
+		{
+			TSharedRef<FJsonObject> RemovedJson = MakeShared<FJsonObject>();
+			RemovedJson->SetStringField(TEXT("name"), Name);
+			RemovedJson->SetStringField(TEXT("class"), Snapshot->ActorClasses.FindRef(Name));
+			RemovedArray.Add(MakeShared<FJsonValueObject>(RemovedJson));
+			DiffYaml += FString::Printf(TEXT("- REMOVED: %s\n"), *Name);
+		}
+	}
+
+	// Find modified actors
+	for (const FString& Name : CurrentActors)
+	{
+		if (!Snapshot->ActorNames.Contains(Name)) continue;
+
+		FTransform* OldTransform = Snapshot->ActorTransforms.Find(Name);
+		FTransform* NewTransform = CurrentTransforms.Find(Name);
+
+		if (OldTransform && NewTransform && !OldTransform->Equals(*NewTransform, 0.1f))
+		{
+			TSharedRef<FJsonObject> ModJson = MakeShared<FJsonObject>();
+			ModJson->SetStringField(TEXT("name"), Name);
+
+			FVector OldLoc = OldTransform->GetLocation();
+			FVector NewLoc = NewTransform->GetLocation();
+			FRotator OldRot = OldTransform->Rotator();
+			FRotator NewRot = NewTransform->Rotator();
+
+			bool bLocationChanged = !OldLoc.Equals(NewLoc, 0.1f);
+			bool bRotationChanged = !OldRot.Equals(NewRot, 0.1f);
+
+			if (bLocationChanged)
+			{
+				TSharedRef<FJsonObject> LocChange = MakeShared<FJsonObject>();
+				LocChange->SetNumberField(TEXT("oldX"), OldLoc.X);
+				LocChange->SetNumberField(TEXT("oldY"), OldLoc.Y);
+				LocChange->SetNumberField(TEXT("oldZ"), OldLoc.Z);
+				LocChange->SetNumberField(TEXT("newX"), NewLoc.X);
+				LocChange->SetNumberField(TEXT("newY"), NewLoc.Y);
+				LocChange->SetNumberField(TEXT("newZ"), NewLoc.Z);
+				ModJson->SetObjectField(TEXT("location"), LocChange);
+			}
+
+			if (bRotationChanged)
+			{
+				TSharedRef<FJsonObject> RotChange = MakeShared<FJsonObject>();
+				RotChange->SetNumberField(TEXT("oldPitch"), OldRot.Pitch);
+				RotChange->SetNumberField(TEXT("oldYaw"), OldRot.Yaw);
+				RotChange->SetNumberField(TEXT("oldRoll"), OldRot.Roll);
+				RotChange->SetNumberField(TEXT("newPitch"), NewRot.Pitch);
+				RotChange->SetNumberField(TEXT("newYaw"), NewRot.Yaw);
+				RotChange->SetNumberField(TEXT("newRoll"), NewRot.Roll);
+				ModJson->SetObjectField(TEXT("rotation"), RotChange);
+			}
+
+			ModifiedArray.Add(MakeShared<FJsonValueObject>(ModJson));
+
+			if (bLocationChanged)
+			{
+				DiffYaml += FString::Printf(TEXT("~ MOVED: %s (%.0f,%.0f,%.0f) -> (%.0f,%.0f,%.0f)\n"),
+					*Name, OldLoc.X, OldLoc.Y, OldLoc.Z, NewLoc.X, NewLoc.Y, NewLoc.Z);
+			}
+			if (bRotationChanged)
+			{
+				DiffYaml += FString::Printf(TEXT("~ ROTATED: %s (%.0f,%.0f,%.0f) -> (%.0f,%.0f,%.0f)\n"),
+					*Name, OldRot.Pitch, OldRot.Yaw, OldRot.Roll, NewRot.Pitch, NewRot.Yaw, NewRot.Roll);
+			}
+		}
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("comparedTo"), Name);
+	Result->SetNumberField(TEXT("addedCount"), AddedArray.Num());
+	Result->SetNumberField(TEXT("removedCount"), RemovedArray.Num());
+	Result->SetNumberField(TEXT("modifiedCount"), ModifiedArray.Num());
+	Result->SetArrayField(TEXT("added"), AddedArray);
+	Result->SetArrayField(TEXT("removed"), RemovedArray);
+	Result->SetArrayField(TEXT("modified"), ModifiedArray);
+	Result->SetStringField(TEXT("diffYaml"), DiffYaml);
+	Result->SetBoolField(TEXT("hasChanges"), AddedArray.Num() > 0 || RemovedArray.Num() > 0 || ModifiedArray.Num() > 0);
+
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleRestoreState
+// POST /api/restore-state { "name": "before" }
+// ============================================================
+
+FString FAgenticMCPServer::HandleRestoreState(const FString& Body)
+{
+	UWorld* World = GetEditorWorld();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world available."));
+	}
+
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	FString Name = TEXT("default");
+	if (Json.IsValid() && Json->HasField(TEXT("name")))
+	{
+		Name = Json->GetStringField(TEXT("name"));
+	}
+
+	FSceneStateSnapshot* Snapshot = SavedSnapshots.Find(Name);
+	if (!Snapshot)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("No saved state found: %s"), *Name));
+	}
+
+	// Begin transaction for restore
+	GEditor->BeginTransaction(FText::FromString(FString::Printf(TEXT("Restore State: %s"), *Name)));
+
+	int32 RestoredCount = 0;
+
+	// Restore actor transforms
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Actor = *It;
+		if (!Actor) continue;
+
+		FString ActorName = Actor->GetName();
+		FTransform* SavedTransform = Snapshot->ActorTransforms.Find(ActorName);
+
+		if (SavedTransform)
+		{
+			Actor->Modify();
+			Actor->SetActorTransform(*SavedTransform);
+			RestoredCount++;
+		}
+	}
+
+	GEditor->EndTransaction();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("name"), Name);
+	Result->SetNumberField(TEXT("restoredCount"), RestoredCount);
+	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Restored %d actors to state '%s'"), RestoredCount, *Name));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleListStates
+// POST /api/list-states { }
+// ============================================================
+
+FString FAgenticMCPServer::HandleListStates(const FString& Body)
+{
+	TArray<TSharedPtr<FJsonValue>> StatesArray;
+
+	for (const auto& Pair : SavedSnapshots)
+	{
+		TSharedRef<FJsonObject> StateJson = MakeShared<FJsonObject>();
+		StateJson->SetStringField(TEXT("name"), Pair.Key);
+		StateJson->SetNumberField(TEXT("actorCount"), Pair.Value.ActorNames.Num());
+		StateJson->SetStringField(TEXT("timestamp"), Pair.Value.Timestamp.ToString());
+		StatesArray.Add(MakeShared<FJsonValueObject>(StateJson));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetNumberField(TEXT("count"), StatesArray.Num());
+	Result->SetArrayField(TEXT("states"), StatesArray);
 	return JsonToString(Result);
 }

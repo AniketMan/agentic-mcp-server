@@ -925,6 +925,58 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleResolveRef(Body);
 	});
+
+	// ---- Debug Visualization ----
+	HandlerMap.Add(TEXT("drawDebug"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDrawDebug(Body);
+	});
+	HandlerMap.Add(TEXT("clearDebug"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleClearDebug(Body);
+	});
+
+	// ---- Blueprint Graph Snapshot ----
+	HandlerMap.Add(TEXT("blueprintSnapshot"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBlueprintSnapshot(Body);
+	});
+
+	// ---- Undo/Redo Transactions ----
+	HandlerMap.Add(TEXT("beginTransaction"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBeginTransaction(Body);
+	});
+	HandlerMap.Add(TEXT("endTransaction"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleEndTransaction(Body);
+	});
+	HandlerMap.Add(TEXT("undo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUndo(Body);
+	});
+	HandlerMap.Add(TEXT("redo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRedo(Body);
+	});
+
+	// ---- Diff/Compare Mode ----
+	HandlerMap.Add(TEXT("saveState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSaveState(Body);
+	});
+	HandlerMap.Add(TEXT("diffState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDiffState(Body);
+	});
+	HandlerMap.Add(TEXT("restoreState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRestoreState(Body);
+	});
+	HandlerMap.Add(TEXT("listStates"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleListStates(Body);
+	});
 }
 
 // ============================================================

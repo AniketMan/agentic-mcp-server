@@ -184,6 +184,25 @@ private:
 	FString HandleWaitReady(const FString& Body);
 	FString HandleResolveRef(const FString& Body);
 
+	// ---- Debug Visualization ----
+	FString HandleDrawDebug(const FString& Body);
+	FString HandleClearDebug(const FString& Body);
+
+	// ---- Blueprint Graph Snapshot ----
+	FString HandleBlueprintSnapshot(const FString& Body);
+
+	// ---- Undo/Redo Transactions ----
+	FString HandleBeginTransaction(const FString& Body);
+	FString HandleEndTransaction(const FString& Body);
+	FString HandleUndo(const FString& Body);
+	FString HandleRedo(const FString& Body);
+
+	// ---- Diff/Compare Mode ----
+	FString HandleSaveState(const FString& Body);
+	FString HandleDiffState(const FString& Body);
+	FString HandleRestoreState(const FString& Body);
+	FString HandleListStates(const FString& Body);
+
 	// ============================================================
 	// Serialization helpers
 	// ============================================================

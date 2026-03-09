@@ -137,10 +137,14 @@ VisualAgent is a unified CLI tool for visual automation of Unreal Engine 5, simi
 - **Scene Snapshots**: Hierarchical actor tree with short refs (`a0`, `a1.c0`) like accessibility trees
 - **On-Demand Screenshots**: GPU-friendly design - screenshots only when explicitly requested
 - **Auto-Screenshot Mode**: Toggle automatic screenshots after visual actions (spawn, move, rotate, delete, camera, focus)
+- **Debug Visualization**: Draw spheres, lines, text, boxes to help AI "see" spatial relationships
+- **Blueprint Inspection**: Get Blueprint graph structure as YAML for understanding logic
+- **Undo/Redo Transactions**: Group operations for atomic undo/redo
+- **Diff/Compare Mode**: Snapshot scene state, compare changes, restore to previous state
 - **Recording System**: Record and replay automation sessions
 - **Short Refs**: Use `a0`, `a1.c2` instead of full actor names
 
-### Commands
+### Core Commands
 
 | Command | Description | Example |
 |---------|-------------|---------|
@@ -159,6 +163,48 @@ VisualAgent is a unified CLI tool for visual automation of Unreal Engine 5, simi
 | `ref` | Resolve short ref to name | `ref a0` |
 | `record` | Recording control | `record start`, `record stop`, `record play` |
 | `help` | Show help | `help` |
+
+### Debug Visualization Commands
+
+Draw debug shapes in the viewport to help AI understand spatial relationships:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `draw-sphere` | Draw sphere at actor/position | `draw-sphere a0 100 --color=red --duration=5` |
+| `draw-line` | Draw line between two points | `draw-line a0 a1 --color=green` |
+| `draw-text` | Draw text label at actor | `draw-text a0 "Player Start"` |
+| `draw-box` | Draw bounding box around actor | `draw-box a0 --color=yellow` |
+| `clear-debug` | Clear all debug draws | `clear-debug` |
+
+### Blueprint Inspection Commands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `blueprint` | Get Blueprint graph as YAML | `blueprint /Game/Blueprints/BP_Character` |
+
+Returns node graph with connections, event nodes, function calls, and variables.
+
+### Undo/Redo Transaction Commands
+
+Group multiple operations into a single undoable transaction:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `begin-transaction` | Start undo transaction | `begin-transaction "Move furniture"` |
+| `end-transaction` | Commit transaction | `end-transaction` |
+| `undo` | Undo operation(s) | `undo` or `undo 3` |
+| `redo` | Redo operation(s) | `redo` or `redo 2` |
+
+### Diff/Compare Mode Commands
+
+Snapshot scene state, make changes, compare or restore:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `save-state` | Snapshot current scene | `save-state before` |
+| `diff` | Compare current to saved | `diff before` |
+| `restore` | Restore to saved state | `restore before` |
+| `list-states` | List all saved states | `list-states` |
 
 ### Screenshot Behavior
 
@@ -181,6 +227,17 @@ VisualAgent is powered by these C++ handlers in `Handlers_VisualAgent.cpp`:
 | `/api/set-viewport` | Set camera position and rotation |
 | `/api/wait-ready` | Wait for assets/compile/render to complete |
 | `/api/resolve-ref` | Resolve short ref to actor/component name |
+| `/api/draw-debug` | Draw debug shapes (sphere, line, text, box) |
+| `/api/clear-debug` | Clear all debug draws |
+| `/api/blueprint-snapshot` | Get Blueprint graph structure |
+| `/api/begin-transaction` | Start undo transaction |
+| `/api/end-transaction` | End undo transaction |
+| `/api/undo` | Undo operation(s) |
+| `/api/redo` | Redo operation(s) |
+| `/api/save-state` | Save scene state snapshot |
+| `/api/diff-state` | Compare current scene to saved state |
+| `/api/restore-state` | Restore scene to saved state |
+| `/api/list-states` | List all saved state snapshots |
 
 ---
 
@@ -203,9 +260,9 @@ VisualAgent is powered by these C++ handlers in `Handlers_VisualAgent.cpp`:
 | `core/cli.py` | ~150 | Command-line interface for direct operation. |
 | `ui/server.py` | ~600 | Flask REST API server with 25+ endpoints. |
 | `ui/static/index.html` | ~2200 | Single-page dashboard application with 10 views. |
-| `AgenticMCP/Tools/visual-agent.js` | ~590 | VisualAgent unified CLI tool for visual automation. |
+| `AgenticMCP/Tools/visual-agent.js` | ~850 | VisualAgent unified CLI tool for visual automation. |
 | `AgenticMCP/Tools/index.js` | ~300 | MCP server with tool registration and routing. |
-| `AgenticMCP/Source/.../Handlers_VisualAgent.cpp` | ~770 | C++ handlers for VisualAgent scene snapshot, screenshot, camera control. |
+| `AgenticMCP/Source/.../Handlers_VisualAgent.cpp` | ~1300 | C++ handlers for VisualAgent: snapshots, screenshots, debug viz, undo/redo, diff. |
 | `ue_plugin/JarvisEditor/` | ~900 | C++ editor plugin for Blueprint graph manipulation (12 functions). |
 | `setup.sh` | ~80 | Bootstrap script for automated environment setup. |
 | `run_dashboard.py` | ~30 | Server launcher script. |
