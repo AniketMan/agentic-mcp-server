@@ -1092,110 +1092,70 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleXRGetHandTracking(Params, Body);
 	});
 
-	// ---- PIE Control ----
-	HandlerMap.Add(TEXT("startPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	// ---- RenderDoc GPU Debugging ----
+	HandlerMap.Add(TEXT("renderdocStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleStartPIE(Params, Body);
+		return HandleRenderDocGetStatus(Params, Body);
 	});
-	HandlerMap.Add(TEXT("stopPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocCaptureFrame"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleStopPIE(Params, Body);
+		return HandleRenderDocCaptureFrame(Params, Body);
 	});
-	HandlerMap.Add(TEXT("pausePIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocCaptureMulti"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandlePausePIE(Params, Body);
+		return HandleRenderDocCaptureMulti(Params, Body);
 	});
-	HandlerMap.Add(TEXT("stepPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocCapturePIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleStepPIE(Params, Body);
+		return HandleRenderDocCapturePIE(Params, Body);
 	});
-	HandlerMap.Add(TEXT("getPIEState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocListCaptures"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleGetPIEState(Params, Body);
+		return HandleRenderDocListCaptures(Params, Body);
 	});
-
-	// ---- Console Commands ----
-	HandlerMap.Add(TEXT("executeConsole"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocOpenCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleExecuteConsole(Params, Body);
+		return HandleRenderDocOpenCapture(Params, Body);
 	});
-	HandlerMap.Add(TEXT("getCVar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocDeleteCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleGetCVar(Params, Body);
+		return HandleRenderDocDeleteCapture(Params, Body);
 	});
-	HandlerMap.Add(TEXT("setCVar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocGetSettings"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleSetCVar(Params, Body);
+		return HandleRenderDocGetSettings(Params, Body);
 	});
-	HandlerMap.Add(TEXT("listCVars"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocSetSettings"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleListCVars(Params, Body);
+		return HandleRenderDocSetSettings(Params, Body);
 	});
-
-	// ---- MetaXR/OculusXR 5.6 ----
-	HandlerMap.Add(TEXT("xrGetHMDState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocSetOverlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRGetHMDState(Params, Body);
+		return HandleRenderDocSetOverlay(Params, Body);
 	});
-	HandlerMap.Add(TEXT("xrSetTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocLaunchUI"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRSetTracking(Params, Body);
+		return HandleRenderDocLaunchUI(Params, Body);
 	});
-	HandlerMap.Add(TEXT("xrGetControllers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocIsCapturing"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRGetControllers(Params, Body);
+		return HandleRenderDocIsCapturing(Params, Body);
 	});
-	HandlerMap.Add(TEXT("xrTriggerHaptic"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocSetCapturePath"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRTriggerHaptic(Params, Body);
+		return HandleRenderDocSetCapturePath(Params, Body);
 	});
-	HandlerMap.Add(TEXT("xrStopHaptic"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocGetGPUInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRStopHaptic(Params, Body);
+		return HandleRenderDocGetGPUInfo(Params, Body);
 	});
-	HandlerMap.Add(TEXT("xrRecenter"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocTriggerCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRRecenter(Params, Body);
+		return HandleRenderDocTriggerCapture(Params, Body);
 	});
-	HandlerMap.Add(TEXT("xrGetGuardian"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	HandlerMap.Add(TEXT("renderdocCleanCaptures"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
-		return HandleXRGetGuardian(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrGetPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRGetPassthrough(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrSetPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRSetPassthrough(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrGetEyeTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRGetEyeTracking(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrSetEyeTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRSetEyeTracking(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrGetFaceTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRGetFaceTracking(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrSetFaceTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRSetFaceTracking(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrGetBodyTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRGetBodyTracking(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrSetBodyTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRSetBodyTracking(Params, Body);
-	});
-	HandlerMap.Add(TEXT("xrGetHandTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleXRGetHandTracking(Params, Body);
+		return HandleRenderDocCleanCaptures(Params, Body);
 	});
 }
 

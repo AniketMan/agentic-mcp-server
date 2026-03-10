@@ -5,8 +5,6 @@
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "LevelEditor.h"
-#include "ILevelViewport.h"
-#include "EditorModeManager.h"
 #include "UnrealEdGlobals.h"
 #include "Editor/UnrealEdEngine.h"
 #include "Settings/LevelEditorPlaySettings.h"
@@ -40,14 +38,6 @@ FString FAgenticMCPServer::HandleStartPIE(const TMap<FString, FString>& Params, 
 		SessionParams.WorldType = EPlaySessionWorldType::PlayInEditor;
 		SessionParams.DestinationSlateViewport = nullptr; // Standalone window
 	}
-	else if (Mode.Equals(TEXT("mobile"), ESearchCase::IgnoreCase))
-	{
-		SessionParams.WorldType = EPlaySessionWorldType::PlayInMobilePreview;
-	}
-	else if (Mode.Equals(TEXT("vr"), ESearchCase::IgnoreCase))
-	{
-		SessionParams.WorldType = EPlaySessionWorldType::PlayInVR;
-	}
 	else
 	{
 		// Default: Play in active viewport
@@ -57,7 +47,7 @@ FString FAgenticMCPServer::HandleStartPIE(const TMap<FString, FString>& Params, 
 	// Start PIE session
 	GEditor->RequestPlaySession(SessionParams);
 
-	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetStringField(TEXT("message"), TEXT("PIE session started"));
 	Result->SetStringField(TEXT("mode"), Mode.IsEmpty() ? TEXT("viewport") : Mode);
@@ -79,7 +69,7 @@ FString FAgenticMCPServer::HandleStopPIE(const TMap<FString, FString>& Params, c
 
 	GEditor->RequestEndPlayMap();
 
-	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetStringField(TEXT("message"), TEXT("PIE session stopped"));
 
@@ -119,7 +109,7 @@ FString FAgenticMCPServer::HandlePausePIE(const TMap<FString, FString>& Params, 
 		PC->SetPause(bPause);
 	}
 
-	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetBoolField(TEXT("paused"), bPause);
 	Result->SetStringField(TEXT("message"), bPause ? TEXT("PIE paused") : TEXT("PIE resumed"));
@@ -154,7 +144,7 @@ FString FAgenticMCPServer::HandleStepPIE(const TMap<FString, FString>& Params, c
 		GEditor->PlayWorld->Tick(LEVELTICK_All, GEditor->PlayWorld->GetDeltaSeconds());
 	}
 
-	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetNumberField(TEXT("framesAdvanced"), Frames);
 
@@ -168,7 +158,7 @@ FString FAgenticMCPServer::HandleGetPIEState(const TMap<FString, FString>& Param
 		return MakeErrorJson(TEXT("Editor not available"));
 	}
 
-	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
 
 	bool bIsPlaying = GEditor->PlayWorld != nullptr;
@@ -186,7 +176,7 @@ FString FAgenticMCPServer::HandleGetPIEState(const TMap<FString, FString>& Param
 		{
 			if (APawn* Pawn = PC->GetPawn())
 			{
-				TSharedPtr<FJsonObject> PlayerObj = MakeShared<FJsonObject>();
+				TSharedRef<FJsonObject> PlayerObj = MakeShared<FJsonObject>();
 				FVector Loc = Pawn->GetActorLocation();
 				FRotator Rot = Pawn->GetActorRotation();
 				PlayerObj->SetNumberField(TEXT("x"), Loc.X);
@@ -200,16 +190,8 @@ FString FAgenticMCPServer::HandleGetPIEState(const TMap<FString, FString>& Param
 			}
 		}
 
-		// Get world type
-		FString WorldType;
-		switch (GEditor->GetPlaySessionWorldType())
-		{
-			case EPlaySessionWorldType::PlayInEditor: WorldType = TEXT("PIE"); break;
-			case EPlaySessionWorldType::SimulateInEditor: WorldType = TEXT("Simulate"); break;
-			case EPlaySessionWorldType::PlayInVR: WorldType = TEXT("VR"); break;
-			case EPlaySessionWorldType::PlayInMobilePreview: WorldType = TEXT("Mobile"); break;
-			default: WorldType = TEXT("Unknown"); break;
-		}
+		// Determine world type based on whether we're simulating
+		FString WorldType = GEditor->bIsSimulatingInEditor ? TEXT("Simulate") : TEXT("PIE");
 		Result->SetStringField(TEXT("worldType"), WorldType);
 	}
 

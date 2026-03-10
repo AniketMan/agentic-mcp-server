@@ -257,6 +257,59 @@ These endpoints provide AI agent access to Quest headset state, tracking, and se
 
 ---
 
+## 9. RenderDoc GPU Debugging
+
+These endpoints provide AI agent access to RenderDoc frame capture and GPU debugging capabilities. **Requires RenderDoc plugin enabled or launch with -AttachRenderDoc.**
+
+### Status & Info
+
+| Tool | What It Does | Key Parameters |
+|------|-------------|----------------|
+| `renderdocStatus` | Get RenderDoc connection status, plugin availability | none |
+| `renderdocIsCapturing` | Check if frame capture is currently in progress | none |
+| `renderdocGetGPUInfo` | Get GPU/RHI info (adapter, driver, feature level, memory) | none |
+
+### Frame Capture
+
+| Tool | What It Does | Key Parameters |
+|------|-------------|----------------|
+| `renderdocCaptureFrame` | Capture the current frame | `filename` (optional) |
+| `renderdocCaptureMulti` | Capture multiple consecutive frames | `frameCount` (1-100) |
+| `renderdocCapturePIE` | Schedule capture when PIE session starts | `delayFrames` (optional) |
+| `renderdocTriggerCapture` | Immediate capture via RenderDoc API | none |
+
+### Capture Management
+
+| Tool | What It Does | Key Parameters |
+|------|-------------|----------------|
+| `renderdocListCaptures` | List all .rdc capture files in capture directory | none |
+| `renderdocOpenCapture` | Open a capture file in RenderDoc UI | `path` |
+| `renderdocDeleteCapture` | Delete a capture file | `path` |
+| `renderdocCleanCaptures` | Delete old captures based on age | `maxAgeDays` (default: 7) |
+| `renderdocSetCapturePath` | Set the capture output directory | `path` |
+
+### Settings & UI
+
+| Tool | What It Does | Key Parameters |
+|------|-------------|----------------|
+| `renderdocGetSettings` | Get current capture settings (CVars and plugin settings) | none |
+| `renderdocSetSettings` | Update capture settings | `captureAllActivity`, `captureFrameCount`, `captureDelay`, etc. |
+| `renderdocSetOverlay` | Enable/disable the RenderDoc overlay | `enabled` (bool) |
+| `renderdocLaunchUI` | Launch the RenderDoc UI application | none |
+
+### RenderDoc Settings Reference
+
+| Setting | CVar | Description |
+|---------|------|-------------|
+| `captureAllActivity` | `renderdoc.CaptureAllActivity` | Capture all viewports and editor windows |
+| `captureCallstacks` | `renderdoc.CaptureCallstacks` | Include API call stacks in capture |
+| `referenceAllResources` | `renderdoc.ReferenceAllResources` | Include all resources (increases file size) |
+| `saveAllInitials` | `renderdoc.SaveAllInitials` | Save initial resource states |
+| `captureDelay` | `renderdoc.CaptureDelay` | Delay before capture starts |
+| `captureFrameCount` | `renderdoc.CaptureFrameCount` | Number of frames to capture |
+
+---
+
 ## 10. Scene State Awareness
 
 The plugin provides mechanisms to understand what exists in the current scene.

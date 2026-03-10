@@ -15,6 +15,7 @@
 #include "EdGraphNode_Comment.h"
 #include "K2Node_Event.h"
 #include "K2Node_CustomEvent.h"
+#include "K2Node_FunctionEntry.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "Dom/JsonValue.h"
