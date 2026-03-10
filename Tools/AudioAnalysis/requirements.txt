@@ -1,0 +1,4 @@
+# Audio Analysis Requirements
+openai-whisper>=20231117
+flask>=2.3.0
+torch>=2.0.0

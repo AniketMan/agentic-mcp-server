@@ -1,0 +1,20 @@
+Animation Name,Character,Scene,Shot,Take,Duration (est),Sequence,Notes
+1_1_02_ue5_Heather_Child_gm01__1_,HeatherChild,1,1,02,,LS_1_1,Opening scene
+1_1_02b_ue5_Heather_Child_gm01__1_,HeatherChild,1,1,02b,,LS_1_1,Alternate take
+1_3_01_ue5_Heather_Child_gm01_Anim,HeatherChild,1,3,01,,LS_1_3,Take 1
+1_3_02_ue5_Heather_Child_gm01,HeatherChild,1,3,02,,LS_1_3,Take 2
+1_3_03_ue5_Heather_Child_gm01,HeatherChild,1,3,03,,LS_1_3,Take 3
+Full_Scene_1_V2_ue5_Anim,HeatherChild,1,Full,V2,,LS_1_Full,Full scene master
+Hug_Loop_2_Anim,HeatherChild,Special,Hug,Loop,,LS_HugLoop,Looping hug animation
+2_1_04_ue5__1__Anim1,HeatherChild,2,1,04,,LS_2_1,Child in Scene 2
+2_1_01_ue5_Heather_Preteen_gm01,HeatherPreTeen,2,1,01,,LS_2_1,Take 1
+2_1_02_ue5_Heather_Preteen_gm01,HeatherPreTeen,2,1,02,,LS_2_1,Take 2
+2_1_03_ue5_Heather_Preteen_gm01,HeatherPreTeen,2,1,03,,LS_2_1,Take 3
+2_1_04_ue5_Heather_Preteen_gm01,HeatherPreTeen,2,1,04,,LS_2_1,Take 4
+2_1_05_ue5_Heather_Preteen_gm01,HeatherPreTeen,2,1,05,,LS_2_1,Take 5
+2_2_05_ue5_Heather_Preteen_gm01,HeatherPreTeen,2,2,05,,LS_2_2R,Shot 2
+HEATHER__ADULT__sits__excitedly_waiting-__2_ue5,HeatherAdult,Adult,-,-,,-,Sitting/waiting idle
+Heather_takes_a_sip_of_her_whisky_and_coke-__ue5,HeatherAdult,Adult,-,-,,-,Drinking animation
+Livelyhands,HeatherAdult,Adult,-,-,,-,Hand gestures loop
+triggers_Heather_to_place_her_hand_in_Susan_ue5,HeatherAdult,Adult,-,-,,-,Susan interaction
+triggers_Heather_to_place_her_hand_in_Susan2_ue5,HeatherAdult,Adult,-,-,,-,Susan interaction alt

@@ -246,6 +246,25 @@ private:
 	FString HandleXRSetPerformanceLevels(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body);
 
+	// ---- Story Handlers (Handlers_Story.cpp) ----
+	FString HandleStoryState(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleStoryAdvance(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleStoryGoto(const TMap<FString, FString>& Params, const FString& Body);
+
+	// ---- DataTable Handlers (Handlers_DataTable.cpp) ----
+	FString HandleDataTableRead(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleDataTableWrite(const TMap<FString, FString>& Params, const FString& Body);
+
+	// ---- Animation Handlers (Handlers_Animation.cpp) ----
+	FString HandleAnimationPlay(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAnimationStop(const TMap<FString, FString>& Params, const FString& Body);
+
+	// ---- Material Handlers (Handlers_Materials.cpp) ----
+	FString HandleMaterialSetParam(const TMap<FString, FString>& Params, const FString& Body);
+
+	// ---- Collision Handlers (Handlers_Collision.cpp) ----
+	FString HandleCollisionTrace(const TMap<FString, FString>& Params, const FString& Body);
+
 	// ---- Audio Handlers (Handlers_Audio.cpp) ----
 	FString HandleAudioGetStatus(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleAudioListActiveSounds(const TMap<FString, FString>& Params, const FString& Body);
@@ -279,6 +298,9 @@ private:
 	FString HandlePixelStreamingGetCodec(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandlePixelStreamingSetCodec(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandlePixelStreamingListPlayers(const TMap<FString, FString>& Params, const FString& Body);
+
+	// ---- RenderDoc Handlers (Handlers_RenderDoc.cpp) ----
+	FString HandleRenderDocCapture(const TMap<FString, FString>& Params, const FString& Body);
 
 	// ============================================================
 	// Serialization helpers

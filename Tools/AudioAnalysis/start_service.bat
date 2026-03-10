@@ -1,0 +1,3 @@
+@echo off
+echo Starting Audio Analysis Service on port 9848...
+python transcribe.py --serve --port 9848

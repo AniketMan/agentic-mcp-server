@@ -1164,6 +1164,58 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleXRRecenter(Params, Body);
 	});
 
+	// ---- Story/Game Handlers ----
+	HandlerMap.Add(TEXT("storyState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryState(Params, Body);
+	});
+	HandlerMap.Add(TEXT("storyAdvance"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryAdvance(Params, Body);
+	});
+	HandlerMap.Add(TEXT("storyGoto"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryGoto(Params, Body);
+	});
+
+	// ---- DataTable Handlers ----
+	HandlerMap.Add(TEXT("dataTableRead"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDataTableRead(Params, Body);
+	});
+	HandlerMap.Add(TEXT("dataTableWrite"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDataTableWrite(Params, Body);
+	});
+
+	// ---- Animation Handlers ----
+	HandlerMap.Add(TEXT("animationPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimationPlay(Params, Body);
+	});
+	HandlerMap.Add(TEXT("animationStop"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimationStop(Params, Body);
+	});
+
+	// ---- Material Handlers ----
+	HandlerMap.Add(TEXT("materialSetParam"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialSetParam(Params, Body);
+	});
+
+	// ---- Collision Handlers ----
+	HandlerMap.Add(TEXT("collisionTrace"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleCollisionTrace(Params, Body);
+	});
+
+	// ---- RenderDoc Handlers ----
+	HandlerMap.Add(TEXT("renderDocCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRenderDocCapture(Params, Body);
+	});
+
 	// ---- Audio Handlers ----
 	HandlerMap.Add(TEXT("audioGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
@@ -1855,6 +1907,38 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("xrSetPerformanceLevels")));
 	Router->BindRoute(FHttpPath(TEXT("/api/xr/recenter")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("xrRecenter")));
+
+	// Story/Game Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/story/state")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("storyState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/story/advance")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("storyAdvance")));
+	Router->BindRoute(FHttpPath(TEXT("/api/story/goto")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("storyGoto")));
+
+	// DataTable Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/datatable/read")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("dataTableRead")));
+	Router->BindRoute(FHttpPath(TEXT("/api/datatable/write")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("dataTableWrite")));
+
+	// Animation Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/animation/play")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("animationPlay")));
+	Router->BindRoute(FHttpPath(TEXT("/api/animation/stop")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("animationStop")));
+
+	// Material Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/material/set-param")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("materialSetParam")));
+
+	// Collision Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/collision/trace")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("collisionTrace")));
+
+	// RenderDoc Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/renderdoc/capture")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("renderDocCapture")));
 
 	// ---- Start listening ----
 	HttpModule.StartAllListeners();
