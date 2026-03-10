@@ -39,10 +39,13 @@ public class AgenticMCP : ModuleRules
 			"ImageWrapper",       // PNG/JPEG compression for screenshots
 			"GraphEditor",        // Graph editor for K2Node types
 			"RenderCore",         // FlushRenderingCommands
-		"LevelSequence",      // Level Sequence reading/editing
+			"LevelSequence",      // Level Sequence reading/editing
 			"MovieScene",         // MovieScene tracks and sections
 			"MovieSceneTracks",   // Audio, Animation tracks
 			"Niagara",            // Niagara particle system APIs
+			"InputCore",          // EKeys, FKey for input simulation
+			"Slate",              // FSlateApplication for input
+			"SlateCore",          // Slate core types
 			"OculusXRHMD",        // Meta XR HMD APIs
 			"OculusXRInput"       // Meta XR Input/Hand tracking APIs
 		});

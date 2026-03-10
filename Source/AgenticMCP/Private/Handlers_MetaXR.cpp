@@ -10,7 +10,6 @@
 // OculusXR includes
 #include "OculusXRFunctionLibrary.h"
 #include "OculusXRInputFunctionLibrary.h"
-#include "OculusXRPassthroughLayerComponent.h"
 #include "OculusXRHMDTypes.h"
 
 FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, const FString& Body)
@@ -182,33 +181,34 @@ FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Pa
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Check if hand tracking is enabled
-	bool bLeftHandTracked = UOculusXRInputFunctionLibrary::IsHandTrackingEnabled();
-	Result->SetBoolField(TEXT("handTrackingEnabled"), bLeftHandTracked);
+	bool bHandTrackingEnabled = UOculusXRInputFunctionLibrary::IsHandTrackingEnabled();
+	Result->SetBoolField(TEXT("handTrackingEnabled"), bHandTrackingEnabled);
 
-	if (bLeftHandTracked)
+	if (bHandTrackingEnabled)
 	{
 		// Left hand
 		TSharedRef<FJsonObject> LeftHandObj = MakeShared<FJsonObject>();
 		EOculusXRTrackingConfidence LeftConfidence = UOculusXRInputFunctionLibrary::GetTrackingConfidence(EOculusXRHandType::HandLeft);
 		LeftHandObj->SetStringField(TEXT("confidence"), LeftConfidence == EOculusXRTrackingConfidence::High ? TEXT("High") : TEXT("Low"));
 
-		FQuat LeftRotation;
-		FVector LeftPosition;
-		float LeftRadius;
-		bool bLeftValid = UOculusXRInputFunctionLibrary::GetHandPointerPose(EOculusXRHandType::HandLeft, LeftRotation, LeftPosition, LeftRadius);
-		LeftHandObj->SetBoolField(TEXT("valid"), bLeftValid);
+		bool bLeftValid = UOculusXRInputFunctionLibrary::IsPointerPoseValid(EOculusXRHandType::HandLeft);
+		LeftHandObj->SetBoolField(TEXT("pointerPoseValid"), bLeftValid);
 		if (bLeftValid)
 		{
+			FTransform LeftPointerPose = UOculusXRInputFunctionLibrary::GetPointerPose(EOculusXRHandType::HandLeft);
+			FVector LeftPosition = LeftPointerPose.GetLocation();
+			FRotator LeftRotation = LeftPointerPose.GetRotation().Rotator();
 			LeftHandObj->SetNumberField(TEXT("positionX"), LeftPosition.X);
 			LeftHandObj->SetNumberField(TEXT("positionY"), LeftPosition.Y);
 			LeftHandObj->SetNumberField(TEXT("positionZ"), LeftPosition.Z);
+			LeftHandObj->SetNumberField(TEXT("rotationPitch"), LeftRotation.Pitch);
+			LeftHandObj->SetNumberField(TEXT("rotationYaw"), LeftRotation.Yaw);
+			LeftHandObj->SetNumberField(TEXT("rotationRoll"), LeftRotation.Roll);
 		}
 
-		// Pinch strength
-		float LeftIndexPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandLeft, EOculusXRFinger::Index);
-		float LeftThumbPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandLeft, EOculusXRFinger::Thumb);
-		LeftHandObj->SetNumberField(TEXT("indexPinchStrength"), LeftIndexPinch);
-		LeftHandObj->SetNumberField(TEXT("thumbPinchStrength"), LeftThumbPinch);
+		// Hand scale
+		float LeftScale = UOculusXRInputFunctionLibrary::GetHandScale(EOculusXRHandType::HandLeft);
+		LeftHandObj->SetNumberField(TEXT("handScale"), LeftScale);
 
 		Result->SetObjectField(TEXT("leftHand"), LeftHandObj);
 
@@ -217,23 +217,28 @@ FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Pa
 		EOculusXRTrackingConfidence RightConfidence = UOculusXRInputFunctionLibrary::GetTrackingConfidence(EOculusXRHandType::HandRight);
 		RightHandObj->SetStringField(TEXT("confidence"), RightConfidence == EOculusXRTrackingConfidence::High ? TEXT("High") : TEXT("Low"));
 
-		FQuat RightRotation;
-		FVector RightPosition;
-		float RightRadius;
-		bool bRightValid = UOculusXRInputFunctionLibrary::GetHandPointerPose(EOculusXRHandType::HandRight, RightRotation, RightPosition, RightRadius);
-		RightHandObj->SetBoolField(TEXT("valid"), bRightValid);
+		bool bRightValid = UOculusXRInputFunctionLibrary::IsPointerPoseValid(EOculusXRHandType::HandRight);
+		RightHandObj->SetBoolField(TEXT("pointerPoseValid"), bRightValid);
 		if (bRightValid)
 		{
+			FTransform RightPointerPose = UOculusXRInputFunctionLibrary::GetPointerPose(EOculusXRHandType::HandRight);
+			FVector RightPosition = RightPointerPose.GetLocation();
+			FRotator RightRotation = RightPointerPose.GetRotation().Rotator();
 			RightHandObj->SetNumberField(TEXT("positionX"), RightPosition.X);
 			RightHandObj->SetNumberField(TEXT("positionY"), RightPosition.Y);
 			RightHandObj->SetNumberField(TEXT("positionZ"), RightPosition.Z);
+			RightHandObj->SetNumberField(TEXT("rotationPitch"), RightRotation.Pitch);
+			RightHandObj->SetNumberField(TEXT("rotationYaw"), RightRotation.Yaw);
+			RightHandObj->SetNumberField(TEXT("rotationRoll"), RightRotation.Roll);
 		}
 
-		// Pinch strength
-		float RightIndexPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandRight, EOculusXRFinger::Index);
-		float RightThumbPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandRight, EOculusXRFinger::Thumb);
-		RightHandObj->SetNumberField(TEXT("indexPinchStrength"), RightIndexPinch);
-		RightHandObj->SetNumberField(TEXT("thumbPinchStrength"), RightThumbPinch);
+		// Hand scale
+		float RightScale = UOculusXRInputFunctionLibrary::GetHandScale(EOculusXRHandType::HandRight);
+		RightHandObj->SetNumberField(TEXT("handScale"), RightScale);
+
+		// Dominant hand
+		EOculusXRHandType DominantHand = UOculusXRInputFunctionLibrary::GetDominantHand();
+		Result->SetStringField(TEXT("dominantHand"), DominantHand == EOculusXRHandType::HandLeft ? TEXT("Left") : TEXT("Right"));
 
 		Result->SetObjectField(TEXT("rightHand"), RightHandObj);
 	}
