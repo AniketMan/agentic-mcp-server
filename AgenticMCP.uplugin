@@ -1,0 +1,28 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "AgenticMCP",
+	"Description": "MCP server for AI-driven Blueprint manipulation, actor management, and level editing in UE5",
+	"Category": "Editor",
+	"CreatedBy": "Aniket Bhatt",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"EnabledByDefault": true,
+	"Modules": [
+		{
+			"Name": "AgenticMCP",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "OculusXR",
+			"Enabled": true
+		}
+	]
+}
