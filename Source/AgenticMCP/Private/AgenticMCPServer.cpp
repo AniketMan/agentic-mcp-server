@@ -1116,6 +1116,12 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleSetCVar(Params, Body);
 	});
 
+	// ---- Input Simulation ----
+	HandlerMap.Add(TEXT("simulateInput"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSimulateInput(Params, Body);
+	});
+
 	// ---- Audio Handlers ----
 	HandlerMap.Add(TEXT("audioGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
@@ -1719,6 +1725,10 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("getCVar")));
 	Router->BindRoute(FHttpPath(TEXT("/api/set-cvar")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("setCVar")));
+
+	// Input Simulation (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/simulate-input")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("simulateInput")));
 
 	// Audio Endpoints
 	Router->BindRoute(FHttpPath(TEXT("/api/audio/status")), EHttpServerRequestVerbs::VERB_GET,

@@ -231,6 +231,9 @@ private:
 	FString HandleGetCVar(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleSetCVar(const TMap<FString, FString>& Params, const FString& Body);
 
+	// ---- Input Simulation (Handlers_Input.cpp) ----
+	FString HandleSimulateInput(const TMap<FString, FString>& Params, const FString& Body);
+
 	// ---- Audio Handlers (Handlers_Audio.cpp) ----
 	FString HandleAudioGetStatus(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleAudioListActiveSounds(const TMap<FString, FString>& Params, const FString& Body);
