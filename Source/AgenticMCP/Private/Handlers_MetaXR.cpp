@@ -1,484 +1,398 @@
-// Copyright (c) Meta Platforms, Inc. All Rights Reserved.
-// Meta XR / OculusXR 5.6 endpoint handlers for AgenticMCP
+// Handlers_MetaXR.cpp
+// Meta XR / OculusXR handlers for AgenticMCP
+// Controls passthrough, guardian, hand tracking, HMD info
 
 #include "AgenticMCPServer.h"
-#include "Misc/App.h"
-#include "Engine/World.h"
-#include "Engine/Engine.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 
-// OculusXR 5.6 Headers
+// OculusXR includes
 #include "OculusXRFunctionLibrary.h"
-#include "OculusXRHMDTypes.h"
 #include "OculusXRInputFunctionLibrary.h"
-#include "OculusXRMovementFunctionLibrary.h"
-#include "OculusXRMovementTypes.h"
-#include "IOculusXRHMDModule.h"
+#include "OculusXRPassthroughLayerComponent.h"
+#include "OculusXRHMDTypes.h"
 
-// ============================================================================
-// HMD STATE & DEVICE INFO
-// ============================================================================
-
-FString FAgenticMCPServer::HandleXRGetHMDState(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    if (!IOculusXRHMDModule::IsAvailable())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("OculusXR HMD module not available"));
-        return JsonObjectToString(Response);
-    }
+	// Device info
+	FString DeviceName = UOculusXRFunctionLibrary::GetDeviceName();
+	EOculusXRDeviceType DeviceType = UOculusXRFunctionLibrary::GetDeviceType();
 
-    Response->SetStringField(TEXT("status"), TEXT("success"));
+	Result->SetStringField(TEXT("deviceName"), DeviceName);
+	Result->SetStringField(TEXT("deviceType"), UEnum::GetValueAsString(DeviceType));
 
-    EOculusXRDeviceType DeviceType = UOculusXRFunctionLibrary::GetDeviceType();
-    Response->SetStringField(TEXT("device_type"), StaticEnum<EOculusXRDeviceType>()->GetNameStringByValue((int64)DeviceType));
+	// HMD Pose
+	FRotator DeviceRotation;
+	FVector DevicePosition;
+	FVector NeckPosition;
+	UOculusXRFunctionLibrary::GetPose(DeviceRotation, DevicePosition, NeckPosition);
 
-    FRotator DeviceRotation;
-    FVector DevicePosition;
-    FVector NeckPosition;
-    UOculusXRFunctionLibrary::GetPose(DeviceRotation, DevicePosition, NeckPosition);
+	TSharedRef<FJsonObject> PoseObj = MakeShared<FJsonObject>();
+	PoseObj->SetNumberField(TEXT("rotationPitch"), DeviceRotation.Pitch);
+	PoseObj->SetNumberField(TEXT("rotationYaw"), DeviceRotation.Yaw);
+	PoseObj->SetNumberField(TEXT("rotationRoll"), DeviceRotation.Roll);
+	PoseObj->SetNumberField(TEXT("positionX"), DevicePosition.X);
+	PoseObj->SetNumberField(TEXT("positionY"), DevicePosition.Y);
+	PoseObj->SetNumberField(TEXT("positionZ"), DevicePosition.Z);
+	Result->SetObjectField(TEXT("pose"), PoseObj);
 
-    TSharedRef<FJsonObject> PoseObj = MakeShared<FJsonObject>();
-    PoseObj->SetNumberField(TEXT("rotation_pitch"), DeviceRotation.Pitch);
-    PoseObj->SetNumberField(TEXT("rotation_yaw"), DeviceRotation.Yaw);
-    PoseObj->SetNumberField(TEXT("rotation_roll"), DeviceRotation.Roll);
-    PoseObj->SetNumberField(TEXT("position_x"), DevicePosition.X);
-    PoseObj->SetNumberField(TEXT("position_y"), DevicePosition.Y);
-    PoseObj->SetNumberField(TEXT("position_z"), DevicePosition.Z);
-    Response->SetObjectField(TEXT("pose"), PoseObj);
+	// Tracking status
+	bool bHMDTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::HMD);
+	bool bLeftControllerTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::LTouch);
+	bool bRightControllerTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::RTouch);
 
-    Response->SetBoolField(TEXT("hmd_tracked"), UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::HMD));
-    Response->SetBoolField(TEXT("has_input_focus"), UOculusXRFunctionLibrary::HasInputFocus());
-    Response->SetNumberField(TEXT("display_frequency"), UOculusXRFunctionLibrary::GetCurrentDisplayFrequency());
+	TSharedRef<FJsonObject> TrackingObj = MakeShared<FJsonObject>();
+	TrackingObj->SetBoolField(TEXT("hmd"), bHMDTracked);
+	TrackingObj->SetBoolField(TEXT("leftController"), bLeftControllerTracked);
+	TrackingObj->SetBoolField(TEXT("rightController"), bRightControllerTracked);
+	Result->SetObjectField(TEXT("tracking"), TrackingObj);
 
-    bool bGPUAvailable;
-    float GPUUtilization;
-    UOculusXRFunctionLibrary::GetGPUUtilization(bGPUAvailable, GPUUtilization);
-    Response->SetNumberField(TEXT("gpu_utilization"), GPUUtilization);
-    Response->SetNumberField(TEXT("gpu_frame_time"), UOculusXRFunctionLibrary::GetGPUFrameTime());
+	// Passthrough support
+	bool bPassthroughSupported = UOculusXRFunctionLibrary::IsPassthroughSupported();
+	bool bColorPassthroughSupported = UOculusXRFunctionLibrary::IsColorPassthroughSupported();
+	bool bPassthroughRecommended = UOculusXRFunctionLibrary::IsPassthroughRecommended();
 
-    return JsonObjectToString(Response);
+	TSharedRef<FJsonObject> PassthroughObj = MakeShared<FJsonObject>();
+	PassthroughObj->SetBoolField(TEXT("supported"), bPassthroughSupported);
+	PassthroughObj->SetBoolField(TEXT("colorSupported"), bColorPassthroughSupported);
+	PassthroughObj->SetBoolField(TEXT("recommended"), bPassthroughRecommended);
+	Result->SetObjectField(TEXT("passthrough"), PassthroughObj);
+
+	// Display info
+	float CurrentFreq = UOculusXRFunctionLibrary::GetCurrentDisplayFrequency();
+	TArray<float> AvailableFreqs = UOculusXRFunctionLibrary::GetAvailableDisplayFrequencies();
+
+	TSharedRef<FJsonObject> DisplayObj = MakeShared<FJsonObject>();
+	DisplayObj->SetNumberField(TEXT("currentFrequency"), CurrentFreq);
+	TArray<TSharedPtr<FJsonValue>> FreqArray;
+	for (float Freq : AvailableFreqs)
+	{
+		FreqArray.Add(MakeShared<FJsonValueNumber>(Freq));
+	}
+	DisplayObj->SetArrayField(TEXT("availableFrequencies"), FreqArray);
+	Result->SetObjectField(TEXT("display"), DisplayObj);
+
+	// Performance
+	EOculusXRProcessorPerformanceLevel CpuLevel, GpuLevel;
+	UOculusXRFunctionLibrary::GetSuggestedCpuAndGpuPerformanceLevels(CpuLevel, GpuLevel);
+
+	TSharedRef<FJsonObject> PerfObj = MakeShared<FJsonObject>();
+	PerfObj->SetStringField(TEXT("cpuLevel"), UEnum::GetValueAsString(CpuLevel));
+	PerfObj->SetStringField(TEXT("gpuLevel"), UEnum::GetValueAsString(GpuLevel));
+
+	bool bGpuAvailable;
+	float GpuUtil;
+	UOculusXRFunctionLibrary::GetGPUUtilization(bGpuAvailable, GpuUtil);
+	PerfObj->SetBoolField(TEXT("gpuAvailable"), bGpuAvailable);
+	PerfObj->SetNumberField(TEXT("gpuUtilization"), GpuUtil);
+	Result->SetObjectField(TEXT("performance"), PerfObj);
+
+	// Input focus
+	bool bHasInputFocus = UOculusXRFunctionLibrary::HasInputFocus();
+	bool bHasSystemOverlay = UOculusXRFunctionLibrary::HasSystemOverlayPresent();
+	Result->SetBoolField(TEXT("hasInputFocus"), bHasInputFocus);
+	Result->SetBoolField(TEXT("hasSystemOverlay"), bHasSystemOverlay);
+
+	return JsonToString(Result);
 }
 
-// ============================================================================
-// FACE TRACKING (OculusXRMovement 5.6)
-// ============================================================================
-
-FString FAgenticMCPServer::HandleXRGetFaceTracking(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    Response->SetBoolField(TEXT("supported"), UOculusXRMovementFunctionLibrary::IsFaceTrackingSupported());
-    Response->SetBoolField(TEXT("enabled"), UOculusXRMovementFunctionLibrary::IsFaceTrackingEnabled());
-    Response->SetBoolField(TEXT("visemes_supported"), UOculusXRMovementFunctionLibrary::IsFaceTrackingVisemesSupported());
+	// Guardian status
+	bool bConfigured = UOculusXRFunctionLibrary::IsGuardianConfigured();
+	bool bDisplayed = UOculusXRFunctionLibrary::IsGuardianDisplayed();
 
-    if (!UOculusXRMovementFunctionLibrary::IsFaceTrackingEnabled())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        return JsonObjectToString(Response);
-    }
+	Result->SetBoolField(TEXT("configured"), bConfigured);
+	Result->SetBoolField(TEXT("displayed"), bDisplayed);
 
-    FOculusXRFaceState FaceState;
-    if (UOculusXRMovementFunctionLibrary::TryGetFaceState(FaceState))
-    {
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        Response->SetBoolField(TEXT("valid"), FaceState.bIsValid);
-        Response->SetNumberField(TEXT("time"), FaceState.Time);
-        Response->SetNumberField(TEXT("expression_count"), FaceState.ExpressionWeights.Num());
-    }
-    else
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Failed to get face state"));
-    }
-    return JsonObjectToString(Response);
+	if (bConfigured)
+	{
+		// Play area dimensions
+		FVector OuterDimensions = UOculusXRFunctionLibrary::GetGuardianDimensions(EOculusXRBoundaryType::Boundary_Outer);
+		FVector PlayAreaDimensions = UOculusXRFunctionLibrary::GetGuardianDimensions(EOculusXRBoundaryType::Boundary_PlayArea);
+
+		TSharedRef<FJsonObject> OuterObj = MakeShared<FJsonObject>();
+		OuterObj->SetNumberField(TEXT("x"), OuterDimensions.X);
+		OuterObj->SetNumberField(TEXT("y"), OuterDimensions.Y);
+		OuterObj->SetNumberField(TEXT("z"), OuterDimensions.Z);
+		Result->SetObjectField(TEXT("outerBoundary"), OuterObj);
+
+		TSharedRef<FJsonObject> PlayAreaObj = MakeShared<FJsonObject>();
+		PlayAreaObj->SetNumberField(TEXT("x"), PlayAreaDimensions.X);
+		PlayAreaObj->SetNumberField(TEXT("y"), PlayAreaDimensions.Y);
+		PlayAreaObj->SetNumberField(TEXT("z"), PlayAreaDimensions.Z);
+		Result->SetObjectField(TEXT("playArea"), PlayAreaObj);
+
+		// Play area transform
+		FTransform PlayAreaTransform = UOculusXRFunctionLibrary::GetPlayAreaTransform();
+		TSharedRef<FJsonObject> TransformObj = MakeShared<FJsonObject>();
+		TransformObj->SetNumberField(TEXT("locationX"), PlayAreaTransform.GetLocation().X);
+		TransformObj->SetNumberField(TEXT("locationY"), PlayAreaTransform.GetLocation().Y);
+		TransformObj->SetNumberField(TEXT("locationZ"), PlayAreaTransform.GetLocation().Z);
+		TransformObj->SetNumberField(TEXT("rotationPitch"), PlayAreaTransform.GetRotation().Rotator().Pitch);
+		TransformObj->SetNumberField(TEXT("rotationYaw"), PlayAreaTransform.GetRotation().Rotator().Yaw);
+		TransformObj->SetNumberField(TEXT("rotationRoll"), PlayAreaTransform.GetRotation().Rotator().Roll);
+		Result->SetObjectField(TEXT("playAreaTransform"), TransformObj);
+
+		// Guardian boundary points (outer)
+		TArray<FVector> BoundaryPoints = UOculusXRFunctionLibrary::GetGuardianPoints(EOculusXRBoundaryType::Boundary_Outer, false);
+		TArray<TSharedPtr<FJsonValue>> PointsArray;
+		for (const FVector& Point : BoundaryPoints)
+		{
+			TSharedRef<FJsonObject> PointObj = MakeShared<FJsonObject>();
+			PointObj->SetNumberField(TEXT("x"), Point.X);
+			PointObj->SetNumberField(TEXT("y"), Point.Y);
+			PointObj->SetNumberField(TEXT("z"), Point.Z);
+			PointsArray.Add(MakeShared<FJsonValueObject>(PointObj));
+		}
+		Result->SetArrayField(TEXT("boundaryPoints"), PointsArray);
+	}
+
+	return JsonToString(Result);
 }
 
-FString FAgenticMCPServer::HandleXRSetFaceTracking(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRSetGuardianVisibility(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    TSharedPtr<FJsonObject> BodyJson;
-    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-    if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Invalid JSON body"));
-        return JsonObjectToString(Response);
-    }
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
 
-    bool bSuccess = true;
-    if (BodyJson->HasField(TEXT("enabled")))
-    {
-        if (BodyJson->GetBoolField(TEXT("enabled")))
-            bSuccess = UOculusXRMovementFunctionLibrary::StartFaceTracking();
-        else
-            bSuccess = UOculusXRMovementFunctionLibrary::StopFaceTracking();
-    }
+	bool bVisible = BodyJson->GetBoolField(TEXT("visible"));
 
-    Response->SetStringField(TEXT("status"), bSuccess ? TEXT("success") : TEXT("error"));
-    Response->SetBoolField(TEXT("enabled"), UOculusXRMovementFunctionLibrary::IsFaceTrackingEnabled());
-    return JsonObjectToString(Response);
+	UOculusXRFunctionLibrary::SetGuardianVisibility(bVisible);
+
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetBoolField(TEXT("guardianVisible"), bVisible);
+
+	return JsonToString(Result);
 }
 
-// ============================================================================
-// BODY TRACKING (OculusXRMovement 5.6)
-// ============================================================================
-
-FString FAgenticMCPServer::HandleXRGetBodyTracking(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    Response->SetBoolField(TEXT("supported"), UOculusXRMovementFunctionLibrary::IsBodyTrackingSupported());
-    Response->SetBoolField(TEXT("enabled"), UOculusXRMovementFunctionLibrary::IsBodyTrackingEnabled());
+	// Check if hand tracking is enabled
+	bool bLeftHandTracked = UOculusXRInputFunctionLibrary::IsHandTrackingEnabled();
+	Result->SetBoolField(TEXT("handTrackingEnabled"), bLeftHandTracked);
 
-    if (!UOculusXRMovementFunctionLibrary::IsBodyTrackingEnabled())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        return JsonObjectToString(Response);
-    }
+	if (bLeftHandTracked)
+	{
+		// Left hand
+		TSharedRef<FJsonObject> LeftHandObj = MakeShared<FJsonObject>();
+		EOculusXRTrackingConfidence LeftConfidence = UOculusXRInputFunctionLibrary::GetTrackingConfidence(EOculusXRHandType::HandLeft);
+		LeftHandObj->SetStringField(TEXT("confidence"), LeftConfidence == EOculusXRTrackingConfidence::High ? TEXT("High") : TEXT("Low"));
 
-    FOculusXRBodyState BodyState;
-    if (UOculusXRMovementFunctionLibrary::TryGetBodyState(BodyState))
-    {
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        Response->SetBoolField(TEXT("active"), BodyState.IsActive);
-        Response->SetNumberField(TEXT("confidence"), BodyState.Confidence);
-        Response->SetNumberField(TEXT("time"), BodyState.Time);
-        Response->SetNumberField(TEXT("joint_count"), BodyState.Joints.Num());
-    }
-    else
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Failed to get body state"));
-    }
-    return JsonObjectToString(Response);
+		FQuat LeftRotation;
+		FVector LeftPosition;
+		float LeftRadius;
+		bool bLeftValid = UOculusXRInputFunctionLibrary::GetHandPointerPose(EOculusXRHandType::HandLeft, LeftRotation, LeftPosition, LeftRadius);
+		LeftHandObj->SetBoolField(TEXT("valid"), bLeftValid);
+		if (bLeftValid)
+		{
+			LeftHandObj->SetNumberField(TEXT("positionX"), LeftPosition.X);
+			LeftHandObj->SetNumberField(TEXT("positionY"), LeftPosition.Y);
+			LeftHandObj->SetNumberField(TEXT("positionZ"), LeftPosition.Z);
+		}
+
+		// Pinch strength
+		float LeftIndexPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandLeft, EOculusXRFinger::Index);
+		float LeftThumbPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandLeft, EOculusXRFinger::Thumb);
+		LeftHandObj->SetNumberField(TEXT("indexPinchStrength"), LeftIndexPinch);
+		LeftHandObj->SetNumberField(TEXT("thumbPinchStrength"), LeftThumbPinch);
+
+		Result->SetObjectField(TEXT("leftHand"), LeftHandObj);
+
+		// Right hand
+		TSharedRef<FJsonObject> RightHandObj = MakeShared<FJsonObject>();
+		EOculusXRTrackingConfidence RightConfidence = UOculusXRInputFunctionLibrary::GetTrackingConfidence(EOculusXRHandType::HandRight);
+		RightHandObj->SetStringField(TEXT("confidence"), RightConfidence == EOculusXRTrackingConfidence::High ? TEXT("High") : TEXT("Low"));
+
+		FQuat RightRotation;
+		FVector RightPosition;
+		float RightRadius;
+		bool bRightValid = UOculusXRInputFunctionLibrary::GetHandPointerPose(EOculusXRHandType::HandRight, RightRotation, RightPosition, RightRadius);
+		RightHandObj->SetBoolField(TEXT("valid"), bRightValid);
+		if (bRightValid)
+		{
+			RightHandObj->SetNumberField(TEXT("positionX"), RightPosition.X);
+			RightHandObj->SetNumberField(TEXT("positionY"), RightPosition.Y);
+			RightHandObj->SetNumberField(TEXT("positionZ"), RightPosition.Z);
+		}
+
+		// Pinch strength
+		float RightIndexPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandRight, EOculusXRFinger::Index);
+		float RightThumbPinch = UOculusXRInputFunctionLibrary::GetHandFingerPinchStrength(EOculusXRHandType::HandRight, EOculusXRFinger::Thumb);
+		RightHandObj->SetNumberField(TEXT("indexPinchStrength"), RightIndexPinch);
+		RightHandObj->SetNumberField(TEXT("thumbPinchStrength"), RightThumbPinch);
+
+		Result->SetObjectField(TEXT("rightHand"), RightHandObj);
+	}
+
+	return JsonToString(Result);
 }
 
-FString FAgenticMCPServer::HandleXRSetBodyTracking(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    TSharedPtr<FJsonObject> BodyJson;
-    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-    if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Invalid JSON body"));
-        return JsonObjectToString(Response);
-    }
+	// Left controller
+	bool bLeftTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::LTouch);
+	EOculusXRControllerType LeftType = UOculusXRFunctionLibrary::GetControllerType(EControllerHand::Left);
 
-    bool bSuccess = true;
-    if (BodyJson->HasField(TEXT("enabled")))
-    {
-        if (BodyJson->GetBoolField(TEXT("enabled")))
-        {
-            EOculusXRBodyJointSet JointSet = EOculusXRBodyJointSet::UpperBody;
-            if (BodyJson->HasField(TEXT("joint_set")))
-            {
-                FString JointSetStr = BodyJson->GetStringField(TEXT("joint_set"));
-                if (JointSetStr.Equals(TEXT("FullBody"), ESearchCase::IgnoreCase))
-                    JointSet = EOculusXRBodyJointSet::FullBody;
-            }
-            bSuccess = UOculusXRMovementFunctionLibrary::StartBodyTrackingByJointSet(JointSet);
-        }
-        else
-        {
-            bSuccess = UOculusXRMovementFunctionLibrary::StopBodyTracking();
-        }
-    }
+	TSharedRef<FJsonObject> LeftObj = MakeShared<FJsonObject>();
+	LeftObj->SetBoolField(TEXT("tracked"), bLeftTracked);
+	LeftObj->SetStringField(TEXT("type"), UEnum::GetValueAsString(LeftType));
+	Result->SetObjectField(TEXT("left"), LeftObj);
 
-    Response->SetStringField(TEXT("status"), bSuccess ? TEXT("success") : TEXT("error"));
-    Response->SetBoolField(TEXT("enabled"), UOculusXRMovementFunctionLibrary::IsBodyTrackingEnabled());
-    return JsonObjectToString(Response);
+	// Right controller
+	bool bRightTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::RTouch);
+	EOculusXRControllerType RightType = UOculusXRFunctionLibrary::GetControllerType(EControllerHand::Right);
+
+	TSharedRef<FJsonObject> RightObj = MakeShared<FJsonObject>();
+	RightObj->SetBoolField(TEXT("tracked"), bRightTracked);
+	RightObj->SetStringField(TEXT("type"), UEnum::GetValueAsString(RightType));
+	Result->SetObjectField(TEXT("right"), RightObj);
+
+	return JsonToString(Result);
 }
 
-// ============================================================================
-// HAND TRACKING DETAIL (OculusXRInput 5.6)
-// ============================================================================
-
-FString FAgenticMCPServer::HandleXRGetHandTracking(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRPassthrough(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    if (!UOculusXRInputFunctionLibrary::IsHandTrackingEnabled())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Hand tracking is not enabled"));
-        return JsonObjectToString(Response);
-    }
+	bool bSupported = UOculusXRFunctionLibrary::IsPassthroughSupported();
+	bool bColorSupported = UOculusXRFunctionLibrary::IsColorPassthroughSupported();
+	bool bRecommended = UOculusXRFunctionLibrary::IsPassthroughRecommended();
+	bool bEnvironmentDepthStarted = UOculusXRFunctionLibrary::IsEnvironmentDepthStarted();
 
-    Response->SetStringField(TEXT("status"), TEXT("success"));
+	Result->SetBoolField(TEXT("supported"), bSupported);
+	Result->SetBoolField(TEXT("colorSupported"), bColorSupported);
+	Result->SetBoolField(TEXT("recommended"), bRecommended);
+	Result->SetBoolField(TEXT("environmentDepthStarted"), bEnvironmentDepthStarted);
 
-    // Left hand
-    TSharedRef<FJsonObject> LeftHand = MakeShared<FJsonObject>();
-    LeftHand->SetBoolField(TEXT("position_valid"), UOculusXRInputFunctionLibrary::IsHandPositionValid(EOculusXRHandType::HandLeft));
-    LeftHand->SetStringField(TEXT("confidence"),
-        StaticEnum<EOculusXRTrackingConfidence>()->GetNameStringByValue(
-            (int64)UOculusXRInputFunctionLibrary::GetTrackingConfidence(EOculusXRHandType::HandLeft)));
-    LeftHand->SetNumberField(TEXT("scale"), UOculusXRInputFunctionLibrary::GetHandScale(EOculusXRHandType::HandLeft));
-    Response->SetObjectField(TEXT("left_hand"), LeftHand);
-
-    // Right hand
-    TSharedRef<FJsonObject> RightHand = MakeShared<FJsonObject>();
-    RightHand->SetBoolField(TEXT("position_valid"), UOculusXRInputFunctionLibrary::IsHandPositionValid(EOculusXRHandType::HandRight));
-    RightHand->SetStringField(TEXT("confidence"),
-        StaticEnum<EOculusXRTrackingConfidence>()->GetNameStringByValue(
-            (int64)UOculusXRInputFunctionLibrary::GetTrackingConfidence(EOculusXRHandType::HandRight)));
-    RightHand->SetNumberField(TEXT("scale"), UOculusXRInputFunctionLibrary::GetHandScale(EOculusXRHandType::HandRight));
-    Response->SetObjectField(TEXT("right_hand"), RightHand);
-
-    Response->SetStringField(TEXT("dominant_hand"),
-        StaticEnum<EOculusXRHandType>()->GetNameStringByValue(
-            (int64)UOculusXRInputFunctionLibrary::GetDominantHand()));
-
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRStopHaptic(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-
-    UOculusXRInputFunctionLibrary::StopHapticEffect(EControllerHand::Left);
-    UOculusXRInputFunctionLibrary::StopHapticEffect(EControllerHand::Right);
-
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetStringField(TEXT("stopped"), TEXT("both"));
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRGetPassthrough(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetBoolField(TEXT("supported"), UOculusXRFunctionLibrary::IsPassthroughSupported());
-    Response->SetBoolField(TEXT("color_supported"), UOculusXRFunctionLibrary::IsColorPassthroughSupported());
-    Response->SetBoolField(TEXT("recommended"), UOculusXRFunctionLibrary::IsPassthroughRecommended());
-    Response->SetBoolField(TEXT("environment_depth_started"), UOculusXRFunctionLibrary::IsEnvironmentDepthStarted());
-
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRSetEyeTracking(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-
-    TSharedPtr<FJsonObject> BodyJson;
-    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-    if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Invalid JSON body"));
-        return JsonObjectToString(Response);
-    }
-
-    bool bEnable = BodyJson->HasField(TEXT("enabled")) ? BodyJson->GetBoolField(TEXT("enabled")) : true;
-    bool bSuccess = bEnable ? UOculusXRMovementFunctionLibrary::StartEyeTracking()
-                            : UOculusXRMovementFunctionLibrary::StopEyeTracking();
-
-    Response->SetStringField(TEXT("status"), bSuccess ? TEXT("success") : TEXT("error"));
-    Response->SetBoolField(TEXT("enabled"), UOculusXRMovementFunctionLibrary::IsEyeTrackingEnabled());
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRSetTracking(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-
-    TSharedPtr<FJsonObject> BodyJson;
-    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-    if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Invalid JSON body"));
-        return JsonObjectToString(Response);
-    }
-
-    if (BodyJson->HasField(TEXT("position_tracking")))
-    {
-        UOculusXRFunctionLibrary::EnablePositionTracking(BodyJson->GetBoolField(TEXT("position_tracking")));
-    }
-    if (BodyJson->HasField(TEXT("orientation_tracking")))
-    {
-        UOculusXRFunctionLibrary::EnableOrientationTracking(BodyJson->GetBoolField(TEXT("orientation_tracking")));
-    }
-
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetBoolField(TEXT("hmd_tracked"), UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::HMD));
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRGetControllers(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-
-    TSharedRef<FJsonObject> LeftController = MakeShared<FJsonObject>();
-    LeftController->SetBoolField(TEXT("tracked"), UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::LTouch));
-    LeftController->SetStringField(TEXT("type"),
-        StaticEnum<EOculusXRControllerType>()->GetNameStringByValue((int64)UOculusXRFunctionLibrary::GetControllerType(EControllerHand::Left)));
-    Response->SetObjectField(TEXT("left"), LeftController);
-
-    TSharedRef<FJsonObject> RightController = MakeShared<FJsonObject>();
-    RightController->SetBoolField(TEXT("tracked"), UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::RTouch));
-    RightController->SetStringField(TEXT("type"),
-        StaticEnum<EOculusXRControllerType>()->GetNameStringByValue((int64)UOculusXRFunctionLibrary::GetControllerType(EControllerHand::Right)));
-    Response->SetObjectField(TEXT("right"), RightController);
-
-    Response->SetBoolField(TEXT("hand_tracking_enabled"), UOculusXRInputFunctionLibrary::IsHandTrackingEnabled());
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRTriggerHaptic(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-
-    TSharedPtr<FJsonObject> BodyJson;
-    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-    if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Invalid JSON body"));
-        return JsonObjectToString(Response);
-    }
-
-    EControllerHand Hand = EControllerHand::Right;
-    if (BodyJson->HasField(TEXT("hand")))
-    {
-        FString HandStr = BodyJson->GetStringField(TEXT("hand"));
-        if (HandStr.Equals(TEXT("left"), ESearchCase::IgnoreCase)) Hand = EControllerHand::Left;
-    }
-
-    EOculusXRHandHapticsLocation Location = EOculusXRHandHapticsLocation::Hand;
-    if (BodyJson->HasField(TEXT("location")))
-    {
-        FString LocStr = BodyJson->GetStringField(TEXT("location"));
-        if (LocStr.Equals(TEXT("thumb"), ESearchCase::IgnoreCase)) Location = EOculusXRHandHapticsLocation::Thumb;
-        else if (LocStr.Equals(TEXT("index"), ESearchCase::IgnoreCase)) Location = EOculusXRHandHapticsLocation::Index;
-    }
-
-    float Frequency = BodyJson->HasField(TEXT("frequency")) ? BodyJson->GetNumberField(TEXT("frequency")) : 160.0f;
-    float Amplitude = BodyJson->HasField(TEXT("amplitude")) ? BodyJson->GetNumberField(TEXT("amplitude")) : 0.5f;
-
-    UOculusXRInputFunctionLibrary::SetHapticsByValue(Frequency, Amplitude, Hand, Location);
-
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetStringField(TEXT("hand"), Hand == EControllerHand::Left ? TEXT("left") : TEXT("right"));
-    Response->SetNumberField(TEXT("frequency"), Frequency);
-    Response->SetNumberField(TEXT("amplitude"), Amplitude);
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-
-    UOculusXRFunctionLibrary::SetBaseRotationAndBaseOffsetInMeters(
-        FRotator::ZeroRotator, FVector::ZeroVector, EOrientPositionSelector::OrientationAndPosition);
-
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetStringField(TEXT("message"), TEXT("HMD recentered"));
-    return JsonObjectToString(Response);
-}
-
-FString FAgenticMCPServer::HandleXRGetGuardian(const TMap<FString, FString>& Params, const FString& Body)
-{
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetBoolField(TEXT("configured"), UOculusXRFunctionLibrary::IsGuardianConfigured());
-
-    if (UOculusXRFunctionLibrary::IsGuardianConfigured())
-    {
-        // Get guardian play area dimensions
-        FVector PlayAreaDims = UOculusXRFunctionLibrary::GetGuardianDimensions(EOculusXRBoundaryType::Boundary_PlayArea);
-
-        TSharedRef<FJsonObject> PlayAreaObj = MakeShared<FJsonObject>();
-        PlayAreaObj->SetNumberField(TEXT("width"), PlayAreaDims.X);
-        PlayAreaObj->SetNumberField(TEXT("depth"), PlayAreaDims.Y);
-        PlayAreaObj->SetNumberField(TEXT("height"), PlayAreaDims.Z);
-        Response->SetObjectField(TEXT("play_area"), PlayAreaObj);
-    }
-    return JsonObjectToString(Response);
+	return JsonToString(Result);
 }
 
 FString FAgenticMCPServer::HandleXRSetPassthrough(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    TSharedPtr<FJsonObject> BodyJson;
-    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-    if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Invalid JSON body"));
-        return JsonObjectToString(Response);
-    }
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
 
-    if (BodyJson->HasField(TEXT("environment_depth")))
-    {
-        if (BodyJson->GetBoolField(TEXT("environment_depth")))
-            UOculusXRFunctionLibrary::StartEnvironmentDepth();
-        else
-            UOculusXRFunctionLibrary::StopEnvironmentDepth();
-    }
-    if (BodyJson->HasField(TEXT("hand_removal")))
-    {
-        UOculusXRFunctionLibrary::SetEnvironmentDepthHandRemoval(BodyJson->GetBoolField(TEXT("hand_removal")));
-    }
-    if (BodyJson->HasField(TEXT("local_dimming")))
-    {
-        UOculusXRFunctionLibrary::SetLocalDimmingOn(BodyJson->GetBoolField(TEXT("local_dimming")));
-    }
+	bool bEnable = BodyJson->GetBoolField(TEXT("enable"));
 
-    Response->SetStringField(TEXT("status"), TEXT("success"));
-    Response->SetBoolField(TEXT("passthrough_supported"), UOculusXRFunctionLibrary::IsPassthroughSupported());
-    Response->SetBoolField(TEXT("environment_depth_started"), UOculusXRFunctionLibrary::IsEnvironmentDepthStarted());
-    return JsonObjectToString(Response);
+	if (bEnable)
+	{
+		UOculusXRFunctionLibrary::StartEnvironmentDepth();
+	}
+	else
+	{
+		UOculusXRFunctionLibrary::StopEnvironmentDepth();
+	}
+
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetBoolField(TEXT("environmentDepthEnabled"), bEnable);
+
+	return JsonToString(Result);
 }
 
-FString FAgenticMCPServer::HandleXRGetEyeTracking(const TMap<FString, FString>& Params, const FString& Body)
+FString FAgenticMCPServer::HandleXRSetDisplayFrequency(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-    Response->SetBoolField(TEXT("supported"), UOculusXRMovementFunctionLibrary::IsEyeTrackingSupported());
-    Response->SetBoolField(TEXT("enabled"), UOculusXRMovementFunctionLibrary::IsEyeTrackingEnabled());
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
 
-    if (!UOculusXRMovementFunctionLibrary::IsEyeTrackingEnabled())
-    {
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        return JsonObjectToString(Response);
-    }
+	float Frequency = BodyJson->GetNumberField(TEXT("frequency"));
 
-    FOculusXREyeGazesState EyeGazesState;
-    if (UOculusXRMovementFunctionLibrary::TryGetEyeGazesState(EyeGazesState))
-    {
-        Response->SetStringField(TEXT("status"), TEXT("success"));
-        Response->SetNumberField(TEXT("time"), EyeGazesState.Time);
+	UOculusXRFunctionLibrary::SetDisplayFrequency(Frequency);
 
-        TArray<TSharedPtr<FJsonValue>> EyesArray;
-        for (int32 i = 0; i < EyeGazesState.EyeGazes.Num(); ++i)
-        {
-            const FOculusXREyeGazeState& EyeGaze = EyeGazesState.EyeGazes[i];
-            TSharedRef<FJsonObject> EyeObj = MakeShared<FJsonObject>();
-            EyeObj->SetStringField(TEXT("eye"), i == 0 ? TEXT("left") : TEXT("right"));
-            EyeObj->SetBoolField(TEXT("valid"), EyeGaze.bIsValid);
-            EyeObj->SetNumberField(TEXT("confidence"), EyeGaze.Confidence);
-            EyeObj->SetNumberField(TEXT("position_x"), EyeGaze.Position.X);
-            EyeObj->SetNumberField(TEXT("position_y"), EyeGaze.Position.Y);
-            EyeObj->SetNumberField(TEXT("position_z"), EyeGaze.Position.Z);
-            EyesArray.Add(MakeShared<FJsonValueObject>(EyeObj));
-        }
-        Response->SetArrayField(TEXT("eye_gazes"), EyesArray);
-    }
-    else
-    {
-        Response->SetStringField(TEXT("status"), TEXT("error"));
-        Response->SetStringField(TEXT("message"), TEXT("Failed to get eye gaze state"));
-    }
-    return JsonObjectToString(Response);
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetNumberField(TEXT("frequency"), Frequency);
+
+	return JsonToString(Result);
+}
+
+FString FAgenticMCPServer::HandleXRSetPerformanceLevels(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString CpuLevelStr = BodyJson->GetStringField(TEXT("cpuLevel"));
+	FString GpuLevelStr = BodyJson->GetStringField(TEXT("gpuLevel"));
+
+	EOculusXRProcessorPerformanceLevel CpuLevel = EOculusXRProcessorPerformanceLevel::SustainedLow;
+	EOculusXRProcessorPerformanceLevel GpuLevel = EOculusXRProcessorPerformanceLevel::SustainedLow;
+
+	// Parse CPU level
+	if (CpuLevelStr.Equals(TEXT("PowerSavings"), ESearchCase::IgnoreCase))
+		CpuLevel = EOculusXRProcessorPerformanceLevel::PowerSavings;
+	else if (CpuLevelStr.Equals(TEXT("SustainedLow"), ESearchCase::IgnoreCase))
+		CpuLevel = EOculusXRProcessorPerformanceLevel::SustainedLow;
+	else if (CpuLevelStr.Equals(TEXT("SustainedHigh"), ESearchCase::IgnoreCase))
+		CpuLevel = EOculusXRProcessorPerformanceLevel::SustainedHigh;
+	else if (CpuLevelStr.Equals(TEXT("Boost"), ESearchCase::IgnoreCase))
+		CpuLevel = EOculusXRProcessorPerformanceLevel::Boost;
+
+	// Parse GPU level
+	if (GpuLevelStr.Equals(TEXT("PowerSavings"), ESearchCase::IgnoreCase))
+		GpuLevel = EOculusXRProcessorPerformanceLevel::PowerSavings;
+	else if (GpuLevelStr.Equals(TEXT("SustainedLow"), ESearchCase::IgnoreCase))
+		GpuLevel = EOculusXRProcessorPerformanceLevel::SustainedLow;
+	else if (GpuLevelStr.Equals(TEXT("SustainedHigh"), ESearchCase::IgnoreCase))
+		GpuLevel = EOculusXRProcessorPerformanceLevel::SustainedHigh;
+	else if (GpuLevelStr.Equals(TEXT("Boost"), ESearchCase::IgnoreCase))
+		GpuLevel = EOculusXRProcessorPerformanceLevel::Boost;
+
+	UOculusXRFunctionLibrary::SetSuggestedCpuAndGpuPerformanceLevels(CpuLevel, GpuLevel);
+
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("cpuLevel"), UEnum::GetValueAsString(CpuLevel));
+	Result->SetStringField(TEXT("gpuLevel"), UEnum::GetValueAsString(GpuLevel));
+
+	return JsonToString(Result);
+}
+
+FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	// Reset position and rotation to current HMD pose
+	FRotator CurrentRotation;
+	FVector CurrentPosition;
+	FVector NeckPosition;
+	UOculusXRFunctionLibrary::GetPose(CurrentRotation, CurrentPosition, NeckPosition);
+
+	// Set the base to current position (recenters the view)
+	UOculusXRFunctionLibrary::SetBaseRotationAndPositionOffset(FRotator::ZeroRotator, FVector::ZeroVector, EOrientPositionSelector::OrientationAndPosition);
+
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("message"), TEXT("View recentered"));
+
+	return JsonToString(Result);
 }

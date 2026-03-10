@@ -1122,6 +1122,48 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleSimulateInput(Params, Body);
 	});
 
+	// ---- Meta XR / OculusXR ----
+	HandlerMap.Add(TEXT("xrStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRStatus(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrGuardian"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRGuardian(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetGuardianVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetGuardianVisibility(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrHandTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRHandTracking(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrControllers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRControllers(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRPassthrough(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetPassthrough(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetDisplayFrequency"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetDisplayFrequency(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetPerformanceLevels"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetPerformanceLevels(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrRecenter"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRRecenter(Params, Body);
+	});
+
 	// ---- Audio Handlers ----
 	HandlerMap.Add(TEXT("audioGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
@@ -1791,6 +1833,28 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("pixelStreamingSetCodec")));
 	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/players")), EHttpServerRequestVerbs::VERB_GET,
 		QueuedHandler(TEXT("pixelStreamingListPlayers")));
+
+	// Meta XR / OculusXR Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/status")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrStatus")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/guardian")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrGuardian")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/guardian/visibility")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetGuardianVisibility")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/hand-tracking")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrHandTracking")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/controllers")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrControllers")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/passthrough")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrPassthrough")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/passthrough/set")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetPassthrough")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/display-frequency")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetDisplayFrequency")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/performance")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetPerformanceLevels")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/recenter")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrRecenter")));
 
 	// ---- Start listening ----
 	HttpModule.StartAllListeners();

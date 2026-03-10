@@ -234,6 +234,18 @@ private:
 	// ---- Input Simulation (Handlers_Input.cpp) ----
 	FString HandleSimulateInput(const TMap<FString, FString>& Params, const FString& Body);
 
+	// ---- Meta XR / OculusXR (Handlers_MetaXR.cpp) ----
+	FString HandleXRStatus(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRGuardian(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRSetGuardianVisibility(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRHandTracking(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRControllers(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRPassthrough(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRSetPassthrough(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRSetDisplayFrequency(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRSetPerformanceLevels(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body);
+
 	// ---- Audio Handlers (Handlers_Audio.cpp) ----
 	FString HandleAudioGetStatus(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleAudioListActiveSounds(const TMap<FString, FString>& Params, const FString& Body);
