@@ -156,6 +156,7 @@ private:
 	FString HandleCompileBlueprint(const FString& Body);
 	FString HandleDuplicateNodes(const FString& Body);
 	FString HandleSetNodeComment(const FString& Body);
+	FString HandleAddComponent(const FString& Body);
 
 	// ---- Actor management handlers (Handlers_Actors.cpp) ----
 	FString HandleListActors(const FString& Body);
@@ -168,6 +169,7 @@ private:
 	// ---- Level management handlers (Handlers_Level.cpp) ----
 	FString HandleListLevels(const FString& Body);
 	FString HandleLoadLevel(const FString& Body);
+	FString HandleRemoveSublevel(const FString& Body);
 	FString HandleGetLevelBlueprint(const FString& Body);
 
 	// ---- Validation and safety handlers (Handlers_Validation.cpp) ----
@@ -183,6 +185,14 @@ private:
 	FString HandleSetViewport(const FString& Body);
 	FString HandleWaitReady(const FString& Body);
 	FString HandleResolveRef(const FString& Body);
+	FString HandleGetCamera(const FString& Body);
+	FString HandleListViewports(const FString& Body);
+	FString HandleGetSelection(const FString& Body);
+
+	// ---- Level Sequences ----
+	FString HandleListSequences(const FString& Body);
+	FString HandleReadSequence(const FString& Body);
+	FString HandleRemoveAudioTracks(const FString& Body);
 
 	// ---- Debug Visualization ----
 	FString HandleDrawDebug(const FString& Body);
@@ -203,59 +213,57 @@ private:
 	FString HandleRestoreState(const FString& Body);
 	FString HandleListStates(const FString& Body);
 
-	// ---- PIE Control handlers (Handlers_PIE.cpp) ----
+	// ---- Python Execution ----
+	FString HandleExecutePython(const FString& Body);
+
+	// ---- Asset Editor ----
+	FString HandleOpenAsset(const FString& Body);
+
+	// ---- PIE Control (Handlers_PIE.cpp) ----
 	FString HandleStartPIE(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleStopPIE(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandlePausePIE(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleStepPIE(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleGetPIEState(const TMap<FString, FString>& Params, const FString& Body);
 
-	// ---- Console Command handlers (Handlers_Console.cpp) ----
+	// ---- Console Commands (Handlers_PIE.cpp) ----
 	FString HandleExecuteConsole(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleGetCVar(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleSetCVar(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleListCVars(const TMap<FString, FString>& Params, const FString& Body);
 
-	// ---- MetaXR/OculusXR 5.6 handlers (Handlers_MetaXR.cpp) ----
-	FString HandleXRGetHMDState(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRSetTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetControllers(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRTriggerHaptic(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRStopHaptic(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetGuardian(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetPassthrough(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRSetPassthrough(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetEyeTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRSetEyeTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetFaceTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRSetFaceTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetBodyTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRSetBodyTracking(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleXRGetHandTracking(const TMap<FString, FString>& Params, const FString& Body);
+	// ---- Audio Handlers (Handlers_Audio.cpp) ----
+	FString HandleAudioGetStatus(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioListActiveSounds(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioGetDeviceInfo(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioListSoundClasses(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioSetVolume(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioGetStats(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioPlaySound(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioStopSound(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioSetListener(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleAudioDebugVisualize(const TMap<FString, FString>& Params, const FString& Body);
 
-	// ---- RenderDoc GPU Debugging handlers (Handlers_RenderDoc.cpp) ----
-	FString HandleRenderDocGetStatus(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocCaptureFrame(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocCaptureMulti(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocCapturePIE(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocListCaptures(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocOpenCapture(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocDeleteCapture(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocGetSettings(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocSetSettings(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocSetOverlay(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocLaunchUI(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocIsCapturing(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocSetCapturePath(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocGetGPUInfo(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocTriggerCapture(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleRenderDocCleanCaptures(const TMap<FString, FString>& Params, const FString& Body);
+	// ---- Niagara Handlers (Handlers_Niagara.cpp) ----
+	FString HandleNiagaraGetStatus(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraListSystems(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraGetSystemInfo(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraGetEmitters(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraSetParameter(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraGetParameters(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraActivateSystem(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraSetEmitterEnable(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraResetSystem(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraGetStats(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleNiagaraDebugHUD(const TMap<FString, FString>& Params, const FString& Body);
 
-	// ============================================================
-	// JSON Helper
-	// ============================================================
-	FString JsonObjectToString(TSharedPtr<FJsonObject> JsonObj);
+	// ---- PixelStreaming Handlers (Handlers_PixelStreaming.cpp) ----
+	FString HandlePixelStreamingGetStatus(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandlePixelStreamingStart(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandlePixelStreamingStop(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandlePixelStreamingListStreamers(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandlePixelStreamingGetCodec(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandlePixelStreamingSetCodec(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandlePixelStreamingListPlayers(const TMap<FString, FString>& Params, const FString& Body);
 
 	// ============================================================
 	// Serialization helpers

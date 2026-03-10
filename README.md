@@ -58,7 +58,7 @@ Regenerate project files and build. The plugin is editor-only and auto-starts wh
 Verify in the Output Log:
 
 ```
-AgenticMCP: HTTP server started on port 9847
+AgenticMCP: HTTP server started on port 9847 (editor mode)
 ```
 
 ### 2. MCP Bridge (Node.js)
@@ -120,6 +120,8 @@ Add to `.cursor/mcp.json`:
 ## HTTP API
 
 All live editor endpoints are at `http://localhost:9847/api/<endpoint>`.
+
+> **Note**: Port 9847 is the default for the editor plugin. Port 3000 is reserved for DevmateMCP.
 
 ### Health and Lifecycle
 
@@ -184,6 +186,116 @@ All live editor endpoints are at `http://localhost:9847/api/<endpoint>`.
 | `/api/unload-level` | POST | Unload a sublevel |
 | `/api/get-level-blueprint` | POST | Get level blueprint |
 
+### Visual Agent / Automation
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/screenshot` | POST | Capture viewport screenshot (base64 JPEG) |
+| `/api/scene-snapshot` | POST | Get hierarchical scene tree with short refs |
+| `/api/focus-actor` | POST | Move editor camera to focus on an actor |
+| `/api/select-actor` | POST | Select actor(s) in the editor |
+| `/api/set-viewport` | POST | Set camera position and rotation |
+| `/api/move-actor` | POST | Move/transform an actor |
+| `/api/get-camera` | POST | Get current viewport camera position, rotation, FOV |
+| `/api/list-viewports` | POST | List all editor viewports with positions and types |
+| `/api/get-selection` | POST | Get currently selected actors with transforms |
+| `/api/wait-ready` | POST | Wait for assets/compile/render to complete |
+| `/api/resolve-ref` | POST | Resolve a short ref (a0, a1.c0) to actor/component |
+| `/api/draw-debug` | POST | Draw debug shapes in viewport |
+| `/api/clear-debug` | POST | Clear debug drawings |
+
+#### get-camera
+
+Returns the current editor viewport camera position, rotation, and settings.
+
+**Request:** `POST /api/get-camera`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "x": -888.39,
+  "y": 583.01,
+  "z": 237.47,
+  "pitch": -3.2,
+  "yaw": -20.2,
+  "roll": 0,
+  "fov": 90,
+  "viewMode": "Static"
+}
+```
+
+#### list-viewports
+
+Returns all available editor viewports with their positions and view types.
+
+**Request:** `POST /api/list-viewports`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 4,
+  "viewports": [
+    {
+      "index": 0,
+      "isActive": false,
+      "isRealtime": false,
+      "x": -1215.38,
+      "y": 18.71,
+      "z": 285.17,
+      "pitch": 0,
+      "yaw": 0,
+      "roll": 0,
+      "fov": 90,
+      "viewType": "Right"
+    },
+    {
+      "index": 1,
+      "isActive": true,
+      "isRealtime": false,
+      "viewType": "Perspective"
+    }
+  ]
+}
+```
+
+#### get-selection
+
+Returns the currently selected actors in the editor with their transforms.
+
+**Request:** `POST /api/get-selection`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 1,
+  "selected": [
+    {
+      "name": "1M_Cube10_0",
+      "label": "Table",
+      "class": "StaticMeshActor",
+      "x": 193.41,
+      "y": 262.10,
+      "z": 0,
+      "pitch": 0,
+      "yaw": 50.0,
+      "roll": 0
+    }
+  ]
+}
+```
+
 ### Validation and Safety
 
 | Endpoint | Method | Description |
@@ -191,6 +303,303 @@ All live editor endpoints are at `http://localhost:9847/api/<endpoint>`.
 | `/api/validate-blueprint` | POST | Compile and validate (no save) |
 | `/api/snapshot-graph` | POST | Take graph snapshot |
 | `/api/restore-graph` | POST | Restore from snapshot |
+
+### PIE Control (Play-In-Editor)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/start-pie` | POST | Start a PIE session (modes: SelectedViewport, NewEditorWindow, VR, MobilePreview) |
+| `/api/stop-pie` | POST | Stop the current PIE session |
+| `/api/pause-pie` | POST | Pause/resume the PIE session |
+| `/api/step-pie` | POST | Single-step the paused PIE session |
+| `/api/get-pie-state` | POST | Get PIE state (isRunning, isPaused, timeSeconds) |
+
+### Console Commands
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/execute-console` | POST | Execute a console command |
+| `/api/get-cvar` | POST | Get a console variable value |
+| `/api/set-cvar` | POST | Set a console variable value |
+
+### Audio System
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/audio/status` | GET | Get audio system status |
+| `/api/audio/active-sounds` | GET | List currently playing sounds |
+| `/api/audio/device-info` | GET | Get audio device information |
+| `/api/audio/sound-classes` | GET | List sound classes |
+| `/api/audio/set-volume` | POST | Set volume for a sound class |
+| `/api/audio/stats` | GET | Get audio statistics |
+| `/api/audio/play` | POST | Play a sound at location |
+| `/api/audio/stop` | POST | Stop a playing sound |
+| `/api/audio/set-listener` | POST | Set listener position/rotation |
+| `/api/audio/debug-visualize` | POST | Toggle audio debug visualization |
+
+### Niagara Particle Systems
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/niagara/status` | GET | Get Niagara system status |
+| `/api/niagara/systems` | GET | List active Niagara systems in the world |
+| `/api/niagara/system-info` | POST | Get detailed info about a Niagara system |
+| `/api/niagara/emitters` | POST | Get emitters for a Niagara component |
+| `/api/niagara/set-parameter` | POST | Set a Niagara parameter value |
+| `/api/niagara/get-parameters` | POST | Get all parameters for a Niagara component |
+| `/api/niagara/activate` | POST | Activate a Niagara system |
+| `/api/niagara/set-emitter-enable` | POST | Enable/disable a specific emitter |
+| `/api/niagara/reset` | POST | Reset a Niagara system |
+| `/api/niagara/stats` | GET | Get Niagara performance statistics |
+| `/api/niagara/debug-hud` | POST | Toggle Niagara debug HUD |
+
+### Pixel Streaming
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/pixelstreaming/status` | GET | Get Pixel Streaming status |
+| `/api/pixelstreaming/start` | POST | Start Pixel Streaming |
+| `/api/pixelstreaming/stop` | POST | Stop Pixel Streaming |
+| `/api/pixelstreaming/streamers` | GET | List active streamers |
+| `/api/pixelstreaming/codec` | GET | Get current codec settings |
+| `/api/pixelstreaming/set-codec` | POST | Set codec settings |
+| `/api/pixelstreaming/players` | GET | List connected players |
+
+### Level Sequences
+
+### PIE Control (Play-In-Editor)
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/start-pie` | POST | Start a PIE session (modes: SelectedViewport, NewEditorWindow, VR, MobilePreview) |
+| `/api/stop-pie` | POST | Stop the current PIE session |
+| `/api/pause-pie` | POST | Pause/resume the PIE session |
+| `/api/step-pie` | POST | Single-step the paused PIE session |
+| `/api/get-pie-state` | POST | Get PIE state (isRunning, isPaused, timeSeconds) |
+
+### Console Commands
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/execute-console` | POST | Execute a console command |
+| `/api/get-cvar` | POST | Get a console variable value |
+| `/api/set-cvar` | POST | Set a console variable value |
+
+### Audio System
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/audio/status` | GET | Get audio system status |
+| `/api/audio/active-sounds` | GET | List currently playing sounds |
+| `/api/audio/device-info` | GET | Get audio device information |
+| `/api/audio/sound-classes` | GET | List sound classes |
+| `/api/audio/set-volume` | POST | Set volume for a sound class |
+| `/api/audio/stats` | GET | Get audio statistics |
+| `/api/audio/play` | POST | Play a sound at location |
+| `/api/audio/stop` | POST | Stop a playing sound |
+| `/api/audio/set-listener` | POST | Set listener position/rotation |
+| `/api/audio/debug-visualize` | POST | Toggle audio debug visualization |
+
+### Niagara Particle Systems
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/niagara/status` | GET | Get Niagara system status |
+| `/api/niagara/systems` | GET | List active Niagara systems in the world |
+| `/api/niagara/system-info` | POST | Get detailed info about a Niagara system |
+| `/api/niagara/emitters` | POST | Get emitters for a Niagara component |
+| `/api/niagara/set-parameter` | POST | Set a Niagara parameter value |
+| `/api/niagara/get-parameters` | POST | Get all parameters for a Niagara component |
+| `/api/niagara/activate` | POST | Activate a Niagara system |
+| `/api/niagara/set-emitter-enable` | POST | Enable/disable a specific emitter |
+| `/api/niagara/reset` | POST | Reset a Niagara system |
+| `/api/niagara/stats` | GET | Get Niagara performance statistics |
+| `/api/niagara/debug-hud` | POST | Toggle Niagara debug HUD |
+
+### Pixel Streaming
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/pixelstreaming/status` | GET | Get Pixel Streaming status |
+| `/api/pixelstreaming/start` | POST | Start Pixel Streaming |
+| `/api/pixelstreaming/stop` | POST | Stop Pixel Streaming |
+| `/api/pixelstreaming/streamers` | GET | List active streamers |
+| `/api/pixelstreaming/codec` | GET | Get current codec settings |
+| `/api/pixelstreaming/set-codec` | POST | Set codec settings |
+| `/api/pixelstreaming/players` | GET | List connected players |
+
+### Level Sequences
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/list-sequences` | POST | List all LevelSequenceActors in loaded levels |
+| `/api/read-sequence` | POST | Read sequence tracks, audio cues, timing data |
+| `/api/remove-audio-tracks` | POST | Remove audio tracks from sequences (music cleanup) |
+
+#### list-sequences
+
+Lists all Level Sequence actors across all loaded levels with timing information.
+
+**Request:** `POST /api/list-sequences`
+```json
+{}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 3,
+  "sequences": [
+    {
+      "actorName": "LevelSequenceActor_0",
+      "actorLabel": "LS_1_1",
+      "level": "SL_Trailer_Logic",
+      "sequenceName": "LS_1_1",
+      "sequencePath": "/Game/Sequences/Scene1/LS_1_1.LS_1_1",
+      "startTime": 0,
+      "endTime": 45.5,
+      "duration": 45.5,
+      "frameRate": 30,
+      "trackCount": 5
+    }
+  ]
+}
+```
+
+#### read-sequence
+
+Reads detailed track information from a Level Sequence including audio cues and bindings.
+
+**Request:** `POST /api/read-sequence`
+```json
+{
+  "sequencePath": "/Game/Sequences/Scene1/LS_1_1",
+  // OR
+  "actorName": "LS_1_1"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "sequenceName": "LS_1_1",
+  "duration": 45.5,
+  "frameRate": 30,
+  "masterTracks": [
+    {
+      "trackName": "Audio",
+      "trackClass": "MovieSceneAudioTrack",
+      "sections": [
+        {
+          "type": "Audio",
+          "startTime": 0,
+          "endTime": 12.5,
+          "soundName": "VO_Susan_Intro",
+          "soundPath": "/Game/Sounds/VO/VO_Susan_Intro",
+          "soundDuration": 12.5
+        }
+      ]
+    }
+  ],
+  "objectBindings": [
+    {
+      "name": "BP_HeatherChild",
+      "trackCount": 3
+    }
+  ]
+}
+```
+
+#### remove-audio-tracks
+
+Removes audio tracks from sequences. Useful for cleaning up music so it can be handled separately.
+
+**Request:** `POST /api/remove-audio-tracks`
+```json
+{
+  "sequencePath": "/Game/Sequences/Scene1/LS_1_1",
+  // OR remove from all sequences:
+  "all": true,
+  // Optional: only remove music, keep VO
+  "musicOnly": true
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "totalTracksRemoved": 15,
+  "sequencesModified": 8,
+  "modifiedSequences": [
+    {"name": "LS_1_1", "tracksRemoved": 2}
+  ],
+  "note": "Changes are in memory. Save modified sequences to persist."
+}
+```
+
+### Audio Analysis (External Service)
+
+A separate Python service provides audio transcription for subtitle generation.
+
+**Setup:**
+```bash
+cd AgenticMCP/Tools/AudioAnalysis
+pip install -r requirements.txt
+python transcribe.py --serve --port 9848
+```
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `http://localhost:9848/health` | GET | Service health check |
+| `http://localhost:9848/transcribe` | POST | Transcribe single audio file |
+| `http://localhost:9848/batch-transcribe` | POST | Transcribe multiple audio files |
+
+#### Transcribe Single File
+
+**Request:** `POST http://localhost:9848/transcribe`
+```json
+{
+  "audioPath": "C:/Project/Content/Sounds/VO/VO_Scene1.wav",
+  "model": "base",
+  "outputFormat": "ue_datatable",
+  "sequenceName": "LS_1_1"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "format": "ue_datatable",
+  "rows": [
+    {
+      "RowName": "Line_001",
+      "Time": 0.0,
+      "Duration": 3.5,
+      "Speaker": "",
+      "Text": "Welcome to Susan's home.",
+      "SequenceName": "LS_1_1"
+    }
+  ]
+}
+```
+
+#### Batch Transcribe (All VO Files)
+
+**Request:** `POST http://localhost:9848/batch-transcribe`
+```json
+{
+  "audioFiles": [
+    {"path": "C:/Project/Content/Sounds/VO/VO_1_1.wav", "sequenceName": "LS_1_1"},
+    {"path": "C:/Project/Content/Sounds/VO/VO_1_2.wav", "sequenceName": "LS_1_2"}
+  ],
+  "model": "base",
+  "outputFormat": "ue_datatable"
+}
+```
 
 ## Supported Node Types
 

@@ -18,15 +18,5 @@
 			"Type": "Editor",
 			"LoadingPhase": "Default"
 		}
-	],
-	"Plugins": [
-		{
-			"Name": "OculusXR",
-			"Enabled": true
-		},
-		{
-			"Name": "RenderDocPlugin",
-			"Enabled": true
-		}
 	]
 }

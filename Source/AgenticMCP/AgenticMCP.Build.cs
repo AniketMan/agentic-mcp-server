@@ -36,13 +36,13 @@ public class AgenticMCP : ModuleRules
 			"LevelEditor",        // Level management APIs
 			"Landscape",          // Landscape actor support
 			"RHI",                // Render hardware interface (for nullrhi commandlet)
-			"RenderCore",         // FlushRenderingCommands for screenshots
 			"ImageWrapper",       // PNG/JPEG compression for screenshots
 			"GraphEditor",        // Graph editor for K2Node types
-			"OculusXRHMD",        // OculusXR 5.6 HMD functions
-			"OculusXRInput",      // OculusXR 5.6 Input/Haptics
-			"OculusXRMovement",   // OculusXR 5.6 Eye/Face/Body tracking
-			"RenderDocPlugin"     // RenderDoc GPU debugging integration
+			"RenderCore",         // FlushRenderingCommands
+			"LevelSequence",      // Level Sequence reading/editing
+			"MovieScene",         // MovieScene tracks and sections
+			"MovieSceneTracks",   // Audio, Animation tracks
+			"Niagara"             // Niagara particle system APIs
 		});
 	}
 }

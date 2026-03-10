@@ -5,6 +5,7 @@
 // Endpoints implemented:
 //   /api/list-levels          - List all loaded levels and streaming sublevels
 //   /api/load-level           - Load a sublevel into the current world
+//   /api/remove-sublevel      - Remove a streaming sublevel from the world
 //   /api/get-level-blueprint  - Get the level blueprint for a specific level
 
 #include "AgenticMCPServer.h"
@@ -183,6 +184,79 @@ FString FAgenticMCPServer::HandleLoadLevel(const FString& Body)
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetStringField(TEXT("levelPath"), LevelPath);
 	Result->SetBoolField(TEXT("isLoaded"), NewLevel->HasLoadedLevel());
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleRemoveSublevel
+// POST /api/remove-sublevel { "levelPath": "/Game/Maps/MyLevel" }
+// Removes a streaming sublevel from the persistent level.
+// ============================================================
+
+FString FAgenticMCPServer::HandleRemoveSublevel(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString LevelPath = Json->GetStringField(TEXT("levelPath"));
+	if (LevelPath.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: levelPath"));
+
+	UWorld* World = GetEditorWorldForLevel();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world available"));
+
+	// Find the streaming level by path
+	ULevelStreaming* FoundLevel = nullptr;
+	for (ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
+	{
+		if (!StreamingLevel) continue;
+
+		FString PackageName = StreamingLevel->GetWorldAssetPackageName();
+		// Match by full path or partial name
+		if (PackageName == LevelPath || PackageName.Contains(LevelPath) || LevelPath.Contains(PackageName))
+		{
+			FoundLevel = StreamingLevel;
+			break;
+		}
+	}
+
+	if (!FoundLevel)
+	{
+		return MakeErrorJson(FString::Printf(
+			TEXT("Streaming level '%s' not found. Use list-levels to see available streaming levels."),
+			*LevelPath));
+	}
+
+	// Get the actual package name before removal for reporting
+	FString RemovedPackageName = FoundLevel->GetWorldAssetPackageName();
+
+	// Remove the level from the world using editor utilities
+	bool bSuccess = false;
+	ULevel* LoadedLevel = FoundLevel->GetLoadedLevel();
+	if (LoadedLevel)
+	{
+		bSuccess = UEditorLevelUtils::RemoveLevelFromWorld(LoadedLevel);
+	}
+
+	if (!bSuccess)
+	{
+		// Try alternative method - directly remove from streaming levels array
+		World->RemoveStreamingLevel(FoundLevel);
+		bSuccess = true;
+	}
+
+	// Mark the world package as dirty so it can be saved
+	if (bSuccess)
+	{
+		World->MarkPackageDirty();
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), bSuccess);
+	Result->SetStringField(TEXT("removedLevel"), RemovedPackageName);
+	Result->SetNumberField(TEXT("remainingSublevels"), World->GetStreamingLevels().Num());
+
 	return JsonToString(Result);
 }
 

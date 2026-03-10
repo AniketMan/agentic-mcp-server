@@ -20,7 +20,7 @@ AgenticMCP is a dual-path MCP server for Unreal Engine 5. It gives you (the AI a
 ## Architecture
 
 ```
-AI Client <-> MCP Protocol (stdio) <-> Node.js MCP Bridge <-> HTTP (localhost:9847) <-> C++ Plugin (inside UE5 editor)
+AI Client <-> MCP Protocol (stdio) <-> Node.js MCP Bridge <-> HTTP (localhost:3000) <-> C++ Plugin (inside UE5 editor)
                                             |
                                             +-> Python Binary Injector (offline fallback, .umap files)
 ```

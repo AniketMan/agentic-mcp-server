@@ -1,199 +1,272 @@
 // Handlers_PIE.cpp
-// Play-In-Editor control handlers for AgenticMCP.
-// Provides: start PIE, stop PIE, pause, resume, step frame, get state
+// Play-In-Editor (PIE) control and Console command endpoints for AgenticMCP
 
 #include "AgenticMCPServer.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonWriter.h"
+#include "Serialization/JsonSerializer.h"
 #include "Editor.h"
-#include "LevelEditor.h"
-#include "UnrealEdGlobals.h"
 #include "Editor/UnrealEdEngine.h"
+#include "UnrealEdGlobals.h"
+#include "LevelEditor.h"
 #include "Settings/LevelEditorPlaySettings.h"
-#include "Kismet/GameplayStatics.h"
+#include "HAL/IConsoleManager.h"
 
 FString FAgenticMCPServer::HandleStartPIE(const TMap<FString, FString>& Params, const FString& Body)
 {
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
 	if (!GEditor)
 	{
-		return MakeErrorJson(TEXT("Editor not available"));
+		return MakeErrorJson(TEXT("GEditor not available"));
 	}
 
-	// Check if already playing
 	if (GEditor->PlayWorld)
 	{
-		return MakeErrorJson(TEXT("PIE session already active"));
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("message"), TEXT("PIE session already running"));
+		Result->SetBoolField(TEXT("alreadyRunning"), true);
+		return JsonToString(Result);
 	}
 
-	// Get play mode from params (default: PlayInViewport)
-	FString Mode = Params.FindRef(TEXT("mode"));
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	FJsonSerializer::Deserialize(Reader, BodyJson);
 
-	// Configure play settings
+	FString Mode = TEXT("SelectedViewport");
+	if (BodyJson.IsValid() && BodyJson->HasField(TEXT("mode")))
+	{
+		Mode = BodyJson->GetStringField(TEXT("mode"));
+	}
+
 	FRequestPlaySessionParams SessionParams;
 
-	if (Mode.Equals(TEXT("simulate"), ESearchCase::IgnoreCase))
+	if (Mode.Equals(TEXT("NewEditorWindow"), ESearchCase::IgnoreCase))
 	{
-		SessionParams.WorldType = EPlaySessionWorldType::SimulateInEditor;
+		SessionParams.DestinationSlateViewport = nullptr;
 	}
-	else if (Mode.Equals(TEXT("standalone"), ESearchCase::IgnoreCase))
+	else if (Mode.Equals(TEXT("VR"), ESearchCase::IgnoreCase))
 	{
-		SessionParams.WorldType = EPlaySessionWorldType::PlayInEditor;
-		SessionParams.DestinationSlateViewport = nullptr; // Standalone window
+		SessionParams.SessionPreviewTypeOverride = EPlaySessionPreviewType::VRPreview;
 	}
-	else
+	else if (Mode.Equals(TEXT("MobilePreview"), ESearchCase::IgnoreCase))
 	{
-		// Default: Play in active viewport
-		SessionParams.WorldType = EPlaySessionWorldType::PlayInEditor;
+		SessionParams.SessionPreviewTypeOverride = EPlaySessionPreviewType::MobilePreview;
 	}
 
-	// Start PIE session
 	GEditor->RequestPlaySession(SessionParams);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("PIE session started"));
-	Result->SetStringField(TEXT("mode"), Mode.IsEmpty() ? TEXT("viewport") : Mode);
-
+	Result->SetStringField(TEXT("message"), TEXT("PIE session starting"));
+	Result->SetStringField(TEXT("mode"), Mode);
 	return JsonToString(Result);
 }
 
 FString FAgenticMCPServer::HandleStopPIE(const TMap<FString, FString>& Params, const FString& Body)
 {
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
 	if (!GEditor)
 	{
-		return MakeErrorJson(TEXT("Editor not available"));
+		return MakeErrorJson(TEXT("GEditor not available"));
 	}
 
 	if (!GEditor->PlayWorld)
 	{
-		return MakeErrorJson(TEXT("No active PIE session"));
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("message"), TEXT("No PIE session running"));
+		Result->SetBoolField(TEXT("wasRunning"), false);
+		return JsonToString(Result);
 	}
 
 	GEditor->RequestEndPlayMap();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("PIE session stopped"));
-
+	Result->SetStringField(TEXT("message"), TEXT("PIE session stopping"));
+	Result->SetBoolField(TEXT("wasRunning"), true);
 	return JsonToString(Result);
 }
 
 FString FAgenticMCPServer::HandlePausePIE(const TMap<FString, FString>& Params, const FString& Body)
 {
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
 	if (!GEditor)
 	{
-		return MakeErrorJson(TEXT("Editor not available"));
+		return MakeErrorJson(TEXT("GEditor not available"));
 	}
 
 	if (!GEditor->PlayWorld)
 	{
-		return MakeErrorJson(TEXT("No active PIE session"));
+		return MakeErrorJson(TEXT("No PIE session running"));
 	}
 
-	// Toggle pause
-	FString Action = Params.FindRef(TEXT("action"));
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	FJsonSerializer::Deserialize(Reader, BodyJson);
+
 	bool bPause = true;
-
-	if (Action.Equals(TEXT("resume"), ESearchCase::IgnoreCase))
+	if (BodyJson.IsValid() && BodyJson->HasField(TEXT("pause")))
 	{
-		bPause = false;
-	}
-	else if (Action.Equals(TEXT("toggle"), ESearchCase::IgnoreCase))
-	{
-		bPause = !GEditor->PlayWorld->IsPaused();
+		bPause = BodyJson->GetBoolField(TEXT("pause"));
 	}
 
 	GEditor->PlayWorld->bDebugPauseExecution = bPause;
 
-	// Also pause/unpause the game
-	if (APlayerController* PC = GEditor->PlayWorld->GetFirstPlayerController())
-	{
-		PC->SetPause(bPause);
-	}
-
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("paused"), bPause);
+	Result->SetBoolField(TEXT("isPaused"), bPause);
 	Result->SetStringField(TEXT("message"), bPause ? TEXT("PIE paused") : TEXT("PIE resumed"));
-
 	return JsonToString(Result);
 }
 
 FString FAgenticMCPServer::HandleStepPIE(const TMap<FString, FString>& Params, const FString& Body)
 {
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
 	if (!GEditor)
 	{
-		return MakeErrorJson(TEXT("Editor not available"));
+		return MakeErrorJson(TEXT("GEditor not available"));
 	}
 
 	if (!GEditor->PlayWorld)
 	{
-		return MakeErrorJson(TEXT("No active PIE session"));
+		return MakeErrorJson(TEXT("No PIE session running"));
 	}
 
-	// Get number of frames to step (default: 1)
-	int32 Frames = 1;
-	FString FramesStr = Params.FindRef(TEXT("frames"));
-	if (!FramesStr.IsEmpty())
+	if (!GUnrealEd)
 	{
-		Frames = FCString::Atoi(*FramesStr);
-		if (Frames < 1) Frames = 1;
+		return MakeErrorJson(TEXT("GUnrealEd not available"));
 	}
 
-	// Step the simulation
-	for (int32 i = 0; i < Frames; ++i)
-	{
-		GEditor->PlayWorld->Tick(LEVELTICK_All, GEditor->PlayWorld->GetDeltaSeconds());
-	}
+	GUnrealEd->PlaySessionSingleStepped();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("framesAdvanced"), Frames);
-
+	Result->SetStringField(TEXT("message"), TEXT("Single step executed"));
 	return JsonToString(Result);
 }
 
 FString FAgenticMCPServer::HandleGetPIEState(const TMap<FString, FString>& Params, const FString& Body)
 {
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
 	if (!GEditor)
 	{
-		return MakeErrorJson(TEXT("Editor not available"));
+		return MakeErrorJson(TEXT("GEditor not available"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
+	bool bIsRunning = GEditor->PlayWorld != nullptr;
+	bool bIsPaused = bIsRunning && GEditor->PlayWorld->bDebugPauseExecution;
 
-	bool bIsPlaying = GEditor->PlayWorld != nullptr;
-	Result->SetBoolField(TEXT("isPlaying"), bIsPlaying);
+	Result->SetBoolField(TEXT("isRunning"), bIsRunning);
+	Result->SetBoolField(TEXT("isPaused"), bIsPaused);
 
-	if (bIsPlaying)
+	if (bIsRunning && GEditor->PlayWorld)
 	{
-		Result->SetBoolField(TEXT("isPaused"), GEditor->PlayWorld->IsPaused());
 		Result->SetNumberField(TEXT("timeSeconds"), GEditor->PlayWorld->GetTimeSeconds());
 		Result->SetNumberField(TEXT("realTimeSeconds"), GEditor->PlayWorld->GetRealTimeSeconds());
-		Result->SetNumberField(TEXT("deltaSeconds"), GEditor->PlayWorld->GetDeltaSeconds());
-
-		// Get player info
-		if (APlayerController* PC = GEditor->PlayWorld->GetFirstPlayerController())
-		{
-			if (APawn* Pawn = PC->GetPawn())
-			{
-				TSharedRef<FJsonObject> PlayerObj = MakeShared<FJsonObject>();
-				FVector Loc = Pawn->GetActorLocation();
-				FRotator Rot = Pawn->GetActorRotation();
-				PlayerObj->SetNumberField(TEXT("x"), Loc.X);
-				PlayerObj->SetNumberField(TEXT("y"), Loc.Y);
-				PlayerObj->SetNumberField(TEXT("z"), Loc.Z);
-				PlayerObj->SetNumberField(TEXT("pitch"), Rot.Pitch);
-				PlayerObj->SetNumberField(TEXT("yaw"), Rot.Yaw);
-				PlayerObj->SetNumberField(TEXT("roll"), Rot.Roll);
-				PlayerObj->SetStringField(TEXT("pawnClass"), Pawn->GetClass()->GetName());
-				Result->SetObjectField(TEXT("player"), PlayerObj);
-			}
-		}
-
-		// Determine world type based on whether we're simulating
-		FString WorldType = GEditor->bIsSimulatingInEditor ? TEXT("Simulate") : TEXT("PIE");
-		Result->SetStringField(TEXT("worldType"), WorldType);
 	}
 
+	return JsonToString(Result);
+}
+
+FString FAgenticMCPServer::HandleExecuteConsole(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	if (!BodyJson->HasField(TEXT("command")))
+	{
+		return MakeErrorJson(TEXT("Missing 'command' field"));
+	}
+
+	FString Command = BodyJson->GetStringField(TEXT("command"));
+	if (Command.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Empty command"));
+	}
+
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No world context available"));
+	}
+
+	bool bSuccess = GEngine->Exec(World, *Command);
+
+	Result->SetBoolField(TEXT("success"), bSuccess);
+	Result->SetStringField(TEXT("command"), Command);
+	Result->SetStringField(TEXT("message"), bSuccess ? TEXT("Command executed") : TEXT("Command failed"));
+	return JsonToString(Result);
+}
+
+FString FAgenticMCPServer::HandleGetCVar(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	if (!BodyJson->HasField(TEXT("name")))
+	{
+		return MakeErrorJson(TEXT("Missing 'name' field"));
+	}
+
+	FString Name = BodyJson->GetStringField(TEXT("name"));
+
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*Name);
+	if (!CVar)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("CVar '%s' not found"), *Name));
+	}
+
+	Result->SetStringField(TEXT("name"), Name);
+	Result->SetStringField(TEXT("value"), CVar->GetString());
+	Result->SetStringField(TEXT("help"), CVar->GetHelp());
+
+	return JsonToString(Result);
+}
+
+FString FAgenticMCPServer::HandleSetCVar(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	TSharedPtr<FJsonObject> BodyJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	if (!BodyJson->HasField(TEXT("name")) || !BodyJson->HasField(TEXT("value")))
+	{
+		return MakeErrorJson(TEXT("Missing 'name' or 'value' field"));
+	}
+
+	FString Name = BodyJson->GetStringField(TEXT("name"));
+	FString Value = BodyJson->GetStringField(TEXT("value"));
+
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(*Name);
+	if (!CVar)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("CVar '%s' not found"), *Name));
+	}
+
+	FString OldValue = CVar->GetString();
+	CVar->Set(*Value);
+
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("name"), Name);
+	Result->SetStringField(TEXT("oldValue"), OldValue);
+	Result->SetStringField(TEXT("newValue"), Value);
 	return JsonToString(Result);
 }

@@ -23,6 +23,8 @@
 #include "Engine/Blueprint.h"
 #include "Engine/World.h"
 #include "Engine/LevelScriptBlueprint.h"
+#include "Engine/SCS_Node.h"
+#include "Engine/SimpleConstructionScript.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
@@ -1382,5 +1384,95 @@ FString FAgenticMCPServer::HandleSetNodeComment(const FString& Body)
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetStringField(TEXT("comment"), Comment);
 	Result->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleAddComponent
+// POST /api/add-component { "blueprint": "BP_Name", "componentClass": "LiveLinkComponent", "componentName": "LiveLinkFace" }
+// Adds a component to a Blueprint's component hierarchy via SCS.
+// ============================================================
+
+FString FAgenticMCPServer::HandleAddComponent(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BlueprintName = Json->GetStringField(TEXT("blueprint"));
+	FString ComponentClassName = Json->GetStringField(TEXT("componentClass"));
+	FString ComponentName = Json->GetStringField(TEXT("componentName"));
+
+	if (BlueprintName.IsEmpty() || ComponentClassName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required fields: blueprint, componentClass"));
+
+	if (ComponentName.IsEmpty())
+		ComponentName = ComponentClassName;
+
+	// Load the blueprint
+	FString LoadError;
+	UBlueprint* BP = LoadBlueprintByName(BlueprintName, LoadError);
+	if (!BP) return MakeErrorJson(LoadError);
+
+	// Get the Simple Construction Script
+	USimpleConstructionScript* SCS = BP->SimpleConstructionScript;
+	if (!SCS)
+		return MakeErrorJson(TEXT("Blueprint does not have a SimpleConstructionScript (not an Actor Blueprint?)"));
+
+	// Find the component class
+	UClass* ComponentClass = FindClassByName(ComponentClassName);
+	if (!ComponentClass)
+	{
+		// Try with "U" prefix stripped or added
+		ComponentClass = FindClassByName(FString(TEXT("U")) + ComponentClassName);
+	}
+	if (!ComponentClass)
+	{
+		// Try common component class paths
+		ComponentClass = LoadClass<UActorComponent>(nullptr,
+			*FString::Printf(TEXT("/Script/LiveLink.%s"), *ComponentClassName));
+	}
+	if (!ComponentClass)
+	{
+		return MakeErrorJson(FString::Printf(
+			TEXT("Component class '%s' not found"), *ComponentClassName));
+	}
+
+	// Check if component already exists
+	for (USCS_Node* Node : SCS->GetAllNodes())
+	{
+		if (Node && Node->ComponentTemplate && Node->ComponentTemplate->GetClass() == ComponentClass)
+		{
+			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+			Result->SetBoolField(TEXT("success"), true);
+			Result->SetBoolField(TEXT("alreadyExists"), true);
+			Result->SetStringField(TEXT("componentName"), Node->GetVariableName().ToString());
+			return JsonToString(Result);
+		}
+	}
+
+	// Create new SCS node
+	USCS_Node* NewNode = SCS->CreateNode(ComponentClass, *ComponentName);
+	if (!NewNode)
+	{
+		return MakeErrorJson(FString::Printf(
+			TEXT("Failed to create SCS node for class '%s'"), *ComponentClassName));
+	}
+
+	// Add to root (or default scene root)
+	SCS->AddNode(NewNode);
+
+	// Mark as modified
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+
+	// Compile and save
+	bool bSaved = SaveBlueprintPackage(BP);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("blueprint"), BlueprintName);
+	Result->SetStringField(TEXT("componentClass"), ComponentClassName);
+	Result->SetStringField(TEXT("componentName"), NewNode->GetVariableName().ToString());
+	Result->SetBoolField(TEXT("saved"), bSaved);
+
 	return JsonToString(Result);
 }

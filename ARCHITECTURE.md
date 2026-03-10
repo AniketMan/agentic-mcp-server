@@ -23,7 +23,7 @@ AgenticMCP is a dual-path UE5 editor manipulation system. It provides AI agents 
 |   contexts/*.md     - UE 5.x API reference per domain            |
 +-------------------------------------------------------------------+
           |                                         |
-     HTTP (port 9847)                        Python subprocess
+     HTTP (port 3000)                        Python subprocess
      (editor running)                        (editor closed)
           |                                         |
 +--------------------------+    +----------------------------------+
@@ -259,7 +259,7 @@ AgenticMCP/
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `UNREAL_MCP_URL` | `http://localhost:9847` | C++ plugin HTTP endpoint |
+| `UNREAL_MCP_URL` | `http://localhost:3000` | C++ plugin HTTP endpoint |
 | `MCP_REQUEST_TIMEOUT_MS` | `30000` | Per-request timeout |
 | `MCP_ASYNC_ENABLED` | `true` | Enable async task queue |
 | `MCP_ASYNC_TIMEOUT_MS` | `300000` | Async operation timeout |
