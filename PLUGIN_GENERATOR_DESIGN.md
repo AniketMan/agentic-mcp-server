@@ -409,6 +409,236 @@ AI sees `QCTX:v1` and knows to use quantized parsing rules.
 
 ---
 
+## Universal Quantized Storage
+
+Since ALL data is AI-to-AI (no humans reading it), **everything is stored quantized**:
+
+### Before: Human-Readable JSON (Wasteful)
+
+```
+Memory/decisions.json          ~5KB per decision
+Memory/patterns.json           ~2KB per pattern
+Context/levels.json            ~10KB per level
+Tester/scenarios/              ~3KB per scenario
+─────────────────────────────────────────────────
+Total for medium project:      ~500KB - 2MB
+```
+
+### After: Quantized Storage (Efficient)
+
+```
+Memory/decisions.q             ~500 bytes per decision
+Memory/patterns.q              ~200 bytes per pattern
+Context/levels.q               ~1KB per level
+Tester/scenarios.q             ~300 bytes per scenario
+─────────────────────────────────────────────────
+Total for medium project:      ~50KB - 200KB (90% reduction)
+```
+
+### Quantized File Formats
+
+#### decisions.q
+```
+QDEC:v1
+D|2026-03-11|actor_pool|ctx:spawn_slow|dec:pool_reuse|rat:10x_faster|out:OK|files:custom_endpoints.json,handlers/pool.js|reuse:1
+D|2026-03-10|preload_s9|ctx:hitch_s9|dec:preload_exit_s8|rat:no_hitch|out:OK|files:handlers/preload.js|reuse:1
+```
+
+#### patterns.q
+```
+QPAT:v1
+P|actor_pooling|trg:spawn>10/s|impl:handlers/actor_pool.js|from:d001|used:5
+P|level_preload|trg:transition>1s|impl:handlers/preloader.js|from:d002|used:3
+```
+
+#### levels.q
+```
+QLVL:v1
+L|Level_01|/Game/Maps/Level_01|act:1523|bp:1|str:Level_01_Audio,Level_01_Lighting
+L|Level_02|/Game/Maps/Level_02|act:892|bp:1|str:Level_02_Audio
+L|MainMenu|/Game/Maps/MainMenu|act:45|bp:0|str:
+```
+
+#### scenarios.q
+```
+QTST:v1
+S|happy_path|type:playthrough|steps:45|est:5m
+T|spawn_check|act:move_to,spawn_point|vrfy:player_visible|ss:1
+T|door_open|act:move_to,door;input,interact|vrfy:door.rot!=0|ss:1
+S|edge_cases|type:boundary|steps:120|est:15m
+T|inv_overflow|act:py,spawn_items(999);input,interact*100|vrfy:inv<=max|crash:0
+```
+
+#### history.q
+```
+QHIS:v1
+H|v15|2026-03-11T19:50|add_endpoint|files:custom_endpoints.json|snap:s015|rb:1
+H|v14|2026-03-11T19:30|upd_levels|files:levels.q|snap:s014|rb:1
+```
+
+### Quantized Schema Reference
+
+```
+HEADER: Q{TYPE}:v{version}
+
+TYPES:
+  CTX - Context (full project state)
+  DEC - Decisions
+  PAT - Patterns
+  LVL - Levels
+  TST - Test scenarios
+  HIS - History
+  SES - Session
+  ABL - Abilities
+  END - Endpoints
+  RUL - Rules
+  SNP - Snapshot
+
+FIELD SEPARATORS:
+  | - Field separator
+  , - List separator (within field)
+  ; - Step separator (within action)
+  : - Key-value separator
+
+COMMON ABBREVIATIONS:
+  ctx   - context
+  dec   - decision
+  rat   - rationale
+  out   - outcome
+  trg   - trigger
+  impl  - implementation
+  act   - actors / action
+  vrfy  - verify
+  ss    - screenshot
+  bp    - blueprint
+  str   - streaming levels
+  rb    - can rollback
+  snap  - snapshot
+  est   - estimated time
+  py    - python
+  inv   - inventory
+```
+
+### Reading/Writing Quantized Data
+
+```javascript
+// Tools/quantizer.js
+
+class Quantizer {
+  // Parse quantized file
+  static parse(content) {
+    const lines = content.trim().split('\n');
+    const header = lines[0]; // e.g., "QDEC:v1"
+    const [type, version] = header.replace('Q', '').split(':');
+
+    const records = lines.slice(1).map(line => {
+      const fields = line.split('|');
+      return this.parseRecord(type, fields);
+    });
+
+    return { type, version, records };
+  }
+
+  // Write quantized file
+  static stringify(type, version, records) {
+    const header = `Q${type}:v${version}`;
+    const lines = records.map(r => this.stringifyRecord(type, r));
+    return [header, ...lines].join('\n');
+  }
+
+  // Parse single record based on type
+  static parseRecord(type, fields) {
+    switch(type) {
+      case 'DEC':
+        return {
+          marker: fields[0],  // 'D'
+          date: fields[1],
+          name: fields[2],
+          context: this.parseKV(fields[3]),
+          decision: this.parseKV(fields[4]),
+          rationale: this.parseKV(fields[5]),
+          outcome: this.parseKV(fields[6]),
+          files: this.parseKV(fields[7])?.split(','),
+          reusable: fields[8] === 'reuse:1'
+        };
+      // ... other types
+    }
+  }
+
+  static parseKV(field) {
+    if (!field?.includes(':')) return field;
+    return field.split(':')[1];
+  }
+}
+```
+
+### Debug Mode (Human-Readable Expansion)
+
+For debugging, a tool can expand quantized data:
+
+```
+POST /api/debug/expand
+{"file": "Memory/decisions.q", "format": "json"}
+
+Returns human-readable JSON (temporary, not stored)
+```
+
+### Benefits of Universal Quantization
+
+| Benefit | Impact |
+|---------|--------|
+| **Storage** | 90% reduction |
+| **Transmission** | 90% fewer tokens per message |
+| **Parse speed** | Faster (less to parse) |
+| **Git diffs** | Smaller commits |
+| **Backup/sync** | Faster |
+
+### File Extensions
+
+| Extension | Contents |
+|-----------|----------|
+| `.q` | Quantized data file |
+| `.qsnap` | Quantized snapshot |
+| `.qlog` | Quantized log |
+
+### Complete Quantized Project Structure
+
+```
+{ProjectName}_MCP/
+├── {ProjectName}_MCP.uplugin
+├── Tools/
+│   ├── index.js
+│   ├── quantizer.js          ← Parse/write quantized files
+│   └── handlers/
+├── Context/
+│   ├── config.q              ← Project config
+│   ├── levels.q              ← Level data
+│   ├── actors.q              ← Actor catalog
+│   └── endpoints.q           ← Custom endpoints
+├── Memory/
+│   ├── decisions.q           ← AI decisions
+│   ├── patterns.q            ← Discovered patterns
+│   ├── history.q             ← Changelog
+│   ├── sessions/
+│   │   ├── 2026-03-11_001.q
+│   │   └── ...
+│   └── snapshots/
+│       ├── s001.qsnap
+│       └── ...
+└── Tester/
+    ├── abilities.q           ← Player abilities
+    ├── rules.q               ← Game rules
+    ├── exposed.q             ← Exposed data endpoints
+    ├── scenarios.q           ← All test scenarios
+    └── results/
+        ├── run_001.q
+        └── ...
+```
+
+**Everything quantized. No JSON. No prose. Just efficient AI-to-AI data.**
+
+---
+
 ## Architecture
 
 ```
