@@ -15,6 +15,8 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraParameterStore.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogMCPNiagara, Log, All);
+
 // ============================================================
 // HandleNiagaraGetStatus
 // GET /api/niagara/status
@@ -342,13 +344,15 @@ FString FAgenticMCPServer::HandleNiagaraGetParameters(const TMap<FString, FStrin
 
 	UWorld* World = GEditor->GetEditorWorldContext().World();
 	UNiagaraComponent* FoundComp = nullptr;
+	AActor* FoundActor = nullptr;
 
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		AActor* Actor = *It;
-		if (Actor->GetName() == ActorName)
+		if (Actor->GetName() == ActorName || Actor->GetActorLabel() == ActorName)
 		{
 			FoundComp = Actor->FindComponentByClass<UNiagaraComponent>();
+			FoundActor = Actor;
 			break;
 		}
 	}
@@ -361,10 +365,94 @@ FString FAgenticMCPServer::HandleNiagaraGetParameters(const TMap<FString, FStrin
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> ParamsArray;
 
+	// Get the Niagara system and read exposed parameters
+	UNiagaraSystem* System = FoundComp->GetAsset();
+
+	// Read user parameters from the component's override parameters
+	const FNiagaraParameterStore& OverrideParams = FoundComp->GetOverrideParameters();
+	TArray<FNiagaraVariableWithOffset> Parameters;
+	OverrideParams.GetParameters(Parameters);
+
+	for (const FNiagaraVariableWithOffset& ParamWithOffset : Parameters)
+	{
+		const FNiagaraVariable& Param = ParamWithOffset;
+		TSharedRef<FJsonObject> ParamObj = MakeShared<FJsonObject>();
+
+		ParamObj->SetStringField(TEXT("name"), Param.GetName().ToString());
+		ParamObj->SetStringField(TEXT("type"), Param.GetType().GetName());
+
+		// Try to read value based on type
+		if (Param.GetType() == FNiagaraTypeDefinition::GetFloatDef())
+		{
+			float Value = 0.0f;
+			if (OverrideParams.GetParameterValue(Value, Param))
+			{
+				ParamObj->SetNumberField(TEXT("value"), Value);
+			}
+		}
+		else if (Param.GetType() == FNiagaraTypeDefinition::GetIntDef())
+		{
+			int32 Value = 0;
+			if (OverrideParams.GetParameterValue(Value, Param))
+			{
+				ParamObj->SetNumberField(TEXT("value"), Value);
+			}
+		}
+		else if (Param.GetType() == FNiagaraTypeDefinition::GetBoolDef())
+		{
+			FNiagaraBool Value;
+			if (OverrideParams.GetParameterValue(Value, Param))
+			{
+				ParamObj->SetBoolField(TEXT("value"), Value.GetValue());
+			}
+		}
+		else if (Param.GetType() == FNiagaraTypeDefinition::GetVec3Def())
+		{
+			FVector Value = FVector::ZeroVector;
+			if (OverrideParams.GetParameterValue(Value, Param))
+			{
+				TSharedRef<FJsonObject> VecObj = MakeShared<FJsonObject>();
+				VecObj->SetNumberField(TEXT("x"), Value.X);
+				VecObj->SetNumberField(TEXT("y"), Value.Y);
+				VecObj->SetNumberField(TEXT("z"), Value.Z);
+				ParamObj->SetObjectField(TEXT("value"), VecObj);
+			}
+		}
+		else if (Param.GetType() == FNiagaraTypeDefinition::GetColorDef())
+		{
+			FLinearColor Value = FLinearColor::White;
+			if (OverrideParams.GetParameterValue(Value, Param))
+			{
+				TSharedRef<FJsonObject> ColorObj = MakeShared<FJsonObject>();
+				ColorObj->SetNumberField(TEXT("r"), Value.R);
+				ColorObj->SetNumberField(TEXT("g"), Value.G);
+				ColorObj->SetNumberField(TEXT("b"), Value.B);
+				ColorObj->SetNumberField(TEXT("a"), Value.A);
+				ParamObj->SetObjectField(TEXT("value"), ColorObj);
+			}
+		}
+
+		ParamsArray.Add(MakeShared<FJsonValueObject>(ParamObj));
+	}
+
+	// Also list system-level user exposed parameters
+	TArray<TSharedPtr<FJsonValue>> ExposedParamsArray;
+	const TArray<FNiagaraVariable>& ExposedVars = System->GetExposedParameters().ReadParameterVariables();
+	for (const FNiagaraVariable& Var : ExposedVars)
+	{
+		TSharedRef<FJsonObject> ExpObj = MakeShared<FJsonObject>();
+		ExpObj->SetStringField(TEXT("name"), Var.GetName().ToString());
+		ExpObj->SetStringField(TEXT("type"), Var.GetType().GetName());
+		ExposedParamsArray.Add(MakeShared<FJsonValueObject>(ExpObj));
+	}
+
 	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetArrayField(TEXT("parameters"), ParamsArray);
-	Result->SetNumberField(TEXT("count"), ParamsArray.Num());
+	Result->SetStringField(TEXT("actorName"), FoundActor->GetName());
+	Result->SetStringField(TEXT("systemName"), System->GetName());
+	Result->SetArrayField(TEXT("overrideParameters"), ParamsArray);
+	Result->SetNumberField(TEXT("overrideCount"), ParamsArray.Num());
+	Result->SetArrayField(TEXT("exposedParameters"), ExposedParamsArray);
+	Result->SetNumberField(TEXT("exposedCount"), ExposedParamsArray.Num());
 
 	return JsonToString(Result);
 }
@@ -446,6 +534,11 @@ FString FAgenticMCPServer::HandleNiagaraSetEmitterEnable(const TMap<FString, FSt
 		return MakeErrorJson(TEXT("Invalid JSON body"));
 	}
 
+	if (!GEditor || !GEditor->GetEditorWorldContext().World())
+	{
+		return MakeErrorJson(TEXT("No editor world available"));
+	}
+
 	FString ActorName;
 	if (!JsonBody->TryGetStringField(TEXT("actorName"), ActorName))
 	{
@@ -461,11 +554,79 @@ FString FAgenticMCPServer::HandleNiagaraSetEmitterEnable(const TMap<FString, FSt
 	bool bEnabled = true;
 	JsonBody->TryGetBoolField(TEXT("enabled"), bEnabled);
 
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	UNiagaraComponent* FoundComp = nullptr;
+	AActor* FoundActor = nullptr;
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Actor = *It;
+		if (Actor->GetName() == ActorName || Actor->GetActorLabel() == ActorName)
+		{
+			FoundComp = Actor->FindComponentByClass<UNiagaraComponent>();
+			FoundActor = Actor;
+			break;
+		}
+	}
+
+	if (!FoundComp || !FoundComp->GetAsset())
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Niagara component not found on actor: %s"), *ActorName));
+	}
+
+	// Find the emitter by name and set its enabled state
+	UNiagaraSystem* System = FoundComp->GetAsset();
+	const TArray<FNiagaraEmitterHandle>& EmitterHandles = System->GetEmitterHandles();
+
+	bool bFoundEmitter = false;
+	int32 EmitterIndex = -1;
+
+	// Try to find by exact name or index
+	if (EmitterName.IsNumeric())
+	{
+		EmitterIndex = FCString::Atoi(*EmitterName);
+		if (EmitterIndex >= 0 && EmitterIndex < EmitterHandles.Num())
+		{
+			bFoundEmitter = true;
+		}
+	}
+	else
+	{
+		for (int32 i = 0; i < EmitterHandles.Num(); i++)
+		{
+			const FNiagaraEmitterHandle& Handle = EmitterHandles[i];
+			if (Handle.GetName().ToString() == EmitterName ||
+				Handle.GetName().ToString().Contains(EmitterName))
+			{
+				EmitterIndex = i;
+				bFoundEmitter = true;
+				break;
+			}
+		}
+	}
+
+	if (!bFoundEmitter || EmitterIndex < 0)
+	{
+		// List available emitters for debugging
+		TArray<FString> AvailableEmitters;
+		for (int32 i = 0; i < EmitterHandles.Num(); i++)
+		{
+			AvailableEmitters.Add(FString::Printf(TEXT("%d: %s"), i, *EmitterHandles[i].GetName().ToString()));
+		}
+		return MakeErrorJson(FString::Printf(TEXT("Emitter '%s' not found. Available emitters: %s"),
+			*EmitterName, *FString::Join(AvailableEmitters, TEXT(", "))));
+	}
+
+	// Set emitter enabled state
+	FoundComp->SetEmitterEnable(EmitterHandles[EmitterIndex].GetName(), bEnabled);
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("emitterName"), EmitterName);
+	Result->SetStringField(TEXT("actorName"), FoundActor->GetName());
+	Result->SetStringField(TEXT("emitterName"), EmitterHandles[EmitterIndex].GetName().ToString());
+	Result->SetNumberField(TEXT("emitterIndex"), EmitterIndex);
 	Result->SetBoolField(TEXT("enabled"), bEnabled);
+	Result->SetBoolField(TEXT("systemActive"), FoundComp->IsActive());
 
 	return JsonToString(Result);
 }

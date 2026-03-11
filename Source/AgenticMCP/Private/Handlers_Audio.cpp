@@ -14,6 +14,8 @@
 #include "Editor.h"
 #include "Kismet/GameplayStatics.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogMCPAudio, Log, All);
+
 FString FAgenticMCPServer::HandleAudioGetStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -110,9 +112,12 @@ FString FAgenticMCPServer::HandleAudioListSoundClasses(const TMap<FString, FStri
 
 FString FAgenticMCPServer::HandleAudioSetVolume(const TMap<FString, FString>& Params, const FString& Body)
 {
+	UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetVolume called with body: %s"), *Body);
+
 	TSharedPtr<FJsonObject> JsonBody = ParseBodyJson(Body);
 	if (!JsonBody.IsValid())
 	{
+		UE_LOG(LogMCPAudio, Error, TEXT("HandleAudioSetVolume: Invalid JSON body"));
 		return MakeErrorJson(TEXT("Invalid JSON body"));
 	}
 
@@ -122,12 +127,73 @@ FString FAgenticMCPServer::HandleAudioSetVolume(const TMap<FString, FString>& Pa
 	double Volume = 1.0;
 	JsonBody->TryGetNumberField(TEXT("volume"), Volume);
 
+	UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetVolume: SoundClass='%s', Volume=%.2f"), *SoundClassName, Volume);
+
+	// Clamp volume to valid range
+	Volume = FMath::Clamp(Volume, 0.0, 2.0);
+
+	bool bFoundClass = false;
+	FString ActualClassName;
+
+	// Find and modify the sound class
+	for (TObjectIterator<USoundClass> It; It; ++It)
+	{
+		USoundClass* SoundClass = *It;
+		if (SoundClass && (SoundClassName.IsEmpty() || SoundClass->GetName().Contains(SoundClassName)))
+		{
+			// Modify the sound class properties
+			SoundClass->Properties.Volume = static_cast<float>(Volume);
+			bFoundClass = true;
+			ActualClassName = SoundClass->GetName();
+
+			// If specific class was requested and found, break
+			if (!SoundClassName.IsEmpty() && SoundClass->GetName() == SoundClassName)
+			{
+				break;
+			}
+		}
+	}
+
+	// Also set volume on active audio components if targeting by component name
+	if (!bFoundClass && !SoundClassName.IsEmpty())
+	{
+		if (GEditor && GEditor->GetEditorWorldContext().World())
+		{
+			UWorld* World = GEditor->GetEditorWorldContext().World();
+			for (TObjectIterator<UAudioComponent> It; It; ++It)
+			{
+				UAudioComponent* AudioComp = *It;
+				if (AudioComp && AudioComp->GetWorld() == World)
+				{
+					if (AudioComp->GetName().Contains(SoundClassName) ||
+						(AudioComp->GetOwner() && AudioComp->GetOwner()->GetName().Contains(SoundClassName)))
+					{
+						AudioComp->SetVolumeMultiplier(static_cast<float>(Volume));
+						bFoundClass = true;
+						ActualClassName = AudioComp->GetName();
+					}
+				}
+			}
+		}
+	}
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("soundClass"), SoundClassName);
+	Result->SetBoolField(TEXT("success"), bFoundClass);
+	Result->SetStringField(TEXT("soundClass"), bFoundClass ? ActualClassName : SoundClassName);
 	Result->SetNumberField(TEXT("volume"), Volume);
+	if (!bFoundClass)
+	{
+		UE_LOG(LogMCPAudio, Warning, TEXT("HandleAudioSetVolume: Sound class '%s' not found"), *SoundClassName);
+		Result->SetStringField(TEXT("warning"), FString::Printf(TEXT("Sound class '%s' not found. Volume not changed."), *SoundClassName));
+	}
+	else
+	{
+		UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetVolume: SUCCESS - Set '%s' volume to %.2f"), *ActualClassName, Volume);
+	}
 	return JsonToString(Result);
 }
+
+FString FAgenticMCPServer::HandleAudioGetStats
 
 FString FAgenticMCPServer::HandleAudioGetStats(const TMap<FString, FString>& Params, const FString& Body)
 {
@@ -237,8 +303,90 @@ FString FAgenticMCPServer::HandleAudioStopSound(const TMap<FString, FString>& Pa
 
 FString FAgenticMCPServer::HandleAudioSetListener(const TMap<FString, FString>& Params, const FString& Body)
 {
+	UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetListener called with body: %s"), *Body);
+
+	TSharedPtr<FJsonObject> JsonBody = ParseBodyJson(Body);
+	if (!JsonBody.IsValid())
+	{
+		UE_LOG(LogMCPAudio, Error, TEXT("HandleAudioSetListener: Invalid JSON body"));
+		return MakeErrorJson(TEXT("Invalid JSON body. Expected: {\"location\": {\"x\": 0, \"y\": 0, \"z\": 0}, \"rotation\": {\"pitch\": 0, \"yaw\": 0, \"roll\": 0}}"));
+	}
+
+	if (!GEditor || !GEditor->GetEditorWorldContext().World())
+	{
+		return MakeErrorJson(TEXT("No editor world available"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+
+	// Parse location
+	FVector ListenerLocation = FVector::ZeroVector;
+	const TSharedPtr<FJsonObject>* LocationObj;
+	if (JsonBody->TryGetObjectField(TEXT("location"), LocationObj))
+	{
+		(*LocationObj)->TryGetNumberField(TEXT("x"), ListenerLocation.X);
+		(*LocationObj)->TryGetNumberField(TEXT("y"), ListenerLocation.Y);
+		(*LocationObj)->TryGetNumberField(TEXT("z"), ListenerLocation.Z);
+	}
+
+	// Parse rotation
+	FRotator ListenerRotation = FRotator::ZeroRotator;
+	const TSharedPtr<FJsonObject>* RotationObj;
+	if (JsonBody->TryGetObjectField(TEXT("rotation"), RotationObj))
+	{
+		double Pitch = 0, Yaw = 0, Roll = 0;
+		(*RotationObj)->TryGetNumberField(TEXT("pitch"), Pitch);
+		(*RotationObj)->TryGetNumberField(TEXT("yaw"), Yaw);
+		(*RotationObj)->TryGetNumberField(TEXT("roll"), Roll);
+		ListenerRotation = FRotator(Pitch, Yaw, Roll);
+	}
+
+	// Get the audio device and set listener override
+	bool bSuccess = false;
+	UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetListener: Setting listener at (%.1f, %.1f, %.1f) rot (%.1f, %.1f, %.1f)"),
+		ListenerLocation.X, ListenerLocation.Y, ListenerLocation.Z,
+		ListenerRotation.Pitch, ListenerRotation.Yaw, ListenerRotation.Roll);
+
+	if (FAudioDeviceManager* DeviceManager = FAudioDeviceManager::Get())
+	{
+		if (FAudioDevice* AudioDevice = DeviceManager->GetActiveAudioDevice().GetAudioDevice())
+		{
+			// Set listener position for the main viewport/listener index 0
+			FTransform ListenerTransform(ListenerRotation, ListenerLocation);
+			AudioDevice->SetListener(World, 0, ListenerTransform, 0.0f);
+			bSuccess = true;
+			UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetListener: SUCCESS - Listener position updated"));
+		}
+		else
+		{
+			UE_LOG(LogMCPAudio, Error, TEXT("HandleAudioSetListener: Failed to get active audio device"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogMCPAudio, Error, TEXT("HandleAudioSetListener: FAudioDeviceManager not available"));
+	}
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
+	Result->SetBoolField(TEXT("success"), bSuccess);
+
+	TSharedRef<FJsonObject> LocJson = MakeShared<FJsonObject>();
+	LocJson->SetNumberField(TEXT("x"), ListenerLocation.X);
+	LocJson->SetNumberField(TEXT("y"), ListenerLocation.Y);
+	LocJson->SetNumberField(TEXT("z"), ListenerLocation.Z);
+	Result->SetObjectField(TEXT("location"), LocJson);
+
+	TSharedRef<FJsonObject> RotJson = MakeShared<FJsonObject>();
+	RotJson->SetNumberField(TEXT("pitch"), ListenerRotation.Pitch);
+	RotJson->SetNumberField(TEXT("yaw"), ListenerRotation.Yaw);
+	RotJson->SetNumberField(TEXT("roll"), ListenerRotation.Roll);
+	Result->SetObjectField(TEXT("rotation"), RotJson);
+
+	if (!bSuccess)
+	{
+		Result->SetStringField(TEXT("error"), TEXT("Failed to get audio device"));
+	}
+
 	return JsonToString(Result);
 }
 

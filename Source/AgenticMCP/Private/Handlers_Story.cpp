@@ -9,10 +9,13 @@
 #include "Engine/World.h"
 #include "Engine/Level.h"
 #include "Engine/LevelStreaming.h"
+#include "Engine/DataTable.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Actor.h"
 #include "EngineUtils.h"
 #include "Editor.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogMCPStory, Log, All);
 
 // Helper function to find BP_StoryController in world including streaming levels
 static AActor* FindStoryControllerInWorld(UWorld* World)
@@ -287,24 +290,95 @@ FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params,
 	}
 	else if (BodyJson->HasField(TEXT("stepName")))
 	{
-		// TODO: Look up step name in DataTable to get index
 		FString StepName = BodyJson->GetStringField(TEXT("stepName"));
-		// For now, extract number from step name like "StoryStep_5" -> 5
-		FString NumStr;
-		for (int32 i = StepName.Len() - 1; i >= 0; --i)
+
+		// Try to look up step name in DataTable
+		FProperty* DataTableProp = StoryController->GetClass()->FindPropertyByName(TEXT("StoryStepsTable"));
+		if (!DataTableProp)
 		{
-			if (FChar::IsDigit(StepName[i]))
+			DataTableProp = StoryController->GetClass()->FindPropertyByName(TEXT("DT_StorySteps"));
+		}
+
+		bool bFoundInDataTable = false;
+		if (DataTableProp)
+		{
+			if (FObjectProperty* ObjProp = CastField<FObjectProperty>(DataTableProp))
 			{
-				NumStr = FString::Chr(StepName[i]) + NumStr;
-			}
-			else if (!NumStr.IsEmpty())
-			{
-				break;
+				UObject* DTObj = ObjProp->GetObjectPropertyValue_InContainer(StoryController);
+				if (UDataTable* DataTable = Cast<UDataTable>(DTObj))
+				{
+					// Iterate through DataTable rows to find matching step name
+					TArray<FName> RowNames = DataTable->GetRowNames();
+					for (int32 i = 0; i < RowNames.Num(); i++)
+					{
+						FName RowName = RowNames[i];
+						if (RowName.ToString() == StepName || RowName.ToString().Contains(StepName))
+						{
+							TargetIndex = i;
+							bFoundInDataTable = true;
+							break;
+						}
+
+						// Also check row data for StepName field
+						uint8* RowData = DataTable->FindRowUnchecked(RowName);
+						if (RowData)
+						{
+							UScriptStruct* RowStruct = DataTable->GetRowStruct();
+							if (RowStruct)
+							{
+								FProperty* NameProp = RowStruct->FindPropertyByName(TEXT("StepName"));
+								if (!NameProp) NameProp = RowStruct->FindPropertyByName(TEXT("Name"));
+								if (!NameProp) NameProp = RowStruct->FindPropertyByName(TEXT("DisplayName"));
+
+								if (NameProp)
+								{
+									if (FStrProperty* StrProp = CastField<FStrProperty>(NameProp))
+									{
+										FString RowStepName = StrProp->GetPropertyValue_InContainer(RowData);
+										if (RowStepName == StepName || RowStepName.Contains(StepName))
+										{
+											TargetIndex = i;
+											bFoundInDataTable = true;
+											break;
+										}
+									}
+									else if (FNameProperty* NmProp = CastField<FNameProperty>(NameProp))
+									{
+										FName RowStepName = NmProp->GetPropertyValue_InContainer(RowData);
+										if (RowStepName.ToString() == StepName || RowStepName.ToString().Contains(StepName))
+										{
+											TargetIndex = i;
+											bFoundInDataTable = true;
+											break;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
-		if (!NumStr.IsEmpty())
+
+		// Fallback: extract number from step name like "StoryStep_5" -> 5
+		if (!bFoundInDataTable)
 		{
-			TargetIndex = FCString::Atoi(*NumStr);
+			FString NumStr;
+			for (int32 i = StepName.Len() - 1; i >= 0; --i)
+			{
+				if (FChar::IsDigit(StepName[i]))
+				{
+					NumStr = FString::Chr(StepName[i]) + NumStr;
+				}
+				else if (!NumStr.IsEmpty())
+				{
+					break;
+				}
+			}
+			if (!NumStr.IsEmpty())
+			{
+				TargetIndex = FCString::Atoi(*NumStr);
+			}
 		}
 	}
 
