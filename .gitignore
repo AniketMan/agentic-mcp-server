@@ -1,3 +1,10 @@
 # Dependencies
 node_modules/
-Tools/node_modules/
+
+# UE Build Artifacts
+Intermediate/
+Binaries/
+DerivedDataCache/
+Saved/
+*.sln
+*.vcxproj*

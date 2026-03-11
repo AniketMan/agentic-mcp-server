@@ -62,6 +62,7 @@
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "Editor.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 
 // ============================================================
 // SEH wrappers for crash-safe compilation and saving (Windows only)
@@ -728,6 +729,57 @@ FString FAgenticMCPServer::HandleRescan()
 }
 
 // ============================================================
+// HandleOpenAsset
+// POST /api/open-asset { "assetPath": "..." }
+// Opens an asset in its appropriate editor (e.g., Sequencer for LevelSequence).
+// ============================================================
+
+FString FAgenticMCPServer::HandleOpenAsset(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString AssetPath = Json->GetStringField(TEXT("assetPath"));
+	if (AssetPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing required field: 'assetPath'"));
+	}
+
+	// Check if GEditor is available
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("GEditor not available"));
+	}
+
+	// Load the asset
+	UObject* Asset = LoadObject<UObject>(nullptr, *AssetPath);
+	if (!Asset)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Failed to load asset: %s"), *AssetPath));
+	}
+
+	// Open the asset in its editor using AssetEditorSubsystem
+	UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+	if (!AssetEditorSubsystem)
+	{
+		return MakeErrorJson(TEXT("AssetEditorSubsystem not available"));
+	}
+
+	bool bOpened = AssetEditorSubsystem->OpenEditorForAsset(Asset);
+	if (!bOpened)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Failed to open editor for asset: %s"), *AssetPath));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("assetPath"), AssetPath);
+	Result->SetStringField(TEXT("assetClass"), Asset->GetClass()->GetName());
+
+	return JsonToString(Result);
+}
+
+// ============================================================
 // Route Registration
 // ============================================================
 
@@ -841,6 +893,10 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSetNodeComment(Body);
 	});
+	HandlerMap.Add(TEXT("addComponent"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAddComponent(Body);
+	});
 
 	// ---- Actor Management ----
 	HandlerMap.Add(TEXT("listActors"), [this](const TMap<FString, FString>& Params, const FString& Body)
@@ -867,6 +923,10 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSetActorTransform(Body);
 	});
+	HandlerMap.Add(TEXT("moveActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetActorTransform(Body);  // moveActor is alias for setActorTransform
+	});
 
 	// ---- Level Management ----
 	HandlerMap.Add(TEXT("listLevels"), [this](const TMap<FString, FString>& Params, const FString& Body)
@@ -877,9 +937,21 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleLoadLevel(Body);
 	});
+	HandlerMap.Add(TEXT("removeSublevel"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRemoveSublevel(Body);
+	});
 	HandlerMap.Add(TEXT("getLevelBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
 		return HandleGetLevelBlueprint(Body);
+	});
+	HandlerMap.Add(TEXT("streamingLevelVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetStreamingLevelVisibility(Body);
+	});
+	HandlerMap.Add(TEXT("outputLog"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetOutputLog(Body);
 	});
 
 	// ---- Validation and Safety ----
@@ -925,6 +997,32 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleResolveRef(Body);
 	});
+	HandlerMap.Add(TEXT("getCamera"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetCamera(Body);
+	});
+	HandlerMap.Add(TEXT("listViewports"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleListViewports(Body);
+	});
+	HandlerMap.Add(TEXT("getSelection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetSelection(Body);
+	});
+
+	// ---- Level Sequences ----
+	HandlerMap.Add(TEXT("listSequences"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleListSequences(Body);
+	});
+	HandlerMap.Add(TEXT("readSequence"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleReadSequence(Body);
+	});
+	HandlerMap.Add(TEXT("removeAudioTracks"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRemoveAudioTracks(Body);
+	});
 
 	// ---- Debug Visualization ----
 	HandlerMap.Add(TEXT("drawDebug"), [this](const TMap<FString, FString>& Params, const FString& Body)
@@ -965,6 +1063,12 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSaveState(Body);
 	});
+
+	// ---- Python Execution ----
+	HandlerMap.Add(TEXT("executePython"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleExecutePython(Body);
+	});
 	HandlerMap.Add(TEXT("diffState"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
 		return HandleDiffState(Body);
@@ -976,6 +1080,270 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("listStates"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
 		return HandleListStates(Body);
+	});
+
+	// ---- Asset Editor ----
+	HandlerMap.Add(TEXT("openAsset"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleOpenAsset(Body);
+	});
+
+	// ---- PIE Control ----
+	HandlerMap.Add(TEXT("startPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStartPIE(Params, Body);
+	});
+	HandlerMap.Add(TEXT("stopPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStopPIE(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pausePIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePausePIE(Params, Body);
+	});
+	HandlerMap.Add(TEXT("stepPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStepPIE(Params, Body);
+	});
+	HandlerMap.Add(TEXT("getPIEState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetPIEState(Params, Body);
+	});
+
+	// ---- Console Commands ----
+	HandlerMap.Add(TEXT("executeConsole"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleExecuteConsole(Params, Body);
+	});
+	HandlerMap.Add(TEXT("getCVar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetCVar(Params, Body);
+	});
+	HandlerMap.Add(TEXT("setCVar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetCVar(Params, Body);
+	});
+
+	// ---- Input Simulation ----
+	HandlerMap.Add(TEXT("simulateInput"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSimulateInput(Params, Body);
+	});
+
+	// ---- Meta XR / OculusXR ----
+	HandlerMap.Add(TEXT("xrStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRStatus(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrGuardian"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRGuardian(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetGuardianVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetGuardianVisibility(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrHandTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRHandTracking(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrControllers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRControllers(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRPassthrough(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetPassthrough(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetDisplayFrequency"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetDisplayFrequency(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetPerformanceLevels"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetPerformanceLevels(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrRecenter"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRRecenter(Params, Body);
+	});
+
+	// ---- Story/Game Handlers ----
+	HandlerMap.Add(TEXT("storyState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryState(Params, Body);
+	});
+	HandlerMap.Add(TEXT("storyAdvance"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryAdvance(Params, Body);
+	});
+	HandlerMap.Add(TEXT("storyGoto"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryGoto(Params, Body);
+	});
+	HandlerMap.Add(TEXT("storyPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryPlay(Params, Body);
+	});
+
+	// ---- DataTable Handlers ----
+	HandlerMap.Add(TEXT("dataTableRead"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDataTableRead(Params, Body);
+	});
+	HandlerMap.Add(TEXT("dataTableWrite"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDataTableWrite(Params, Body);
+	});
+
+	// ---- Animation Handlers ----
+	HandlerMap.Add(TEXT("animationPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimationPlay(Params, Body);
+	});
+	HandlerMap.Add(TEXT("animationStop"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimationStop(Params, Body);
+	});
+
+	// ---- Material Handlers ----
+	HandlerMap.Add(TEXT("materialSetParam"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialSetParam(Params, Body);
+	});
+
+	// ---- Collision Handlers ----
+	HandlerMap.Add(TEXT("collisionTrace"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleCollisionTrace(Params, Body);
+	});
+
+	// ---- RenderDoc Handlers ----
+	HandlerMap.Add(TEXT("renderDocCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRenderDocCapture(Params, Body);
+	});
+
+	// ---- Audio Handlers ----
+	HandlerMap.Add(TEXT("audioGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioGetStatus(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioListActiveSounds"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioListActiveSounds(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioGetDeviceInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioGetDeviceInfo(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioListSoundClasses"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioListSoundClasses(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioSetVolume"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioSetVolume(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioGetStats"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioGetStats(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioPlaySound"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioPlaySound(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioStopSound"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioStopSound(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioSetListener"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioSetListener(Params, Body);
+	});
+	HandlerMap.Add(TEXT("audioDebugVisualize"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioDebugVisualize(Params, Body);
+	});
+
+	// ---- Niagara Handlers ----
+	HandlerMap.Add(TEXT("niagaraGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetStatus(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraListSystems"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraListSystems(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetSystemInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetSystemInfo(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetEmitters"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetEmitters(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraSetParameter"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraSetParameter(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetParameters"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetParameters(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraActivateSystem"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraActivateSystem(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraSetEmitterEnable"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraSetEmitterEnable(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraResetSystem"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraResetSystem(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetStats"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetStats(Params, Body);
+	});
+	HandlerMap.Add(TEXT("niagaraDebugHUD"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraDebugHUD(Params, Body);
+	});
+
+	// ---- PixelStreaming Handlers ----
+	HandlerMap.Add(TEXT("pixelStreamingGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingGetStatus(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingStart"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingStart(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingStop"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingStop(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingListStreamers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingListStreamers(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingGetCodec"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingGetCodec(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingSetCodec"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingSetCodec(Params, Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingListPlayers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingListPlayers(Params, Body);
 	});
 }
 
@@ -1073,6 +1441,87 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				return true;
 			}));
 
+	// ---- /mcp/status — MCP bridge health check ----
+	Router->BindRoute(FHttpPath(TEXT("/mcp/status")), EHttpServerRequestVerbs::VERB_GET,
+		FHttpRequestHandler::CreateLambda(
+			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+			{
+				TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+				J->SetStringField(TEXT("status"), TEXT("connected"));
+				J->SetStringField(TEXT("server"), TEXT("AgenticMCP"));
+				J->SetStringField(TEXT("version"), TEXT("1.0.0"));
+				J->SetStringField(TEXT("mode"), bIsEditor ? TEXT("editor") : TEXT("commandlet"));
+				J->SetNumberField(TEXT("blueprintCount"), AllBlueprintAssets.Num());
+				J->SetNumberField(TEXT("mapCount"), AllMapAssets.Num());
+				TUniquePtr<FHttpServerResponse> R = FHttpServerResponse::Create(
+					JsonToString(J), TEXT("application/json"));
+				OnComplete(MoveTemp(R));
+				return true;
+			}));
+
+	// ---- /mcp/tools — Auto-discovery of all registered tools ----
+	Router->BindRoute(FHttpPath(TEXT("/mcp/tools")), EHttpServerRequestVerbs::VERB_GET,
+		FHttpRequestHandler::CreateLambda(
+			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+			{
+				TArray<TSharedPtr<FJsonValue>> ToolsArray;
+				for (const auto& Pair : HandlerMap)
+				{
+					TSharedRef<FJsonObject> Tool = MakeShared<FJsonObject>();
+					Tool->SetStringField(TEXT("name"), Pair.Key);
+					ToolsArray.Add(MakeShared<FJsonValueObject>(Tool));
+				}
+				TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+				J->SetArrayField(TEXT("tools"), ToolsArray);
+				TUniquePtr<FHttpServerResponse> R = FHttpServerResponse::Create(
+					JsonToString(J), TEXT("application/json"));
+				OnComplete(MoveTemp(R));
+				return true;
+			}));
+
+	// ---- /mcp/tool/<name> — Execute a tool by name (queued to game thread) ----
+	Router->BindRoute(FHttpPath(TEXT("/mcp/tool")), EHttpServerRequestVerbs::VERB_POST,
+		FHttpRequestHandler::CreateLambda(
+			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+			{
+				// Extract tool name from the relative path
+				// The request path after /mcp/tool/ contains the tool name
+				FString RelPath = Request.RelativePath.GetPath();
+				FString ToolName;
+				if (RelPath.StartsWith(TEXT("/")))
+				{
+					ToolName = RelPath.RightChop(1);
+				}
+				else
+				{
+					ToolName = RelPath;
+				}
+
+				if (ToolName.IsEmpty())
+				{
+					TSharedRef<FJsonObject> Err = MakeShared<FJsonObject>();
+					Err->SetStringField(TEXT("error"), TEXT("Missing tool name in URL"));
+					TUniquePtr<FHttpServerResponse> R = FHttpServerResponse::Create(
+						JsonToString(Err), TEXT("application/json"));
+					OnComplete(MoveTemp(R));
+					return true;
+				}
+
+				// Queue to game thread like all other handlers
+				TSharedPtr<FPendingRequest> Req = MakeShared<FPendingRequest>();
+				Req->Endpoint = ToolName;
+				Req->QueryParams = Request.QueryParams;
+				if (Request.Body.Num() > 0)
+				{
+					TArray<uint8> NullTerminated(Request.Body);
+					NullTerminated.Add(0);
+					Req->Body = UTF8_TO_TCHAR((const ANSICHAR*)NullTerminated.GetData());
+				}
+				Req->OnComplete = OnComplete;
+				RequestQueue.Enqueue(Req);
+				return true;
+			}));
+
 	// ---- Bind all queued routes ----
 	// Blueprint Read (GET)
 	Router->BindRoute(FHttpPath(TEXT("/api/list")), EHttpServerRequestVerbs::VERB_GET,
@@ -1149,6 +1598,10 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("loadLevel")));
 	Router->BindRoute(FHttpPath(TEXT("/api/get-level-blueprint")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("getLevelBlueprint")));
+	Router->BindRoute(FHttpPath(TEXT("/api/remove-sublevel")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("removeSublevel")));
+	Router->BindRoute(FHttpPath(TEXT("/api/open-asset")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("openAsset")));
 
 	// Validation and Safety (POST)
 	Router->BindRoute(FHttpPath(TEXT("/api/validate-blueprint")), EHttpServerRequestVerbs::VERB_POST,
@@ -1157,6 +1610,224 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("snapshotGraph")));
 	Router->BindRoute(FHttpPath(TEXT("/api/restore-graph")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("restoreGraph")));
+
+	// Visual Agent / Automation (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/scene-snapshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("sceneSnapshot")));
+	Router->BindRoute(FHttpPath(TEXT("/api/screenshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("screenshot")));
+	Router->BindRoute(FHttpPath(TEXT("/api/focus-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("focusActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/select-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("selectActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/set-viewport")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("setViewport")));
+	Router->BindRoute(FHttpPath(TEXT("/api/wait-ready")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("waitReady")));
+	Router->BindRoute(FHttpPath(TEXT("/api/resolve-ref")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("resolveRef")));
+	Router->BindRoute(FHttpPath(TEXT("/api/move-actor")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("moveActor")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-camera")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("getCamera")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-viewports")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listViewports")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-selection")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("getSelection")));
+
+	// Level Sequences (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/list-sequences")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listSequences")));
+	Router->BindRoute(FHttpPath(TEXT("/api/read-sequence")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("readSequence")));
+	Router->BindRoute(FHttpPath(TEXT("/api/remove-audio-tracks")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("removeAudioTracks")));
+
+	// Debug Drawing (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/draw-debug")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("drawDebug")));
+	Router->BindRoute(FHttpPath(TEXT("/api/clear-debug")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("clearDebug")));
+
+	// Blueprint Snapshot (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/blueprint-snapshot")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("blueprintSnapshot")));
+
+	// Transaction/Undo (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/begin-transaction")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("beginTransaction")));
+	Router->BindRoute(FHttpPath(TEXT("/api/end-transaction")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("endTransaction")));
+	Router->BindRoute(FHttpPath(TEXT("/api/undo")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("undo")));
+	Router->BindRoute(FHttpPath(TEXT("/api/redo")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("redo")));
+
+	// State Management (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/save-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("saveState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/diff-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("diffState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/restore-state")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("restoreState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-states")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("listStates")));
+
+	// Python Execution (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/execute-python")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("executePython")));
+
+	// Add Component to Blueprint (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/add-component")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("addComponent")));
+
+	// PIE Control (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/start-pie")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("startPIE")));
+	Router->BindRoute(FHttpPath(TEXT("/api/stop-pie")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("stopPIE")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pause-pie")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("pausePIE")));
+	Router->BindRoute(FHttpPath(TEXT("/api/step-pie")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("stepPIE")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-pie-state")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("getPIEState")));
+
+	// Console Commands (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/execute-console")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("executeConsole")));
+	Router->BindRoute(FHttpPath(TEXT("/api/get-cvar")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("getCVar")));
+	Router->BindRoute(FHttpPath(TEXT("/api/set-cvar")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("setCVar")));
+
+	// Input Simulation (POST)
+	Router->BindRoute(FHttpPath(TEXT("/api/simulate-input")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("simulateInput")));
+
+	// Audio Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/status")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("audioGetStatus")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/active-sounds")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("audioListActiveSounds")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/device-info")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("audioGetDeviceInfo")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/sound-classes")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("audioListSoundClasses")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/set-volume")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("audioSetVolume")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/stats")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("audioGetStats")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/play")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("audioPlaySound")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/stop")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("audioStopSound")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/set-listener")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("audioSetListener")));
+	Router->BindRoute(FHttpPath(TEXT("/api/audio/debug-visualize")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("audioDebugVisualize")));
+
+	// Niagara Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/status")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("niagaraGetStatus")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/systems")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("niagaraListSystems")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/system-info")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraGetSystemInfo")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/emitters")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraGetEmitters")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/set-parameter")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraSetParameter")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/parameters")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraGetParameters")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/activate")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraActivateSystem")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/set-emitter")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraSetEmitterEnable")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/reset")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraResetSystem")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/stats")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("niagaraGetStats")));
+	Router->BindRoute(FHttpPath(TEXT("/api/niagara/debug-hud")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("niagaraDebugHUD")));
+
+	// PixelStreaming Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/status")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("pixelStreamingGetStatus")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/start")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("pixelStreamingStart")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/stop")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("pixelStreamingStop")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/streamers")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("pixelStreamingListStreamers")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/codec")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("pixelStreamingGetCodec")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/set-codec")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("pixelStreamingSetCodec")));
+	Router->BindRoute(FHttpPath(TEXT("/api/pixelstreaming/players")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("pixelStreamingListPlayers")));
+
+	// Meta XR / OculusXR Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/status")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrStatus")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/guardian")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrGuardian")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/guardian/visibility")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetGuardianVisibility")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/hand-tracking")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrHandTracking")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/controllers")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrControllers")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/passthrough")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrPassthrough")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/passthrough/set")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetPassthrough")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/display-frequency")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetDisplayFrequency")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/performance")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetPerformanceLevels")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/recenter")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrRecenter")));
+
+	// Story/Game Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/story/state")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("storyState")));
+	Router->BindRoute(FHttpPath(TEXT("/api/story/advance")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("storyAdvance")));
+	Router->BindRoute(FHttpPath(TEXT("/api/story/goto")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("storyGoto")));
+	Router->BindRoute(FHttpPath(TEXT("/api/story/play")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("storyPlay")));
+
+	// DataTable Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/datatable/read")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("dataTableRead")));
+	Router->BindRoute(FHttpPath(TEXT("/api/datatable/write")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("dataTableWrite")));
+
+	// Animation Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/animation/play")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("animationPlay")));
+	Router->BindRoute(FHttpPath(TEXT("/api/animation/stop")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("animationStop")));
+
+	// Material Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/material/set-param")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("materialSetParam")));
+
+	// Collision Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/collision/trace")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("collisionTrace")));
+
+	// RenderDoc Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/renderdoc/capture")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("renderDocCapture")));
+
+	// Level Visibility & Log Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/streaming-level-visibility")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("streamingLevelVisibility")));
+	Router->BindRoute(FHttpPath(TEXT("/api/output-log")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("outputLog")));
 
 	// ---- Start listening ----
 	HttpModule.StartAllListeners();
@@ -1207,4 +1878,54 @@ bool FAgenticMCPServer::ProcessOneRequest()
 	Req->OnComplete(MoveTemp(Response));
 
 	return true;
+}
+
+// ============================================================
+// HandleExecutePython
+// POST /api/execute-python { "script": "...", "file": "..." }
+// Executes Python code or a Python file in the editor.
+// ============================================================
+
+FString FAgenticMCPServer::HandleExecutePython(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString Script = Json->GetStringField(TEXT("script"));
+	FString FilePath = Json->GetStringField(TEXT("file"));
+
+	if (Script.IsEmpty() && FilePath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing required field: 'script' (inline code) or 'file' (path to .py file)"));
+	}
+
+	FString Command;
+	if (!FilePath.IsEmpty())
+	{
+		// Execute a Python file
+		Command = FString::Printf(TEXT("py \"%s\""), *FilePath);
+	}
+	else
+	{
+		// Execute inline Python script - escape quotes and newlines for console
+		FString EscapedScript = Script.Replace(TEXT("\""), TEXT("\\\""));
+		Command = FString::Printf(TEXT("py -c \"%s\""), *EscapedScript);
+	}
+
+	// Execute via editor console command
+	if (GEditor)
+	{
+		GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
+	}
+	else
+	{
+		return MakeErrorJson(TEXT("GEditor not available"));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("executed"), !FilePath.IsEmpty() ? FilePath : TEXT("inline script"));
+	Result->SetStringField(TEXT("note"), TEXT("Check Output Log for script results"));
+
+	return JsonToString(Result);
 }

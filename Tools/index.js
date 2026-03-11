@@ -15,7 +15,7 @@
  * - Auto-path selection with status reporting
  *
  * Environment Variables:
- *   UNREAL_MCP_URL          - Base URL for Unreal MCP server (default: http://localhost:3000)
+ *   UNREAL_MCP_URL          - Base URL for Unreal MCP server (default: http://localhost:9847)
  *   MCP_REQUEST_TIMEOUT_MS  - HTTP request timeout in ms (default: 30000)
  *   MCP_ASYNC_ENABLED       - Enable async task queue (default: true)
  *   MCP_ASYNC_TIMEOUT_MS    - Async operation timeout (default: 300000)
@@ -70,7 +70,7 @@ import {
 // Configuration with defaults
 // ---------------------------------------------------------------------------
 const CONFIG = {
-  unrealMcpUrl: process.env.UNREAL_MCP_URL || "http://localhost:3000",
+  unrealMcpUrl: process.env.UNREAL_MCP_URL || "http://localhost:9847",
   requestTimeoutMs: parseInt(process.env.MCP_REQUEST_TIMEOUT_MS, 10) || 30000,
   injectContext: process.env.INJECT_CONTEXT === "true",
   asyncEnabled: process.env.MCP_ASYNC_ENABLED !== "false",
