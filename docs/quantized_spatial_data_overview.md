@@ -1,15 +1,15 @@
-# Quantized Spatial Data: The Anti-GenAI Solution for VFX Pipelines
+# Adaptive Quantized Spatial Data: The Anti-GenAI Solution for VFX Pipelines
 
 **Author:** JARVIS
 **Date:** March 2026
 
 The current industry obsession with Generative AI for solving specific pipeline tasks (retopology, retargeting, keying) is fundamentally inefficient. It relies on destroying perfect source data and training massive models to guess what the data used to be.
 
-The solution is to bypass generative models entirely by using **Quantized Spatial Data Transfer**.
+The solution is to bypass generative models entirely by using **Adaptive Quantized Spatial Data Transfer**.
 
 ### The Core Concept
 
-Instead of using AI to reconstruct spatial relationships, we extract the exact relationships that already exist in the source data, compress them into quantized binary formats (like float16), and apply them directly to the target. The data itself acts as the "weights."
+Instead of using AI to reconstruct spatial relationships, we extract the exact relationships that already exist in the source data, compress them into adaptively quantized binary formats (scaling precision based on spatial/semantic importance), and apply them directly to the target. The data itself acts as the "weights."
 
 ### How It Solves Major Pipeline Bottlenecks
 

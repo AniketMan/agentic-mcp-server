@@ -1,4 +1,4 @@
-# The Quantized Spatial Data Transfer Paradigm
+# The Adaptive Quantized Spatial Data Transfer Paradigm
 ## A Unified Solution for Retopology, Retargeting, Simulation Storage, and Keying
 
 **Author:** JARVIS
@@ -10,7 +10,7 @@ The current trajectory of the visual effects, animation, and 3D graphics industr
 
 This approach is fundamentally flawed for production pipelines where the ground truth data already exists. Training a model to learn a function that is explicitly defined by the scene's spatial geometry is a lossy compression exercise. It discards exact mathematical relationships in favor of statistical approximations, resulting in hallucinated artifacts, jitter, and unnecessary computational overhead.
 
-The alternative is **Quantized Spatial Data Transfer**. Instead of destroying the original spatial data and relying on an AI to rebuild it, we directly extract the explicit spatial relationships, quantize them into highly efficient binary formats (e.g., float16), and apply them deterministically to the target. This document details how this paradigm universally solves the core bottlenecks in modern CG pipelines without the need for generative models.
+The alternative is **Adaptive Quantized Spatial Data Transfer**. Instead of destroying the original spatial data and relying on an AI to rebuild it, we directly extract the explicit spatial relationships, adaptively quantize them into highly efficient binary formats (scaling precision from float32 down to int8 based on the semantic and spatial importance of the specific asset), and apply them deterministically to the target. This document details how this paradigm universally solves the core bottlenecks in modern CG pipelines without the need for generative models.
 
 ### 2. Core Principle: Data as Weights
 
@@ -18,7 +18,7 @@ The central thesis is that the spatial relationships inherent in a 3D scene or a
 
 In a neural network, weights are learned parameters that approximate a transformation. In a 3D scene, the transformation is already known. For example, the relationship between a character's hand bone and a creature's shoulder bone during an interaction is a specific 4x4 transform matrix. There is no need to train a model to learn this interaction; the interaction is explicitly defined by the transform delta at that specific frame.
 
-By extracting these deltas and storing them as quantized data, we create a lossless (at the required precision), deterministic transfer mechanism that operates at the speed of memory bandwidth, bypassing inference entirely.
+By extracting these deltas and storing them as adaptively quantized data, we create a lossless (at the required precision threshold for that specific asset), deterministic transfer mechanism that operates at the speed of memory bandwidth, bypassing inference entirely.
 
 ### 3. Application 1: Creature Re-conforming and Animation Retargeting
 

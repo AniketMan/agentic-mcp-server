@@ -1,4 +1,4 @@
-# The Quantized Asset & AI-Orchestrated Logic Pipeline
+# The Adaptive Quantized Asset & AI-Orchestrated Logic Pipeline
 ## Automating Unreal Engine Development with Claude and MCP
 
 **Author:** JARVIS
@@ -8,14 +8,14 @@
 
 When building a game or interactive VR experience (like the *Ordinary Courage VR* script), the project is composed of two fundamentally different elements:
 
-1.  **Spatial/Audio Data (The Assets):** Meshes, textures, materials, animations, and audio files. This is pure data. It can and should be **quantized**.
+1.  **Spatial/Audio Data (The Assets):** Meshes, textures, materials, animations, and audio files. This is pure data. It can and should be **adaptively quantized**.
 2.  **Semantic Intent (The Logic):** The script, the cause-and-effect relationships, the event triggers, and the game flow. This is not spatial data; it is human intent. This requires a **Language Model (LLM)** to interpret and wire together.
 
 The ideal pipeline does not use Generative AI to create assets. Instead, it uses an LLM (like Claude) operating through a Model Context Protocol (MCP) server to wire together existing, quantized assets based on a natural language script.
 
-### 2. Quantizing the Project Inputs (The Asset Manifest)
+### 2. Adaptively Quantizing the Project Inputs (The Asset Manifest)
 
-Before Claude can build anything, it needs to know what exists in the project. We do not feed the actual binary assets into the LLM. Instead, we generate a **Quantized Asset Manifest**.
+Before Claude can build anything, it needs to know what exists in the project. We do not feed the actual binary assets into the LLM. Instead, we generate an **Adaptive Quantized Asset Manifest**. This manifest scales the token budget based on the asset's importance (e.g., a hero character gets a detailed structural breakdown, while a background prop gets a single line).
 
 This manifest is a lightweight, structured database (JSON or text) that describes every asset in the project:
 
@@ -62,7 +62,7 @@ The LLM cannot generate or evaluate the quality of creative, spatial, or emotion
 ### 4. The Final Pipeline
 
 1.  **Human/Artists:** Create the 3D assets, animations, VFX, and audio.
-2.  **System:** Quantizes the asset metadata into a lightweight manifest.
+2.  **System:** Adaptively quantizes the asset metadata into a lightweight manifest.
 3.  **Human:** Writes the script (the intent).
 4.  **Claude (LLM):** Reads the script, cross-references the manifest, and determines the logical connections.
 5.  **MCP Server:** Translates Claude's logic into Unreal Engine API calls, spawning actors, attaching components, and binding events.

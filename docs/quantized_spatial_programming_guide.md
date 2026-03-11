@@ -1,4 +1,4 @@
-# INSTRUCTION MANUAL: Programming with Quantized Spatial Data
+# INSTRUCTION MANUAL: Programming with Adaptive Quantized Spatial Data
 ## A Guide for AI Agents and Developers Building High-Performance VFX/3D Software
 
 **Author:** JARVIS
@@ -11,7 +11,7 @@ When tasked with building software to solve spatial, temporal, or visual problem
 *   **When to use a model:** When you need to generate *new* information that does not exist (e.g., hallucinating a background behind an object, identifying the semantic label of a pixel like SAM does).
 *   **When NOT to use a model:** When you are manipulating, transferring, or blending data that you already have on a hard drive (e.g., bone transforms, pixel colors, mesh vertices).
 
-If a user has terabytes of 3D scenes, raw footage, or simulation caches, that data *is* the model. Your job is to extract the relationships from that data, quantize them, and apply them.
+If a user has terabytes of 3D scenes, raw footage, or simulation caches, that data *is* the model. Your job is to extract the relationships from that data, adaptively quantize them (assigning precision based on the semantic weight of the asset), and apply them.
 
 ### 2. The CPU vs. GPU Architecture Split
 
@@ -70,7 +70,7 @@ NVIDIA GPUs have extreme raw compute power but suffer from the PCIe transfer bot
 ### 5. Summary Checklist for AI Developers
 
 When a user asks you to build a tool for 3D/VFX manipulation:
-1.  **Does the perfect data already exist?** (Yes: use Quantized Spatial Transfer. No: consider a Generative Model).
+1.  **Does the perfect data already exist?** (Yes: use Adaptive Quantized Spatial Transfer. No: consider a Generative Model).
 2.  **Is the task semantic or mathematical?** (Semantic: use an AI model like SAM to tag the data. Mathematical: use GPU compute on quantized data).
 3.  **Are you storing floats as text/JSON?** (If yes, stop. Use binary float16).
 4.  **Are you moving data back and forth across the PCIe bus unnecessarily?** (If yes, optimize memory pointers for UMA or use DirectStorage for CUDA).

@@ -1,10 +1,10 @@
-# System Prompt / Instructions for Claude: Building the Universal Quantizer
+# System Prompt / Instructions for Claude: Building the Universal Adaptive Quantizer
 
 **Context:**
 I am building a local, GPU-accelerated pipeline where all data (3D models, images, video, audio, and text documentation) is stored as sparse, quantized float16/int16 binary files. This allows me to use my 2TB+ NVMe drive as an "infinite context window" for a small local LLM (like Qwen 7B) running on an RTX 5080, bypassing the need for massive cloud models.
 
 **Your Task:**
-Write a Python application called `universal_quantizer.py`. This tool must ingest various file formats, extract their raw numerical data, quantize it to float16 (or int16 for audio), apply sparse indexing (skipping default/zero values), and write the result to a custom binary format with a schema header. It must also include a retrieval engine for text embeddings.
+Write a Python application called `universal_adaptive_quantizer.py`. This tool must ingest various file formats, extract their raw numerical data, adaptively quantize it (dynamically choosing float16, int16, or int8 based on the data's complexity and semantic role), apply sparse indexing (skipping default/zero values), and write the result to a custom binary format with a schema header. It must also include a retrieval engine for text embeddings.
 
 ### Core Requirements
 
@@ -15,10 +15,11 @@ The script must recursively scan a directory and route files to the correct pars
 *   **Audio (`.wav`, `.mp3`, `.flac`):** Use `soundfile` or `librosa` to extract the waveform. For TTS profiles, support chunking by phoneme/silence boundaries.
 *   **Text/Docs (`.md`, `.txt`, `.html`, `.pdf`):** Use `pdfplumber` or standard I/O to read text. Chunk the text into ~500 token segments. Use `sentence-transformers` (e.g., `all-MiniLM-L6-v2`) to generate embeddings for each chunk.
 
-**2. The Quantization Backend**
-All extracted numerical data must pass through a single quantization function:
-*   Convert float32 arrays to `np.float16` (using `array.astype(np.float16)`).
-*   For audio, convert to `np.int16`.
+**2. The Adaptive Quantization Backend**
+All extracted numerical data must pass through an adaptive quantization function that determines the minimum necessary precision:
+*   **Hero Assets / Complex Geometry:** Convert float32 arrays to `np.float16` (using `array.astype(np.float16)`).
+*   **Background Props / Simple Geometry:** Convert to `np.int8` normalized to a bounding box to save maximum space.
+*   **Audio:** Convert to `np.int16`.
 *   **Sparse Indexing:** Implement a basic sparse storage mechanism. Define a default value (e.g., 0.0). Create a bitmask or index array of non-default values. Only store the non-default values in the final binary array.
 
 **3. Binary Output Format**
