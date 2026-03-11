@@ -261,6 +261,141 @@ FString FAgenticMCPServer::HandleRemoveSublevel(const FString& Body)
 }
 
 // ============================================================
+// HandleSetStreamingLevelVisibility
+// POST /api/streaming-level-visibility { "levelPath": "...", "visible": true/false }
+// Makes a streaming level visible or hidden.
+// ============================================================
+
+FString FAgenticMCPServer::HandleSetStreamingLevelVisibility(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString LevelPath = Json->GetStringField(TEXT("levelPath"));
+	if (LevelPath.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: levelPath"));
+
+	bool bVisible = Json->GetBoolField(TEXT("visible"));
+
+	UWorld* World = GetEditorWorldForLevel();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world available"));
+
+	// Find the streaming level
+	ULevelStreaming* FoundLevel = nullptr;
+	for (ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
+	{
+		if (!StreamingLevel) continue;
+
+		FString PackageName = StreamingLevel->GetWorldAssetPackageName();
+		if (PackageName == LevelPath || PackageName.Contains(LevelPath) || LevelPath.Contains(PackageName))
+		{
+			FoundLevel = StreamingLevel;
+			break;
+		}
+	}
+
+	if (!FoundLevel)
+	{
+		return MakeErrorJson(FString::Printf(
+			TEXT("Streaming level '%s' not found. Use list-levels to see available streaming levels."),
+			*LevelPath));
+	}
+
+	// Set visibility
+	bool bWasVisible = FoundLevel->GetShouldBeVisibleFlag();
+	FoundLevel->SetShouldBeVisible(bVisible);
+
+	// Force update streaming
+	World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("levelPath"), FoundLevel->GetWorldAssetPackageName());
+	Result->SetBoolField(TEXT("wasVisible"), bWasVisible);
+	Result->SetBoolField(TEXT("isNowVisible"), bVisible);
+	Result->SetBoolField(TEXT("isLoaded"), FoundLevel->HasLoadedLevel());
+
+	return JsonToString(Result);
+}
+
+// ============================================================
+// HandleGetOutputLog
+// POST /api/output-log { "lines": 50, "filter": "optional" }
+// Returns recent output log entries.
+// ============================================================
+
+FString FAgenticMCPServer::HandleGetOutputLog(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+
+	int32 NumLines = 50;
+	FString Filter;
+
+	if (Json.IsValid())
+	{
+		if (Json->HasField(TEXT("lines")))
+		{
+			NumLines = static_cast<int32>(Json->GetNumberField(TEXT("lines")));
+		}
+		if (Json->HasField(TEXT("filter")))
+		{
+			Filter = Json->GetStringField(TEXT("filter"));
+		}
+	}
+
+	NumLines = FMath::Clamp(NumLines, 1, 500);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TArray<TSharedPtr<FJsonValue>> LogArray;
+
+	// Access the output log via GLog
+	if (GLog)
+	{
+		// Use output devices to capture log
+		// Note: This is a simplified implementation - full log access
+		// would require implementing a custom FOutputDevice
+
+		// For now, read from the log file directly
+		FString LogFilePath = FPaths::ProjectLogDir() / TEXT("*.log");
+		TArray<FString> LogFiles;
+		IFileManager::Get().FindFiles(LogFiles, *LogFilePath, true, false);
+
+		if (LogFiles.Num() > 0)
+		{
+			// Get most recent log file
+			FString LatestLog = FPaths::ProjectLogDir() / LogFiles.Last();
+
+			TArray<FString> Lines;
+			if (FFileHelper::LoadFileToStringArray(Lines, *LatestLog))
+			{
+				int32 StartIndex = FMath::Max(0, Lines.Num() - NumLines);
+				for (int32 i = StartIndex; i < Lines.Num(); ++i)
+				{
+					const FString& Line = Lines[i];
+					if (Filter.IsEmpty() || Line.Contains(Filter))
+					{
+						LogArray.Add(MakeShared<FJsonValueString>(Line));
+					}
+				}
+			}
+
+			Result->SetStringField(TEXT("logFile"), LatestLog);
+		}
+	}
+
+	Result->SetArrayField(TEXT("lines"), LogArray);
+	Result->SetNumberField(TEXT("count"), LogArray.Num());
+	Result->SetNumberField(TEXT("requested"), NumLines);
+	if (!Filter.IsEmpty())
+	{
+		Result->SetStringField(TEXT("filter"), Filter);
+	}
+
+	return JsonToString(Result);
+}
+
+// ============================================================
 // HandleGetLevelBlueprint
 // POST /api/get-level-blueprint { "level": "MyLevel" }
 // ============================================================

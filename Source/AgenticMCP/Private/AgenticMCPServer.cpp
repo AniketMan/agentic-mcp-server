@@ -945,6 +945,14 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleGetLevelBlueprint(Body);
 	});
+	HandlerMap.Add(TEXT("streamingLevelVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetStreamingLevelVisibility(Body);
+	});
+	HandlerMap.Add(TEXT("outputLog"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetOutputLog(Body);
+	});
 
 	// ---- Validation and Safety ----
 	HandlerMap.Add(TEXT("validateBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body)
@@ -1176,6 +1184,10 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("storyGoto"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
 		return HandleStoryGoto(Params, Body);
+	});
+	HandlerMap.Add(TEXT("storyPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryPlay(Params, Body);
 	});
 
 	// ---- DataTable Handlers ----
@@ -1915,6 +1927,8 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("storyAdvance")));
 	Router->BindRoute(FHttpPath(TEXT("/api/story/goto")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("storyGoto")));
+	Router->BindRoute(FHttpPath(TEXT("/api/story/play")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("storyPlay")));
 
 	// DataTable Endpoints
 	Router->BindRoute(FHttpPath(TEXT("/api/datatable/read")), EHttpServerRequestVerbs::VERB_POST,

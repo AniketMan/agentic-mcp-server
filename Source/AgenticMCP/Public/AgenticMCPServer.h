@@ -171,6 +171,8 @@ private:
 	FString HandleLoadLevel(const FString& Body);
 	FString HandleRemoveSublevel(const FString& Body);
 	FString HandleGetLevelBlueprint(const FString& Body);
+	FString HandleSetStreamingLevelVisibility(const FString& Body);
+	FString HandleGetOutputLog(const FString& Body);
 
 	// ---- Validation and safety handlers (Handlers_Validation.cpp) ----
 	FString HandleValidateBlueprint(const FString& Body);
@@ -250,6 +252,7 @@ private:
 	FString HandleStoryState(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleStoryAdvance(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleStoryGoto(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleStoryPlay(const TMap<FString, FString>& Params, const FString& Body);
 
 	// ---- DataTable Handlers (Handlers_DataTable.cpp) ----
 	FString HandleDataTableRead(const TMap<FString, FString>& Params, const FString& Body);

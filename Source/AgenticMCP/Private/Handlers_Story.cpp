@@ -7,41 +7,93 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "Engine/World.h"
+#include "Engine/Level.h"
+#include "Engine/LevelStreaming.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Actor.h"
 #include "EngineUtils.h"
 #include "Editor.h"
 
-FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params, const FString& Body)
+// Helper function to find BP_StoryController in world including streaming levels
+static AActor* FindStoryControllerInWorld(UWorld* World)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	if (!World) return nullptr;
 
-	UWorld* World = nullptr;
-	if (GEditor && GEditor->PlayWorld)
-	{
-		World = GEditor->PlayWorld;
-	}
-
-	if (!World)
-	{
-		return MakeErrorJson(TEXT("No PIE world active. Start PIE first."));
-	}
-
-	// Find BP_StoryController in the world
-	AActor* StoryController = nullptr;
+	// First try TActorIterator (searches all loaded levels)
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		if (It->GetName().Contains(TEXT("StoryController")) ||
 			It->GetClass()->GetName().Contains(TEXT("BP_StoryController")))
 		{
-			StoryController = *It;
-			break;
+			return *It;
 		}
 	}
 
+	// If not found, explicitly search streaming levels
+	for (ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
+	{
+		if (!StreamingLevel || !StreamingLevel->HasLoadedLevel()) continue;
+
+		ULevel* LoadedLevel = StreamingLevel->GetLoadedLevel();
+		if (!LoadedLevel) continue;
+
+		for (AActor* Actor : LoadedLevel->Actors)
+		{
+			if (!Actor) continue;
+			if (Actor->GetName().Contains(TEXT("StoryController")) ||
+				Actor->GetClass()->GetName().Contains(TEXT("BP_StoryController")))
+			{
+				return Actor;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	// Try PIE world first, then editor world
+	UWorld* World = nullptr;
+	if (GEditor && GEditor->PlayWorld)
+	{
+		World = GEditor->PlayWorld;
+	}
+	else if (GEditor)
+	{
+		World = GEditor->GetEditorWorldContext().World();
+	}
+
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
+	}
+
+	// Find BP_StoryController in the world (including streaming levels)
+	AActor* StoryController = FindStoryControllerInWorld(World);
+
 	if (!StoryController)
 	{
-		return MakeErrorJson(TEXT("BP_StoryController not found in world"));
+		// Provide more helpful error message
+		TArray<FString> LoadedLevels;
+		LoadedLevels.Add(World->GetName());
+		for (ULevelStreaming* SL : World->GetStreamingLevels())
+		{
+			if (SL && SL->HasLoadedLevel())
+			{
+				LoadedLevels.Add(FString::Printf(TEXT("%s (visible: %s)"),
+					*SL->GetWorldAssetPackageName(),
+					SL->GetShouldBeVisibleFlag() ? TEXT("true") : TEXT("false")));
+			}
+		}
+
+		FString LevelList = FString::Join(LoadedLevels, TEXT(", "));
+		return MakeErrorJson(FString::Printf(
+			TEXT("BP_StoryController not found. Searched in: %s. "
+				 "Ensure ML_Main is loaded and visible. Use /api/streaming-level-visibility to show hidden levels."),
+			*LevelList));
 	}
 
 	Result->SetStringField(TEXT("controllerName"), StoryController->GetName());
@@ -120,32 +172,28 @@ FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Para
 {
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
+	// Try PIE world first, then editor world
 	UWorld* World = nullptr;
 	if (GEditor && GEditor->PlayWorld)
 	{
 		World = GEditor->PlayWorld;
 	}
+	else if (GEditor)
+	{
+		World = GEditor->GetEditorWorldContext().World();
+	}
 
 	if (!World)
 	{
-		return MakeErrorJson(TEXT("No PIE world active. Start PIE first."));
+		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
 	}
 
-	// Find BP_StoryController
-	AActor* StoryController = nullptr;
-	for (TActorIterator<AActor> It(World); It; ++It)
-	{
-		if (It->GetName().Contains(TEXT("StoryController")) ||
-			It->GetClass()->GetName().Contains(TEXT("BP_StoryController")))
-		{
-			StoryController = *It;
-			break;
-		}
-	}
+	// Find BP_StoryController (including in streaming levels)
+	AActor* StoryController = FindStoryControllerInWorld(World);
 
 	if (!StoryController)
 	{
-		return MakeErrorJson(TEXT("BP_StoryController not found in world"));
+		return MakeErrorJson(TEXT("BP_StoryController not found in world. Use /api/streaming-level-visibility to show hidden levels."));
 	}
 
 	// Get current index before advancing
@@ -214,32 +262,28 @@ FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params,
 		return MakeErrorJson(TEXT("Invalid JSON body. Expected: {\"index\": N} or {\"stepName\": \"StoryStep_X\"}"));
 	}
 
+	// Try PIE world first, then editor world
 	UWorld* World = nullptr;
 	if (GEditor && GEditor->PlayWorld)
 	{
 		World = GEditor->PlayWorld;
 	}
+	else if (GEditor)
+	{
+		World = GEditor->GetEditorWorldContext().World();
+	}
 
 	if (!World)
 	{
-		return MakeErrorJson(TEXT("No PIE world active. Start PIE first."));
+		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
 	}
 
-	// Find BP_StoryController
-	AActor* StoryController = nullptr;
-	for (TActorIterator<AActor> It(World); It; ++It)
-	{
-		if (It->GetName().Contains(TEXT("StoryController")) ||
-			It->GetClass()->GetName().Contains(TEXT("BP_StoryController")))
-		{
-			StoryController = *It;
-			break;
-		}
-	}
+	// Find BP_StoryController (including in streaming levels)
+	AActor* StoryController = FindStoryControllerInWorld(World);
 
 	if (!StoryController)
 	{
-		return MakeErrorJson(TEXT("BP_StoryController not found in world"));
+		return MakeErrorJson(TEXT("BP_StoryController not found in world. Use /api/streaming-level-visibility to show hidden levels."));
 	}
 
 	int32 TargetIndex = -1;
@@ -328,6 +372,88 @@ FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params,
 	Result->SetNumberField(TEXT("previousIndex"), PreviousIndex);
 	Result->SetNumberField(TEXT("targetIndex"), TargetIndex);
 	Result->SetNumberField(TEXT("newIndex"), NewIndex);
+
+	return JsonToString(Result);
+}
+
+FString FAgenticMCPServer::HandleStoryPlay(const TMap<FString, FString>& Params, const FString& Body)
+{
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+
+	// Try PIE world first, then editor world
+	UWorld* World = nullptr;
+	if (GEditor && GEditor->PlayWorld)
+	{
+		World = GEditor->PlayWorld;
+	}
+	else if (GEditor)
+	{
+		World = GEditor->GetEditorWorldContext().World();
+	}
+
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
+	}
+
+	// Find BP_StoryController (including in streaming levels)
+	AActor* StoryController = FindStoryControllerInWorld(World);
+
+	if (!StoryController)
+	{
+		return MakeErrorJson(TEXT("BP_StoryController not found in world. Use /api/streaming-level-visibility to show hidden levels."));
+	}
+
+	// Get current index
+	int32 CurrentIndex = -1;
+	FProperty* IndexProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentStoryIndex"));
+	if (IndexProp)
+	{
+		IndexProp->GetValue_InContainer(StoryController, &CurrentIndex);
+	}
+
+	// Try to call PlayCurrentStep function
+	UFunction* PlayFunc = StoryController->GetClass()->FindFunctionByName(TEXT("PlayCurrentStep"));
+	if (!PlayFunc)
+	{
+		PlayFunc = StoryController->GetClass()->FindFunctionByName(TEXT("PlayStep"));
+	}
+	if (!PlayFunc)
+	{
+		PlayFunc = StoryController->GetClass()->FindFunctionByName(TEXT("PlayCurrentSequence"));
+	}
+
+	if (PlayFunc)
+	{
+		StoryController->ProcessEvent(PlayFunc, nullptr);
+		Result->SetBoolField(TEXT("success"), true);
+		Result->SetStringField(TEXT("method"), TEXT("function"));
+		Result->SetStringField(TEXT("functionCalled"), PlayFunc->GetName());
+		Result->SetNumberField(TEXT("currentIndex"), CurrentIndex);
+	}
+	else
+	{
+		// List available functions for debugging
+		TArray<FString> FuncNames;
+		for (TFieldIterator<UFunction> FIt(StoryController->GetClass()); FIt; ++FIt)
+		{
+			UFunction* Func = *FIt;
+			if (Func->HasAnyFunctionFlags(FUNC_BlueprintCallable | FUNC_Event))
+			{
+				FuncNames.Add(Func->GetName());
+			}
+		}
+
+		Result->SetBoolField(TEXT("success"), false);
+		Result->SetStringField(TEXT("error"), TEXT("PlayCurrentStep function not found"));
+
+		TArray<TSharedPtr<FJsonValue>> FuncArray;
+		for (const FString& Name : FuncNames)
+		{
+			FuncArray.Add(MakeShared<FJsonValueString>(Name));
+		}
+		Result->SetArrayField(TEXT("availableFunctions"), FuncArray);
+	}
 
 	return JsonToString(Result);
 }
