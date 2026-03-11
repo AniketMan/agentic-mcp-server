@@ -4,12 +4,58 @@
 
 AgenticMCP is a **two-tier plugin system** for Unreal Engine that gives AI agents full control over the editor.
 
-| Plugin | Location | Contains | Modifiable By |
-|--------|----------|----------|---------------|
-| **AgenticMCP** | Engine OR Project | C++ plugin, all UE handlers | Developer only |
-| **{ProjectName}_MCP** | Project/Plugins/ | JSON + JS (no C++) | **AI (live) + Developer** |
+**IMPORTANT:** This is a **TOOL PROVIDER**, not an AI invoker.
 
-**The Power:** AI can live-code `{ProjectName}_MCP` to adapt to real-time decisions. Those adaptations persist and compound across sessions.
+The AI lives in the **host application** (VS Code + Cline/Devmate, Claude Desktop, Cursor, or a custom in-house tool). We just expose MCP tools and project context. No API keys needed in our plugins.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     AI HOST (provides the AI)                            │
+│                                                                          │
+│   • VS Code + Cline / Copilot / Devmate                                 │
+│   • Claude Desktop                                                       │
+│   • Cursor                                                              │
+│   • Windsurf                                                            │
+│   • Custom in-house tool                                                │
+│                                                                          │
+│   THEY handle AI API keys and billing. WE don't.                        │
+│                                                                          │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │
+                          MCP Protocol (stdio)
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│              {ProjectName}_MCP (TOOL PROVIDER)                          │
+│                                                                          │
+│   We expose:                                                            │
+│   • MCP tools (via Node.js bridge)                                      │
+│   • Project context (Context/*.json)                                    │
+│   • AI memory (Memory/*.json)                                           │
+│   • Test scenarios (Tester/*.json)                                      │
+│                                                                          │
+│   We do NOT:                                                            │
+│   • Make AI API calls                                                   │
+│   • Store API keys                                                      │
+│   • Run inference                                                       │
+│                                                                          │
+│   The AI in VS Code/Cline reads our context and uses our tools.        │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │
+                              HTTP :9847
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     AgenticMCP (C++ Plugin)                              │
+│                   Does the actual UE manipulation                       │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+| Component | Role | Has AI? |
+|-----------|------|---------|
+| **VS Code / Cline / Claude Desktop** | AI Host | ✅ Yes (their API keys) |
+| **{ProjectName}_MCP** | Tool Provider + Context | ❌ No |
+| **AgenticMCP** | UE Manipulation Engine | ❌ No |
 
 ---
 
