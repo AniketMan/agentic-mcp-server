@@ -1123,6 +1123,10 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSetCVar(Params, Body);
 	});
+	HandlerMap.Add(TEXT("listCVars"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleListCVars(Params, Body);
+	});
 
 	// ---- Input Simulation ----
 	HandlerMap.Add(TEXT("simulateInput"), [this](const TMap<FString, FString>& Params, const FString& Body)

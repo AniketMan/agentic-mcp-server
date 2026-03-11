@@ -1,88 +1,125 @@
-# Critical Fixes - 2026-03-11
+# AgenticMCP Critical Fixes - 2026-03-11
 
-Root cause: 9 commits landed on 3/10 after the last known-good state (morning of 3/10). Multiple AI-assisted coding sessions introduced duplicate code blocks, missing endpoints, and a port mismatch that broke the MCP bridge connection entirely.
+## Summary
 
-## Fix 1: Missing `/mcp/*` Endpoints (CRITICAL - Bridge Connection Failure)
+9 commits landed on 3/10 after the last known-good state. Multiple AI coding sessions
+stacked duplicate code blocks and missed the `/mcp/*` endpoint layer entirely. Additionally,
+the `/mcp/tools` endpoint only returned tool names with no metadata, causing agents to
+register every tool with empty parameter schemas -- tools appeared to work but sent no
+arguments and executed as no-ops.
 
-**Problem:** The JS MCP bridge (`Tools/index.js` via `lib.js`) connects to the C++ plugin using `/mcp/status`, `/mcp/tools`, and `/mcp/tool/{name}` endpoints. The C++ plugin had **zero** `/mcp/*` routes registered. The bridge could never establish a connection.
+## Fix 1: Missing `/mcp/*` Endpoints (CRITICAL)
 
-**Root cause:** The original Natfii bridge architecture expects these endpoints. When the C++ plugin was rewritten/expanded on 3/10, only `/api/*` routes were added. The `/mcp/*` layer was never implemented.
+**Problem:** The JS bridge calls `/mcp/status`, `/mcp/tools`, `/mcp/tool/{name}` but the
+C++ plugin only had `/api/*` routes. The bridge could never connect to the plugin.
 
-**Fix:** Added three new route handlers in `AgenticMCPServer.cpp::Start()`:
-- `GET /mcp/status` - Returns connection status, server version, asset counts
-- `GET /mcp/tools` - Auto-discovery endpoint that enumerates all registered `HandlerMap` entries
-- `POST /mcp/tool/{name}` - Wildcard route that extracts the tool name from the URL path and queues execution to the game thread (same as `/api/*` routes)
+**Fix:** Added three new endpoint registrations in `Start()`:
+- `GET /mcp/status` -- returns server status, project name, engine version
+- `GET /mcp/tools` -- returns list of all registered tool names from HandlerMap
+- `POST /mcp/tool/*` -- catch-all that extracts tool name from URL path, queues to game thread
 
-## Fix 2: Port Mismatch (CRITICAL - Connection Failure)
+## Fix 2: Port Mismatch (CRITICAL)
 
-**Problem:** C++ plugin listens on port `9847`. JS bridge defaulted to `http://localhost:3000`.
+**Problem:** C++ plugin listens on port `9847`, JS bridge defaulted to `localhost:3000`.
 
-**Root cause:** The JS code was copied from the Natfii bridge which uses port 3000. The C++ plugin was configured for 9847 but the JS default was never updated.
+**Fix:** Updated `Tools/index.js` default from `3000` to `9847`. Updated ARCHITECTURE.md.
 
-**Fix:** Changed default in `Tools/index.js` from `localhost:3000` to `localhost:9847`. Updated `ARCHITECTURE.md` to match.
+## Fix 3: Tool Registry -- Empty Parameter Schemas (CRITICAL)
 
-## Fix 3: 25 Duplicate `BindRoute` Calls (Build/Runtime Failure)
+**Problem:** The `/mcp/tools` endpoint returned only `{ "name": "toolName" }` per tool.
+The JS bridge accessed `tool.description`, `tool.parameters`, and `tool.annotations` --
+all `undefined`. Every tool was registered with the MCP protocol as:
+- Description: `"[Unreal Editor] undefined"`
+- Input schema: `{ type: "object", properties: {} }` (empty)
 
-**Problem:** The `Start()` function had entire blocks of `Router->BindRoute()` calls duplicated verbatim:
-- Level Sequences block (3 routes) duplicated
-- Visual Agent block (11 routes) duplicated
-- Debug Drawing block (2 routes) duplicated
-- Blueprint Snapshot (1 route) duplicated
-- Transaction/Undo block (4 routes) duplicated
-- State Management block (4 routes) duplicated
+Agents saw the tools, called them, but sent **empty request bodies** because the schema
+said no parameters were needed. C++ handlers received empty JSON, parsed nothing, and
+either returned silent errors or executed no-ops.
 
-UE's HTTP router may crash, silently fail, or produce undefined behavior when the same path is bound twice.
+**This is why it "went through the process" but nothing actually happened in the editor.**
 
-**Root cause:** Multiple commit sessions on 3/10 copy-pasted route blocks without checking for existing registrations.
+**Fix:** Created `Tools/tool-registry.json` with full metadata for all 127 tools:
+- `description` -- human-readable tool description
+- `parameters` -- array of `{ name, type, description, required }` objects
+- `annotations` -- `{ readOnlyHint, destructiveHint }` for safety classification
 
-**Fix:** Removed all duplicate `BindRoute` blocks (lines 1560-1567 and 1598-1651 in the original file).
+Updated `Tools/index.js` to:
+1. Load `tool-registry.json` at startup into a `Map<name, metadata>`
+2. When listing tools, cross-reference the live C++ tool list with the registry
+3. Enrich each tool with full description, parameter schema, and annotations
+4. Log warnings for any tools in C++ but missing from the registry
 
-## Fix 4: 154-Line Duplicate `HandlerMap.Add` Block (Silent Override)
+**Architecture note:** Metadata lives in the JS bridge layer (tool-registry.json), not in
+C++. The C++ `/mcp/tools` endpoint serves as a live validation source confirming which
+tools are actually registered. This avoids embedding 2000+ lines of JSON string literals
+in C++ and makes metadata easy to update without recompiling the plugin.
 
-**Problem:** The `RegisterHandlers()` function had a full duplicate block of `HandlerMap.Add` calls for PIE Control, Console Commands, Audio, Niagara, and PixelStreaming handlers (lines 1348-1501). `TMap::Add` silently overwrites existing keys, so this wasn't a compile error but was unnecessary bloat and a maintenance hazard.
+## Fix 4: 25 Duplicate BindRoute Calls (HIGH)
 
-**Fix:** Removed the duplicate block (154 lines).
+**Problem:** Same HTTP paths registered twice in UE's HTTP router. Undefined behavior --
+second registration may silently overwrite or crash.
 
-## Fix 5: Missing Route Bindings for Existing Handlers
+**Fix:** Removed all duplicate BindRoute blocks (Level Sequences, Visual Agent, Debug,
+Snapshot, Transaction, State categories).
 
-**Problem:** Two handlers had `HandlerMap.Add` entries but no corresponding `Router->BindRoute`:
-- `removeSublevel` - Handler at line 940, no `/api/remove-sublevel` route
-- `openAsset` - Handler at line 1086, no `/api/open-asset` route
+## Fix 5: 154-line Duplicate HandlerMap Block (MEDIUM)
 
-These tools were registered in the dispatch map but unreachable via HTTP.
+**Problem:** PIE, Console, Audio, Niagara, PixelStreaming handlers registered twice in
+HandlerMap. Second registration overwrites first with identical lambda.
 
-**Fix:** Added `BindRoute` calls for both in the Level Management section.
+**Fix:** Removed the duplicate block (lines 1348-1501).
 
-## Fix 6: Build Artifacts in Git
+## Fix 6: Missing Handler Registrations (MEDIUM)
 
-**Problem:** `AgenticMCP/Intermediate/` contained 27 UE build artifact files committed to the repo.
+**Problem:** Three handlers had implementations and header declarations but were not
+wired up:
+- `removeSublevel` -- had handler, no HandlerMap entry, no BindRoute
+- `openAsset` -- had handler, no HandlerMap entry, no BindRoute
+- `listCVars` -- had handler and header declaration, no HandlerMap entry
 
-**Fix:** Removed the directory and updated `.gitignore` to exclude `Intermediate/`, `Binaries/`, `DerivedDataCache/`, and `Saved/`.
+**Fix:** Added BindRoute entries for removeSublevel and openAsset. Added HandlerMap entry
+for listCVars. All three now in tool-registry.json with full metadata.
 
-## Fix 7: Stale Duplicate File Tree
+## Fix 7: Build Artifacts in Git (LOW)
 
-**Problem:** The repo has two copies of the plugin:
-- `Source/` (root) - current, 25 handler files
-- `AgenticMCP/Source/` - stale copy, only 11 handler files
+**Problem:** 27 files in `AgenticMCP/Intermediate/` committed to the repo.
 
-The root `Source/` was being actively edited but `AgenticMCP/Source/` was out of sync (missing 14 handler files added on 3/10).
+**Fix:** Removed `AgenticMCP/Intermediate/`. Updated `.gitignore` to exclude
+`Intermediate/`, `Binaries/`, `DerivedDataCache/`, `Saved/`, `node_modules/`.
 
-**Fix:** Synced all files from `Source/` to `AgenticMCP/Source/`. Both copies now match.
+## Fix 8: Stale AgenticMCP/Source/ Copy (LOW)
 
-## Branch Audit
+**Problem:** `AgenticMCP/Source/` was an older copy of `Source/`, missing 14 handler files.
 
-| Branch | Status | Notes |
-|--------|--------|-------|
-| `master` | Active | All fixes applied here. 13 commits total. |
-| `phase1-metaxr` | Stale | Diverged at commit `c01a8c4` (3/9). Contains 2 commits not on master (`fb603e0`, `aa14796`) but master has 9 newer commits that supersede this branch. Safe to delete. |
+**Fix:** Synced all files from `Source/` to `AgenticMCP/Source/`.
+
+## Verification Checklist
+
+- [x] 127 HandlerMap entries (no duplicates)
+- [x] 127 tool-registry.json entries (1:1 match with HandlerMap)
+- [x] 0 duplicate BindRoute calls
+- [x] /mcp/status, /mcp/tools, /mcp/tool/* endpoints present
+- [x] JS bridge defaults to port 9847
+- [x] Tool registry loaded at startup with full metadata for all 127 tools
+- [x] listCVars, removeSublevel, openAsset all wired up
+- [x] No Intermediate/ in git
+- [x] AgenticMCP/ copy synced with root Source/
+
+## Branch Status
+
+- `master` -- all fixes applied
+- `phase1-metaxr` -- stale branch from 3/9, fully superseded by master, safe to delete
 
 ## UE 5.6 Oculus Fork Compatibility
 
-The existing version guards from the previous fix session (`fixes/ue56-api-compat/`) are confirmed present and correct:
-- SpawnActor uses `FTransform` overload (universal)
-- `AddLevelToWorld` guarded with `ENGINE_MINOR_VERSION >= 6`
-- `AddFunctionGraph` guarded with 4th parameter for 5.6+
-- `BlueprintFactory.h` include added
-- `ErrorsFromLastCompile` replaced with `BP->Status` for 5.6+
+All 5 version guards from the previous fix session are confirmed present and correct.
+No additional 5.6 compat issues found in the new handler files (Audio, Niagara,
+PixelStreaming, MetaXR, Story, DataTable, etc.) as they use stable APIs.
 
-No additional 5.6 compat issues found in the new handler files (Audio, Niagara, PixelStreaming, MetaXR, etc.) as they use stable APIs.
+## EXR Screenshot Issue
+
+No EXR references found in the screenshot handler code. The `HandleScreenshot` function
+uses `FViewport::Draw()` with standard PNG/JPEG encoding. If the agent was "using EXRs
+to take pictures," it was likely a hallucination caused by the empty parameter schema --
+the agent could not pass format/width/height parameters, so it may have attempted
+workarounds through console commands or Python execution.

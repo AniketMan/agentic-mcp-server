@@ -25,6 +25,9 @@
  *   AGENTIC_PROJECT_ROOT    - UE project root for fallback (auto-detect if not set)
  */
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -104,6 +107,26 @@ const server = new Server(
 let cachedTools = [];
 
 // ---------------------------------------------------------------------------
+// Tool Registry — loads description, parameters, and annotations from JSON
+// The C++ /mcp/tools endpoint only returns tool names. This registry provides
+// the full metadata (description, parameter schema, annotations) that the MCP
+// protocol requires so that agents know HOW to call each tool.
+// ---------------------------------------------------------------------------
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let toolRegistry = new Map();
+try {
+  const registryPath = join(__dirname, "tool-registry.json");
+  const registryData = JSON.parse(readFileSync(registryPath, "utf-8"));
+  for (const tool of registryData.tools || []) {
+    toolRegistry.set(tool.name, tool);
+  }
+  log.info("Tool registry loaded", { count: toolRegistry.size });
+} catch (error) {
+  log.error("Failed to load tool registry", { error: error.message });
+  log.warn("Tools will be registered with minimal metadata -- agents may not send correct parameters");
+}
+
+// ---------------------------------------------------------------------------
 // Handle list_tools request
 // ---------------------------------------------------------------------------
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -133,17 +156,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   });
 
   // If editor is connected, register all live tools via auto-discovery
+  // The C++ plugin returns tool names; we enrich with metadata from tool-registry.json
   if (editorConnected) {
     const unrealTools = await fetchUnrealTools();
     cachedTools = unrealTools;
 
     for (const tool of unrealTools) {
-      mcpTools.push({
-        name: `unreal_${tool.name}`,
-        description: `[Unreal Editor] ${tool.description}`,
-        inputSchema: convertToMCPSchema(tool.parameters),
-        annotations: convertAnnotations(tool.annotations),
-      });
+      const registry = toolRegistry.get(tool.name);
+      if (registry) {
+        // Full metadata from registry
+        mcpTools.push({
+          name: `unreal_${tool.name}`,
+          description: `[Unreal Editor] ${registry.description}`,
+          inputSchema: convertToMCPSchema(registry.parameters),
+          annotations: convertAnnotations(registry.annotations),
+        });
+      } else {
+        // Tool exists in C++ but not in registry -- register with minimal info
+        // so it is still callable, but log a warning
+        log.warn("Tool missing from registry", { tool: tool.name });
+        mcpTools.push({
+          name: `unreal_${tool.name}`,
+          description: `[Unreal Editor] ${tool.description || tool.name} (no registry metadata)`,
+          inputSchema: convertToMCPSchema(tool.parameters),
+          annotations: convertAnnotations(tool.annotations),
+        });
+      }
     }
   }
   // If editor is NOT connected but fallback is available, register fallback tools
