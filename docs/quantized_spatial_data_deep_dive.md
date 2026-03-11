@@ -96,3 +96,51 @@ The execution of quantized spatial data transfer varies based on the available h
 ### 8. Conclusion
 
 The pursuit of Generalized AI for specific, deterministic CG pipeline tasks is a misallocation of computational resources. By recognizing that spatial relationships and raw sensor data are the ultimate ground truth, and by storing that data in highly optimized, quantized formats, we bypass the need for probabilistic reconstruction. This paradigm shift offers orders of magnitude improvements in speed, storage efficiency, and absolute accuracy across the entire production pipeline.
+
+### 9. The Transfer vs. Generation Line (Video and Compositing)
+
+A critical distinction in this paradigm is separating **Transfer** from **Generation**. The current trend in generative video (e.g., diffusion models for dance transfers or style transfers) is to regenerate every pixel from scratch, using the source videos merely as "guides." This is computationally disastrous and inherently inconsistent.
+
+**The Quantized Transfer Approach:**
+When transferring properties between two existing videos (e.g., placing Actor A's appearance onto Actor B's motion in Scene C's lighting), no generative model is needed for the vast majority of the frame.
+
+1.  **Extract & Quantize Properties:** Separate the source videos into quantized, independent channels:
+    *   **Pose:** Skeletal motion data (quantized joint transforms).
+    *   **Appearance:** Texture, skin, and clothing maps (quantized RGB).
+    *   **Proportions:** Bone lengths and skeletal scale.
+    *   **Lighting:** Light direction, intensity, and color temperature (quantized float values).
+2.  **Blend via Sliders:** Because the lighting and appearance are now just quantized values, they can be exposed as real-time sliders. Interpolating the lighting between Scene A and Scene B is a simple mathematical blend (a multiply and add per pixel), not a re-render.
+3.  **The Role of Generation:** A model is *only* required to hallucinate occluded regions (e.g., when a dancer raises an arm, revealing torso pixels that were never visible in the source video). This reduces the AI's job from generating 100% of the frame to simply inpainting the 5% of missing pixels.
+
+### 10. Temporal Pixel Accumulation (The Twin Shot Workflow)
+
+The quantized paradigm eliminates the need for traditional clean plates in compositing (e.g., when an actor plays twins in the same scene).
+
+**The Traditional Flaw:** Clean plates require a locked-off camera and a separate take with an empty room. If the camera moves, the clean plate is useless.
+
+**The Quantized Solution:**
+The camera rolls continuously. The system stores every background pixel it sees, tagged with its 3D world position and the frame it was visible.
+
+1.  **Continuous Accumulation:** As the actor moves through the scene, they reveal different parts of the background. Every newly revealed pixel is added to a quantized background buffer.
+2.  **World-Space Storage:** Pixels are stored with their RGB value (float16), world position (float16 x3), and normal direction (float16 x2).
+3.  **Reprojection:** Even if the camera moves, the system knows the exact 3D location of the accumulated background pixels. When compiling the final "twin" shot, the system simply reprojects the accumulated background pixels behind the actors. No rotoscoping of the background or locked-off cameras are required.
+
+### 11. Depth Replaces Segmentation (The Hierarchy of Need)
+
+The rule of thumb for this architecture is: **Models fill in for data you don't have.** The more data you store quantized, the less you need any model.
+
+*   **If you only have RGB video:** You need massive models for segmentation (SAM), depth estimation, and keying.
+*   **If you have RGB + Depth (LiDAR/Stereo):** You do not need SAM. Depth *is* the segmentation. A pixel at 2 meters is the subject; a pixel at 5 meters is the wall. There is no ambiguity. You only need a tiny inpainting model for occluded pixels.
+*   **If you have RGB + Depth + Camera Tracking + Temporal Accumulation:** You have virtually a complete 3D representation of the scene. The need for AI inference approaches zero.
+
+### 12. The LLM as a Translator, Not a Knowledge Base
+
+When applying this paradigm to information retrieval and scripting (e.g., using Claude via MCP to build an Unreal Engine scene), the architecture mirrors the RAG (Retrieval-Augmented Generation) concept, but with stricter boundaries.
+
+**The Flaw in Current LLM Usage:** Users treat the LLM as the knowledge base, relying on its internal weights to remember facts, API calls, or documentation. This leads to hallucinations because the knowledge and the language translation are tangled together.
+
+**The Quantized Solution:**
+1.  **The Knowledge Layer:** The actual documentation, API references, and project asset manifests are stored as quantized, structured data (JSON, Markdown) on the local drive. This is the absolute ground truth.
+2.  **The Translation Layer:** The LLM (Claude, Llama, etc.) acts *only* as a translator. Its job is to receive a human question, look up the relevant quantized data, and translate that data into human-readable text or executable code.
+
+The size of the LLM required scales with the complexity of the *translation*, not the complexity of the *knowledge*. A 1B parameter model can answer "What is the input resolution?" by pointing to a number in the quantized docs. A 70B model is only needed if you require it to synthesize multiple documents into a narrative essay. In both cases, the knowledge remains perfectly intact on the hard drive, never degraded by model compression.
