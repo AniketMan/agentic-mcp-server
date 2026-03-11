@@ -221,6 +221,194 @@ These files contain the same context and are regenerated whenever context change
 
 ---
 
+## Quantized Context (Token Optimization)
+
+To reduce token usage, we send a **compressed context format** instead of verbose prose.
+
+### Verbose vs Quantized
+
+**Verbose (wasteful):**
+```markdown
+# Project Context: MyGame
+
+## Project Information
+- **Project Name:** MyGame
+- **Unreal Engine Version:** 5.6
+- **AgenticMCP Location:** Local plugin at http://localhost:9847
+- **Current Status:** Editor is running
+
+## Currently Loaded Level
+- **Level Name:** Level_01
+- **Full Path:** /Game/Maps/Level_01
+- **Number of Actors:** 1,523
+- **Play-In-Editor Status:** Not running
+
+## Memory from Past Sessions
+### Recent Decisions Made by AI
+1. On 2026-03-11, I added an enemy pooling pattern which resulted in 10x spawn speedup
+2. On 2026-03-10, I created a preload system for Scene 9 assets to reduce hitching
+
+... (500+ tokens)
+```
+
+**Quantized (efficient):**
+```
+CTX|MyGame|UE5.6|local:9847|up
+LVL|Level_01|/Game/Maps/Level_01|1523|pie:off
+MEM|d:2|p:2|s:3
+D|2026-03-11|actor_pool|10x spawn|OK
+D|2026-03-10|preload_s9|no hitch|OK
+P|actor_pooling|spawn>10/s
+P|level_preload|transition>1s
+ABL|move,jump,sprint,attack,block,interact
+END|/project/player-state,/project/quest-status,/project/enemy-count
+TST|happy_path,edge_cases,stress_test,break_attempts
+```
+**(~80 tokens vs 500+)**
+
+### Quantized Format Specification
+
+```
+HEADER
+CTX|{project}|{engine}|{mcp_location}|{status}
+
+LEVEL
+LVL|{name}|{path}|{actors}|pie:{on/off}
+
+MEMORY SUMMARY
+MEM|d:{decisions}|p:{patterns}|s:{sessions}
+
+DECISIONS (recent 5)
+D|{date}|{name}|{outcome}|{status}
+
+PATTERNS
+P|{name}|{trigger}
+
+ABILITIES (comma list)
+ABL|{ability1},{ability2},...
+
+CUSTOM ENDPOINTS (paths only)
+END|{path1},{path2},...
+
+TEST SCENARIOS (names only)
+TST|{scenario1},{scenario2},...
+
+RULES (abbreviated)
+RUL|ss:before+after|1act|verify|log
+```
+
+### Key Abbreviations
+
+| Abbrev | Meaning |
+|--------|---------|
+| `CTX` | Context header |
+| `LVL` | Level info |
+| `MEM` | Memory summary |
+| `D` | Decision |
+| `P` | Pattern |
+| `ABL` | Abilities |
+| `END` | Endpoints |
+| `TST` | Test scenarios |
+| `RUL` | Rules |
+| `ss` | Screenshot |
+| `pie` | Play-In-Editor |
+| `OK` | Success |
+| `FAIL` | Failure |
+
+### Implementation
+
+```javascript
+// Tools/context-quantizer.js
+
+function quantizeContext(context) {
+  const lines = [];
+
+  // Header
+  lines.push(`CTX|${context.project.name}|UE${context.project.engine}|${context.mcp.mode}:${context.mcp.port}|${context.status}`);
+
+  // Level
+  if (context.level) {
+    lines.push(`LVL|${context.level.name}|${context.level.path}|${context.level.actors}|pie:${context.pie ? 'on' : 'off'}`);
+  }
+
+  // Memory summary
+  const mem = context.memory;
+  lines.push(`MEM|d:${mem.decisions?.length || 0}|p:${mem.patterns?.length || 0}|s:${mem.sessions?.length || 0}`);
+
+  // Recent decisions (last 5)
+  mem.decisions?.slice(-5).forEach(d => {
+    lines.push(`D|${d.date}|${d.name}|${d.outcome}|${d.status}`);
+  });
+
+  // Patterns
+  mem.patterns?.forEach(p => {
+    lines.push(`P|${p.name}|${p.trigger}`);
+  });
+
+  // Abilities (comma-separated)
+  if (context.abilities?.length) {
+    lines.push(`ABL|${context.abilities.join(',')}`);
+  }
+
+  // Endpoints (paths only)
+  if (context.endpoints?.length) {
+    lines.push(`END|${context.endpoints.map(e => e.path).join(',')}`);
+  }
+
+  // Test scenarios
+  if (context.tests?.length) {
+    lines.push(`TST|${context.tests.join(',')}`);
+  }
+
+  // Rules (always same)
+  lines.push(`RUL|ss:before+after|1act|verify|log`);
+
+  return lines.join('\n');
+}
+```
+
+### Expansion on AI Side
+
+The AI knows to expand:
+- `CTX|MyGame|UE5.6|local:9847|up` → "Project MyGame, Unreal 5.6, local MCP on port 9847, editor running"
+- `D|2026-03-11|actor_pool|10x spawn|OK` → "On 2026-03-11, implemented actor_pool pattern, achieved 10x spawn improvement, successful"
+- `RUL|ss:before+after|1act|verify|log` → "Screenshot before and after, one action at a time, verify each action, log to memory"
+
+### Token Savings
+
+| Context Type | Verbose | Quantized | Savings |
+|--------------|---------|-----------|---------|
+| Project info | ~50 | ~15 | 70% |
+| Level info | ~40 | ~12 | 70% |
+| 5 decisions | ~200 | ~50 | 75% |
+| 3 patterns | ~100 | ~25 | 75% |
+| Abilities | ~30 | ~10 | 67% |
+| Endpoints | ~50 | ~15 | 70% |
+| **Total** | ~500+ | ~130 | **~75%** |
+
+### When to Use Verbose vs Quantized
+
+| Scenario | Format |
+|----------|--------|
+| First connection (AI needs to learn format) | Verbose (once) |
+| Subsequent messages | Quantized |
+| AI requests full details | Verbose on-demand |
+| Tight token budget | Quantized always |
+
+### Self-Describing Header
+
+Include format version so AI knows how to parse:
+
+```
+QCTX:v1
+CTX|MyGame|UE5.6|local:9847|up
+...
+```
+
+AI sees `QCTX:v1` and knows to use quantized parsing rules.
+
+---
+
 ## Architecture
 
 ```
