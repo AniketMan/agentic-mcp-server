@@ -639,6 +639,75 @@ Returns human-readable JSON (temporary, not stored)
 
 ---
 
+## Data Flow: What's Quantized vs Not
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│    HUMAN     │     │  {Project}   │     │   UNREAL     │
+│  (or Agent)  │     │    _MCP      │     │   ENGINE     │
+└──────┬───────┘     └──────┬───────┘     └──────┬───────┘
+       │                    │                    │
+       │   NATURAL LANG     │                    │
+       │   "Add spawner"    │                    │
+       │   ────────────────►│                    │
+       │                    │                    │
+       │              ┌─────┴─────┐              │
+       │              │  STORAGE  │              │
+       │              │  (ALL .q) │              │
+       │              │ quantized │              │
+       │              └─────┬─────┘              │
+       │                    │                    │
+       │                    │   COMMANDS/CODE    │
+       │                    │   POST /api/spawn  │
+       │                    │   {"class":"BP_E"} │
+       │                    │───────────────────►│
+       │                    │                    │
+       │                    │◄───────────────────│
+       │                    │   {"success":true} │
+       │                    │                    │
+       │   NATURAL LANG     │                    │
+       │◄───────────────────│                    │
+       │   "Done. Spawned   │                    │
+       │    at 100,200,0"   │                    │
+       │                    │                    │
+```
+
+### Summary: Three Data Domains
+
+| Domain | Format | Examples |
+|--------|--------|----------|
+| **Human ↔ MCP** | Natural language | "Add enemy spawner", "Done, spawned at X,Y,Z" |
+| **MCP ↔ Storage** | Quantized (.q) | `D\|2026-03-11\|spawn\|ctx:level_01\|out:OK` |
+| **MCP ↔ Unreal** | Commands & Code | `POST /api/spawn-actor`, Python scripts |
+
+### Why This Split?
+
+| Domain | Why This Format |
+|--------|-----------------|
+| **Human ↔ MCP** | Humans speak naturally. Middleman agent (Cline/Devmate) handles translation. |
+| **MCP ↔ Storage** | No human reads this. Pure AI-to-AI. Maximize efficiency. |
+| **MCP ↔ Unreal** | Unreal expects HTTP/JSON. Python expects Python. Code is code. |
+
+### The Middleman Agent
+
+If using VS Code + Cline/Devmate:
+
+```
+Human ──► Cline ──► {Project}_MCP ──► Storage (.q)
+                         │
+                         └──► AgenticMCP ──► Unreal
+```
+
+Cline/Devmate is the "middleman agent" that:
+- Takes human natural language
+- Translates to MCP tool calls
+- Receives responses
+- Translates back to human language
+
+We never need to handle natural language processing ourselves.
+
+---
+
 ## Architecture
 
 ```
