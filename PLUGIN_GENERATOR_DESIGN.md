@@ -708,6 +708,144 @@ We never need to handle natural language processing ourselves.
 
 ---
 
+## Neural Network Analogy
+
+The system architecture maps directly to a neural network:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    NEURAL NETWORK MAPPING                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+TRADITIONAL NEURAL NET:
+    Input → Hidden Layers → Activation Function → Output
+              (weights)       (non-linear)
+
+OUR SYSTEM:
+    Human → AI Agent → Plugin → Unreal
+    (input)  (hidden +   (activation)  (output)
+             optimizer)
+```
+
+### Forward Pass
+
+```
+┌────────┐          ┌────────┐          ┌────────┐          ┌────────┐
+│ HUMAN  │          │   AI   │          │ PLUGIN │          │ UNREAL │
+│COMMAND │─────────►│ AGENT  │─────────►│  MCP   │─────────►│ STATE  │
+│        │          │        │          │        │          │        │
+│"Add    │          │Reasons │          │Execute │          │Actor   │
+│ enemy" │          │Plans   │          │Command │          │spawned │
+│        │          │Decides │          │Return  │          │at XYZ  │
+│        │          │using   │          │Result  │          │        │
+│ INPUT  │          │Memory  │          │        │          │ OUTPUT │
+└────────┘          └────────┘          └────────┘          └────────┘
+                         │
+                         │ Uses learned
+                         │ patterns
+                         ▼
+                    ┌────────┐
+                    │ MEMORY │
+                    │  (.q)  │
+                    │WEIGHTS │
+                    └────────┘
+```
+
+### Backward Pass (Learning)
+
+```
+┌────────┐          ┌────────┐          ┌────────┐          ┌────────┐
+│ HUMAN  │          │   AI   │          │ PLUGIN │          │ UNREAL │
+│        │          │ AGENT  │◄─────────│  MCP   │◄─────────│ STATE  │
+│        │          │        │          │        │          │        │
+│        │          │Evaluate│          │Return  │          │success │
+│        │          │outcome │          │result  │          │or fail │
+│        │          │(loss)  │          │+ screenshot       │        │
+└────────┘          └────────┘          └────────┘          └────────┘
+                         │
+                         │ Update weights
+                         │ based on outcome
+                         ▼
+                    ┌────────┐
+                    │ MEMORY │
+                    │  (.q)  │
+                    │ UPDATE │
+                    │WEIGHTS │
+                    └────────┘
+```
+
+### The Complete Mapping
+
+| Neural Net Component | Our System | Role |
+|---------------------|------------|------|
+| **Input Layer** | Human command | Raw intent / instruction |
+| **Hidden Layers** | AI Agent (Cline/Claude) | Transform, reason, plan, decide |
+| **Weights** | Memory/.q files | Learned patterns, past decisions |
+| **Activation Function** | Plugin (MCP) | Execute command, produce output |
+| **Output** | Unreal state change | The actual effect in the world |
+| **Loss Function** | Screenshot diff + state verification | Did it work correctly? |
+| **Backpropagation** | Store outcome in Memory/ | Update "weights" for next time |
+| **Optimizer** | AI reasoning + Memory lookup | Improve decisions over time |
+
+### Key Insight: Self-Optimizing System
+
+```
+EPOCH 1 (First attempt):
+Human: "Spawn enemies faster"
+AI: [no prior knowledge] → tries basic spawn loop → slow
+Plugin: executes → returns timing data
+Loss: 10 enemies/sec (too slow)
+Backprop: stores failure in Memory/
+
+EPOCH 2 (Learning):
+Human: "Spawn enemies faster"
+AI: [reads Memory] → sees pooling pattern worked before → tries pool
+Plugin: executes → returns timing data
+Loss: 100 enemies/sec (good!)
+Backprop: stores success + pattern in Memory/
+
+EPOCH 3+ (Optimized):
+Human: "Spawn enemies faster"
+AI: [reads Memory] → immediately uses pooling pattern
+Plugin: executes
+Output: 100 enemies/sec from the start
+
+THE SYSTEM GOT SMARTER.
+```
+
+### Memory = Weights
+
+The `.q` files in Memory/ are literally the "weights" of this system:
+
+```
+Memory/
+├── patterns.q      ← "These approaches work"      (positive weights)
+├── decisions.q     ← "This is what I tried"       (weight history)
+├── history.q       ← "This succeeded/failed"      (gradient signal)
+└── sessions/       ← "Training epochs"            (batch history)
+```
+
+Each successful outcome **strengthens** a pattern (increases weight).
+Each failure **weakens** an approach (decreases weight).
+
+### Why This Matters
+
+Traditional AI tools: Same intelligence every session. No learning.
+
+Our system:
+- **Session 1**: AI is "untrained" for this project
+- **Session 10**: AI knows project patterns, common issues, shortcuts
+- **Session 100**: AI is highly optimized for this specific project
+
+**The Memory folder IS the trained model.**
+
+You could even:
+- **Export Memory/** to share learned patterns with another project
+- **Import Memory/** from a similar project to jumpstart learning
+- **Reset Memory/** to "retrain" from scratch
+
+---
+
 ## Architecture
 
 ```
