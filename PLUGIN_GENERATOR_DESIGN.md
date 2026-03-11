@@ -846,6 +846,117 @@ You could even:
 
 ---
 
+## AI Model Requirements: Scaling Down
+
+The "intelligence" of the AI model only matters for **interpreting vague human input**.
+
+### The Insight
+
+| Human Input Quality | Required AI | Why |
+|---------------------|-------------|-----|
+| **Vague** ("make it better") | Claude/GPT-4 | Needs reasoning to interpret intent |
+| **Precise** ("spawn BP_Enemy at 100,200,0") | Ollama/WebLLM | Just map command to tool call |
+
+### Vague vs Precise Commands
+
+```
+VAGUE (needs big AI):                 PRECISE (any AI works):
+─────────────────────                 ──────────────────────
+"Add some enemies"                    "Spawn 5 BP_Enemy actors at:
+                                       (100,0,0), (200,0,0), (300,0,0),
+                                       (400,0,0), (500,0,0)"
+
+"Make the lighting                    "Set DirectionalLight intensity
+ more dramatic"                        to 8.0, color to (1.0,0.8,0.6),
+                                       angle to -45 pitch"
+
+"Fix the performance"                 "Enable actor pooling for BP_Enemy,
+                                       pool size 50, preload on level start"
+
+"Test if it works"                    "Run test scenario: happy_path,
+                                       verify all checkpoints pass"
+```
+
+### Why This Matters
+
+A **competent developer** gives precise instructions:
+- No ambiguity to resolve
+- No creative decisions needed
+- Direct mapping: command → tool call → execute
+
+In this case, the AI's only job is:
+1. Parse the command (trivial)
+2. Map to tool call (trivial)
+3. Execute (Plugin does this)
+4. Store result (Plugin does this)
+
+**Even a 1B parameter model can do this.**
+
+### The AI Tier Spectrum
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  HUMAN INPUT QUALITY          →→→→→→→→→→→→→→→→           AI REQUIRED   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  "do the thing"                                              Claude Opus │
+│  "make it work"                                              Claude 4.5  │
+│  "add enemies to level 3"                                    Claude Haiku│
+│  "spawn enemies at these coords: [list]"                     Llama 3 8B  │
+│  "call /api/spawn-actor with {json}"                         Llama 3 1B  │
+│  "{\"tool\":\"spawn\",\"args\":{...}}"                       WebLLM/WASM │
+│                                                                          │
+│  ◄───────────────────────────────────────────────────────────────────►  │
+│  VAGUE                                                          PRECISE  │
+│  (expensive)                                                    (cheap)  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Optimal Setup for Different Users
+
+| User Type | Recommended AI | Why |
+|-----------|----------------|-----|
+| **Designer** (vague ideas) | Claude/GPT-4 | Needs interpretation |
+| **Developer** (precise specs) | Ollama 8B | Just execution |
+| **Automation script** (JSON commands) | WebLLM/1B | Pure translation |
+| **CI/CD pipeline** (exact commands) | None needed | Direct API calls |
+
+### The Plugin Makes Small AI Viable
+
+Without our system:
+- Small AI can't figure out how to do things
+- No memory of past successes
+- Each session starts from zero
+
+With our system:
+- Memory/.q has all the patterns
+- Plugin knows all the commands
+- Context is pre-loaded
+- Small AI just needs to connect the dots
+
+```
+BEFORE (Small AI alone):
+"spawn enemy" → ??? → fail
+
+AFTER (Small AI + Memory + Plugin):
+"spawn enemy" → check Memory/patterns.q →
+  "actor_pool pattern works" →
+  call /api/spawn-actor → success
+```
+
+### Cost Implications
+
+| Setup | Cost per 1000 commands |
+|-------|------------------------|
+| Claude Opus + vague prompts | ~$50 |
+| Claude Haiku + clear prompts | ~$5 |
+| Ollama local + precise commands | $0 (just electricity) |
+| WebLLM + JSON commands | $0 (runs in browser) |
+
+**A competent developer using precise commands can run this for free.**
+
+---
+
 ## Architecture
 
 ```
