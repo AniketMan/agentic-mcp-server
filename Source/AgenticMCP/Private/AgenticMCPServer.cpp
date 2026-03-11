@@ -1954,6 +1954,12 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 	Router->BindRoute(FHttpPath(TEXT("/api/renderdoc/capture")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("renderDocCapture")));
 
+	// Level Visibility & Log Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/streaming-level-visibility")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("streamingLevelVisibility")));
+	Router->BindRoute(FHttpPath(TEXT("/api/output-log")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("outputLog")));
+
 	// ---- Start listening ----
 	HttpModule.StartAllListeners();
 	bRunning = true;

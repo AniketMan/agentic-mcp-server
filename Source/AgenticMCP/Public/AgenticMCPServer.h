@@ -228,10 +228,11 @@ private:
 	FString HandleStepPIE(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleGetPIEState(const TMap<FString, FString>& Params, const FString& Body);
 
-	// ---- Console Commands (Handlers_PIE.cpp) ----
+	// ---- Console Commands (Handlers_Console.cpp) ----
 	FString HandleExecuteConsole(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleGetCVar(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleSetCVar(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleListCVars(const TMap<FString, FString>& Params, const FString& Body);
 
 	// ---- Input Simulation (Handlers_Input.cpp) ----
 	FString HandleSimulateInput(const TMap<FString, FString>& Params, const FString& Body);

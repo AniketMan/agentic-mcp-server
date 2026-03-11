@@ -55,13 +55,9 @@ FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params
 {
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-	// Try PIE world first, then editor world
+	// Use editor world - streaming levels are visible there even during PIE
 	UWorld* World = nullptr;
-	if (GEditor && GEditor->PlayWorld)
-	{
-		World = GEditor->PlayWorld;
-	}
-	else if (GEditor)
+	if (GEditor)
 	{
 		World = GEditor->GetEditorWorldContext().World();
 	}
@@ -172,13 +168,9 @@ FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Para
 {
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
-	// Try PIE world first, then editor world
+	// Use editor world - streaming levels are visible there even during PIE
 	UWorld* World = nullptr;
-	if (GEditor && GEditor->PlayWorld)
-	{
-		World = GEditor->PlayWorld;
-	}
-	else if (GEditor)
+	if (GEditor)
 	{
 		World = GEditor->GetEditorWorldContext().World();
 	}
