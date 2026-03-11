@@ -1,1038 +1,2691 @@
 {
   "tools": [
     {
-      "name": "list",
-      "description": "List all Blueprint assets in the project",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "blueprint",
-      "description": "Get detailed info about a Blueprint (variables, graphs, components)",
+      "name": "addComponent",
+      "description": "Add a component to a Blueprint",
       "parameters": [
-        { "name": "name", "type": "string", "description": "Blueprint name or package path", "required": true }
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "componentClass",
+          "type": "string",
+          "description": "Component class (e.g. StaticMeshComponent, PointLightComponent)",
+          "required": false
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Name for the new component",
+          "required": false
+        }
       ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "graph",
-      "description": "Get all nodes and connections in a Blueprint graph",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Blueprint name or package path", "required": true },
-        { "name": "graph", "type": "string", "description": "Graph name (default: EventGraph)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "search",
-      "description": "Search for nodes across all Blueprints by keyword",
-      "parameters": [
-        { "name": "query", "type": "string", "description": "Search keyword", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "references",
-      "description": "Find all references to a Blueprint asset",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Blueprint name or package path", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "listClasses",
-      "description": "List available UClasses filtered by parent class",
-      "parameters": [
-        { "name": "parentClass", "type": "string", "description": "Parent class to filter by (e.g. Actor, Pawn)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "listFunctions",
-      "description": "List callable functions for a given class or Blueprint",
-      "parameters": [
-        { "name": "className", "type": "string", "description": "Class or Blueprint name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "listProperties",
-      "description": "List properties/variables for a given class or Blueprint",
-      "parameters": [
-        { "name": "className", "type": "string", "description": "Class or Blueprint name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "getPinInfo",
-      "description": "Get detailed pin info for a specific node",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuid", "type": "string", "description": "Node GUID", "required": true },
-        { "name": "graphName", "type": "string", "description": "Graph name (default: EventGraph)" }
-      ],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
       "name": "addNode",
       "description": "Add a node to a Blueprint graph",
       "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeType", "type": "string", "description": "Node type (e.g. CallFunction, Event, CustomEvent, VariableGet, VariableSet, IfThenElse, Sequence, DynamicCast, MacroInstance, BreakStruct, MakeStruct, Knot, Comment)", "required": true },
-        { "name": "graphName", "type": "string", "description": "Graph name (default: EventGraph)" },
-        { "name": "posX", "type": "number", "description": "X position" },
-        { "name": "posY", "type": "number", "description": "Y position" },
-        { "name": "functionName", "type": "string", "description": "Function name (for CallFunction nodes)" },
-        { "name": "eventName", "type": "string", "description": "Event name (for Event/CustomEvent nodes)" },
-        { "name": "variableName", "type": "string", "description": "Variable name (for VariableGet/Set nodes)" },
-        { "name": "targetClass", "type": "string", "description": "Target class (for DynamicCast)" },
-        { "name": "macroName", "type": "string", "description": "Macro name (for MacroInstance)" },
-        { "name": "structType", "type": "string", "description": "Struct type (for BreakStruct/MakeStruct)" },
-        { "name": "commentText", "type": "string", "description": "Comment text (for Comment nodes)" }
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "graph",
+          "type": "string",
+          "description": "Graph name within the blueprint",
+          "required": false
+        },
+        {
+          "name": "nodeType",
+          "type": "string",
+          "description": "Node type (e.g. CallFunction, Event, CustomEvent, VariableGet, VariableSet, IfThenElse, Sequence, DynamicCast, MacroInstance, BreakStruct, MakeStruct, Knot, Comment)",
+          "required": false
+        },
+        {
+          "name": "posX",
+          "type": "string",
+          "description": "X position",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "string",
+          "description": "Y position",
+          "required": false
+        },
+        {
+          "name": "typeName",
+          "type": "string",
+          "description": "typeName parameter",
+          "required": false
+        },
+        {
+          "name": "functionName",
+          "type": "string",
+          "description": "Function name (for CallFunction nodes)",
+          "required": false
+        },
+        {
+          "name": "className",
+          "type": "string",
+          "description": "UE class name to use",
+          "required": false
+        },
+        {
+          "name": "variableName",
+          "type": "string",
+          "description": "Variable name (for VariableGet/Set nodes)",
+          "required": false
+        },
+        {
+          "name": "castTarget",
+          "type": "string",
+          "description": "castTarget parameter",
+          "required": false
+        },
+        {
+          "name": "eventName",
+          "type": "string",
+          "description": "Event name (for Event/CustomEvent nodes)",
+          "required": false
+        },
+        {
+          "name": "actorClass",
+          "type": "string",
+          "description": "actorClass parameter",
+          "required": false
+        },
+        {
+          "name": "comment",
+          "type": "string",
+          "description": "comment parameter",
+          "required": false
+        },
+        {
+          "name": "width",
+          "type": "string",
+          "description": "Width in pixels",
+          "required": false
+        },
+        {
+          "name": "height",
+          "type": "string",
+          "description": "Height in pixels",
+          "required": false
+        },
+        {
+          "name": "macroName",
+          "type": "string",
+          "description": "Macro name (for MacroInstance)",
+          "required": false
+        },
+        {
+          "name": "macroSource",
+          "type": "string",
+          "description": "macroSource parameter",
+          "required": false
+        }
       ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "deleteNode",
-      "description": "Delete a node from a Blueprint graph",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuid", "type": "string", "description": "Node GUID to delete", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "connectPins",
-      "description": "Connect two pins between nodes in a Blueprint graph",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "sourceNodeGuid", "type": "string", "description": "Source node GUID", "required": true },
-        { "name": "sourcePinName", "type": "string", "description": "Source pin name", "required": true },
-        { "name": "targetNodeGuid", "type": "string", "description": "Target node GUID", "required": true },
-        { "name": "targetPinName", "type": "string", "description": "Target pin name", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "disconnectPin",
-      "description": "Disconnect all connections from a pin",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuid", "type": "string", "description": "Node GUID", "required": true },
-        { "name": "pinName", "type": "string", "description": "Pin name to disconnect", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "setPinDefault",
-      "description": "Set the default value of a pin",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuid", "type": "string", "description": "Node GUID", "required": true },
-        { "name": "pinName", "type": "string", "description": "Pin name", "required": true },
-        { "name": "value", "type": "string", "description": "Default value to set", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "moveNode",
-      "description": "Move a node to a new position in the graph",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuid", "type": "string", "description": "Node GUID", "required": true },
-        { "name": "posX", "type": "number", "description": "New X position", "required": true },
-        { "name": "posY", "type": "number", "description": "New Y position", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "refreshAllNodes",
-      "description": "Refresh all nodes in a Blueprint (reconstructs pins)",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "createBlueprint",
-      "description": "Create a new Blueprint asset",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "parentClass", "type": "string", "description": "Parent class (default: Actor)" },
-        { "name": "path", "type": "string", "description": "Package path (default: /Game/Blueprints)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "createGraph",
-      "description": "Create a new function graph in a Blueprint",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "graphName", "type": "string", "description": "New graph name", "required": true },
-        { "name": "graphType", "type": "string", "description": "Graph type: function or macro (default: function)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "deleteGraph",
-      "description": "Delete a graph from a Blueprint",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "graphName", "type": "string", "description": "Graph name to delete", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
       "name": "addVariable",
       "description": "Add a variable to a Blueprint",
       "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "variableName", "type": "string", "description": "Variable name", "required": true },
-        { "name": "variableType", "type": "string", "description": "Variable type (e.g. float, int, bool, string, Vector, Rotator, Transform, or any UClass/UStruct name)", "required": true },
-        { "name": "defaultValue", "type": "string", "description": "Default value as string" },
-        { "name": "isExposed", "type": "boolean", "description": "Expose to editor (default: false)" }
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type filter (e.g. 'blueprint', 'map', 'all')",
+          "required": false
+        }
       ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "removeVariable",
-      "description": "Remove a variable from a Blueprint",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "variableName", "type": "string", "description": "Variable name to remove", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "compileBlueprint",
-      "description": "Compile a Blueprint and report errors",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "duplicateNodes",
-      "description": "Duplicate nodes within a Blueprint graph",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuids", "type": "array", "description": "Array of node GUIDs to duplicate", "required": true },
-        { "name": "offsetX", "type": "number", "description": "X offset for duplicated nodes (default: 200)" },
-        { "name": "offsetY", "type": "number", "description": "Y offset for duplicated nodes (default: 200)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "setNodeComment",
-      "description": "Set or update the comment on a node",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeGuid", "type": "string", "description": "Node GUID", "required": true },
-        { "name": "comment", "type": "string", "description": "Comment text", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "addComponent",
-      "description": "Add a component to a Blueprint",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "componentClass", "type": "string", "description": "Component class (e.g. StaticMeshComponent, PointLightComponent)", "required": true },
-        { "name": "componentName", "type": "string", "description": "Name for the new component" },
-        { "name": "parentComponent", "type": "string", "description": "Parent component name to attach to" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "listActors",
-      "description": "List all actors in the current level",
-      "parameters": [
-        { "name": "classFilter", "type": "string", "description": "Filter by class name" },
-        { "name": "nameFilter", "type": "string", "description": "Filter by actor name (substring match)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "getActor",
-      "description": "Get detailed info about a specific actor",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name or label", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "spawnActor",
-      "description": "Spawn a new actor in the level",
-      "parameters": [
-        { "name": "className", "type": "string", "description": "Actor class to spawn (e.g. StaticMeshActor, PointLight, CameraActor)", "required": true },
-        { "name": "name", "type": "string", "description": "Label for the spawned actor" },
-        { "name": "location", "type": "object", "description": "Spawn location {x, y, z}" },
-        { "name": "rotation", "type": "object", "description": "Spawn rotation {pitch, yaw, roll}" },
-        { "name": "scale", "type": "object", "description": "Scale {x, y, z}" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "deleteActor",
-      "description": "Delete an actor from the level",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name to delete", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "setActorProperty",
-      "description": "Set a property on an actor",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name", "required": true },
-        { "name": "property", "type": "string", "description": "Property path (e.g. StaticMeshComponent.StaticMesh)", "required": true },
-        { "name": "value", "type": "string", "description": "Value to set", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "setActorTransform",
-      "description": "Set the transform (location/rotation/scale) of an actor",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name", "required": true },
-        { "name": "location", "type": "object", "description": "Location {x, y, z}" },
-        { "name": "rotation", "type": "object", "description": "Rotation {pitch, yaw, roll}" },
-        { "name": "scale", "type": "object", "description": "Scale {x, y, z}" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "listLevels",
-      "description": "List all levels/sublevels in the current world",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "loadLevel",
-      "description": "Load/open a level by name or path",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Level name or package path", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "removeSublevel",
-      "description": "Remove a streaming sublevel from the current world",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Sublevel name to remove", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "getLevelBlueprint",
-      "description": "Get the level Blueprint for the current or specified level",
-      "parameters": [
-        { "name": "levelName", "type": "string", "description": "Level name (default: current persistent level)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "streamingLevelVisibility",
-      "description": "Set visibility of a streaming sublevel",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Sublevel name", "required": true },
-        { "name": "visible", "type": "boolean", "description": "Whether the sublevel should be visible", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "outputLog",
-      "description": "Read recent entries from the Output Log",
-      "parameters": [
-        { "name": "count", "type": "number", "description": "Number of log entries to return (default: 50)" },
-        { "name": "filter", "type": "string", "description": "Filter by category or keyword" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "validateBlueprint",
-      "description": "Validate a Blueprint for errors without compiling",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "snapshotGraph",
-      "description": "Take a snapshot of a Blueprint graph for later rollback",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "graphName", "type": "string", "description": "Graph name (default: all graphs)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "restoreGraph",
-      "description": "Restore a Blueprint graph from a previous snapshot",
-      "parameters": [
-        { "name": "snapshotId", "type": "string", "description": "Snapshot ID to restore", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "sceneSnapshot",
-      "description": "Get a structured snapshot of all actors in the scene",
-      "parameters": [
-        { "name": "classFilter", "type": "string", "description": "Filter by actor class" },
-        { "name": "includeComponents", "type": "boolean", "description": "Include component details (default: true)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "screenshot",
-      "description": "Capture a viewport screenshot and return as base64 image",
-      "parameters": [
-        { "name": "width", "type": "number", "description": "Target width in pixels (default: 1280)" },
-        { "name": "height", "type": "number", "description": "Target height in pixels (default: 720)" },
-        { "name": "format", "type": "string", "description": "Image format: png or jpeg (default: jpeg)" },
-        { "name": "quality", "type": "number", "description": "JPEG quality 1-100 (default: 75)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "focusActor",
-      "description": "Focus the viewport camera on a specific actor",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name or ref ID", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "selectActor",
-      "description": "Select an actor in the editor",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name or ref ID", "required": true },
-        { "name": "addToSelection", "type": "boolean", "description": "Add to current selection instead of replacing" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "setViewport",
-      "description": "Set the viewport camera position and orientation",
-      "parameters": [
-        { "name": "location", "type": "object", "description": "Camera location {x, y, z}", "required": true },
-        { "name": "rotation", "type": "object", "description": "Camera rotation {pitch, yaw, roll}", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "waitReady",
-      "description": "Wait for the editor to be ready (useful after level loads)",
-      "parameters": [
-        { "name": "timeoutMs", "type": "number", "description": "Timeout in milliseconds (default: 5000)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "resolveRef",
-      "description": "Resolve a short ref ID (e.g. a3) to an actor name",
-      "parameters": [
-        { "name": "ref", "type": "string", "description": "Short reference ID", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "moveActor",
-      "description": "Move an actor by a relative offset or to an absolute position",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Actor name or ref ID", "required": true },
-        { "name": "location", "type": "object", "description": "Target location {x, y, z}" },
-        { "name": "offset", "type": "object", "description": "Relative offset {x, y, z}" },
-        { "name": "rotation", "type": "object", "description": "Target rotation {pitch, yaw, roll}" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "getCamera",
-      "description": "Get the current viewport camera position and orientation",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "listViewports",
-      "description": "List all open viewport windows",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "getSelection",
-      "description": "Get the currently selected actors in the editor",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "listSequences",
-      "description": "List all Level Sequence assets in the project",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "readSequence",
-      "description": "Read the tracks and keyframes of a Level Sequence",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Sequence name or path", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "removeAudioTracks",
-      "description": "Remove audio tracks from a Level Sequence",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Sequence name or path", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "drawDebug",
-      "description": "Draw debug shapes in the viewport (lines, spheres, boxes)",
-      "parameters": [
-        { "name": "shapes", "type": "array", "description": "Array of shape objects with type, position, color, etc.", "required": true },
-        { "name": "duration", "type": "number", "description": "Duration in seconds (default: 5)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "clearDebug",
-      "description": "Clear all debug draw shapes",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "blueprintSnapshot",
-      "description": "Take a full snapshot of a Blueprint including all graphs",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "beginTransaction",
-      "description": "Begin an undo transaction",
-      "parameters": [
-        { "name": "description", "type": "string", "description": "Transaction description", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "endTransaction",
-      "description": "End the current undo transaction",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "undo",
-      "description": "Undo the last transaction",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "redo",
-      "description": "Redo the last undone transaction",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "saveState",
-      "description": "Save the current state of a Blueprint for later diffing",
-      "parameters": [
-        { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "label", "type": "string", "description": "Optional label for this state" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "diffState",
-      "description": "Compare current Blueprint state against a saved state",
-      "parameters": [
-        { "name": "stateId", "type": "string", "description": "State ID to compare against", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "restoreState",
-      "description": "Restore a Blueprint to a previously saved state",
-      "parameters": [
-        { "name": "stateId", "type": "string", "description": "State ID to restore", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "listStates",
-      "description": "List all saved Blueprint states",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "executePython",
-      "description": "Execute Python code or a Python file in the editor",
-      "parameters": [
-        { "name": "script", "type": "string", "description": "Inline Python code to execute" },
-        { "name": "file", "type": "string", "description": "Path to a .py file to execute" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "openAsset",
-      "description": "Open an asset in its default editor",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "Asset name or package path", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "rescan",
-      "description": "Rescan the asset registry for new or changed assets",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "startPIE",
-      "description": "Start Play-In-Editor session",
-      "parameters": [
-        { "name": "mode", "type": "string", "description": "PIE mode: viewport, newWindow, or VR (default: viewport)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "stopPIE",
-      "description": "Stop the current Play-In-Editor session",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "pausePIE",
-      "description": "Pause or resume the Play-In-Editor session",
-      "parameters": [
-        { "name": "paused", "type": "boolean", "description": "True to pause, false to resume" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "stepPIE",
-      "description": "Step one frame in a paused PIE session",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "getPIEState",
-      "description": "Get the current PIE session state",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "executeConsole",
-      "description": "Execute a console command in the editor",
-      "parameters": [
-        { "name": "command", "type": "string", "description": "Console command to execute", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "getCVar",
-      "description": "Get the value of a console variable",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "CVar name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "setCVar",
-      "description": "Set the value of a console variable",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "CVar name", "required": true },
-        { "name": "value", "type": "string", "description": "Value to set", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "simulateInput",
-      "description": "Simulate keyboard or mouse input in the editor or PIE",
-      "parameters": [
-        { "name": "key", "type": "string", "description": "Key name (e.g. W, A, S, D, SpaceBar, LeftMouseButton)", "required": true },
-        { "name": "event", "type": "string", "description": "Input event: pressed, released, or held (default: pressed)" },
-        { "name": "duration", "type": "number", "description": "Hold duration in seconds (for held event)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "xrStatus",
-      "description": "Get the current XR/VR headset and runtime status",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "xrGuardian",
-      "description": "Get the guardian/play area boundary info",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "xrSetGuardianVisibility",
-      "description": "Show or hide the guardian boundary",
-      "parameters": [
-        { "name": "visible", "type": "boolean", "description": "Whether to show the guardian", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "xrHandTracking",
-      "description": "Get hand tracking data (joint positions, gestures)",
-      "parameters": [
-        { "name": "hand", "type": "string", "description": "Which hand: left, right, or both (default: both)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "xrControllers",
-      "description": "Get controller tracking data and button states",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "xrPassthrough",
-      "description": "Get passthrough mode status",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "xrSetPassthrough",
-      "description": "Enable or disable passthrough mode",
-      "parameters": [
-        { "name": "enabled", "type": "boolean", "description": "Whether to enable passthrough", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "xrSetDisplayFrequency",
-      "description": "Set the HMD display refresh rate",
-      "parameters": [
-        { "name": "frequency", "type": "number", "description": "Refresh rate in Hz (e.g. 72, 90, 120)", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "xrSetPerformanceLevels",
-      "description": "Set CPU and GPU performance levels for XR",
-      "parameters": [
-        { "name": "cpuLevel", "type": "number", "description": "CPU performance level 0-4" },
-        { "name": "gpuLevel", "type": "number", "description": "GPU performance level 0-4" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "xrRecenter",
-      "description": "Recenter the XR tracking origin",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "storyState",
-      "description": "Get the current story/narrative state",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "storyAdvance",
-      "description": "Advance the story to the next beat",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "storyGoto",
-      "description": "Jump to a specific story beat or chapter",
-      "parameters": [
-        { "name": "target", "type": "string", "description": "Beat ID or chapter name", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "storyPlay",
-      "description": "Play/resume story playback",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "dataTableRead",
-      "description": "Read rows from a DataTable asset",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "DataTable asset name or path", "required": true },
-        { "name": "rowFilter", "type": "string", "description": "Filter rows by name pattern" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "dataTableWrite",
-      "description": "Write or update rows in a DataTable asset",
-      "parameters": [
-        { "name": "name", "type": "string", "description": "DataTable asset name or path", "required": true },
-        { "name": "rows", "type": "array", "description": "Array of row objects to write", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
       "name": "animationPlay",
       "description": "Play an animation on an actor's skeletal mesh",
       "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true },
-        { "name": "animationName", "type": "string", "description": "Animation asset name or path", "required": true },
-        { "name": "loop", "type": "boolean", "description": "Whether to loop (default: false)" }
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "animation",
+          "type": "string",
+          "description": "animation parameter",
+          "required": false
+        },
+        {
+          "name": "playRate",
+          "type": "string",
+          "description": "Playback rate multiplier",
+          "required": false
+        },
+        {
+          "name": "loop",
+          "type": "string",
+          "description": "Whether to loop (default: false)",
+          "required": false
+        }
       ],
-      "annotations": { "destructiveHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
       "name": "animationStop",
       "description": "Stop animation playback on an actor",
       "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true }
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "stopMontages",
+          "type": "string",
+          "description": "stopMontages parameter",
+          "required": false
+        },
+        {
+          "name": "blendOutTime",
+          "type": "string",
+          "description": "blendOutTime parameter",
+          "required": false
+        }
       ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "materialSetParam",
-      "description": "Set a material parameter on an actor's mesh",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true },
-        { "name": "paramName", "type": "string", "description": "Material parameter name", "required": true },
-        { "name": "value", "type": "number", "description": "Scalar value to set", "required": true },
-        { "name": "materialIndex", "type": "number", "description": "Material slot index (default: 0)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "collisionTrace",
-      "description": "Perform a line trace / raycast in the scene",
-      "parameters": [
-        { "name": "start", "type": "object", "description": "Start position {x, y, z}", "required": true },
-        { "name": "end", "type": "object", "description": "End position {x, y, z}", "required": true },
-        { "name": "channel", "type": "string", "description": "Trace channel (default: Visibility)" }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "audioGetStatus",
-      "description": "Get the audio system status",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "audioListActiveSounds",
-      "description": "List all currently playing sounds",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "audioGetDeviceInfo",
-      "description": "Get audio device information",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "audioListSoundClasses",
-      "description": "List all sound classes and their volumes",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "audioSetVolume",
-      "description": "Set the volume of a sound class",
-      "parameters": [
-        { "name": "soundClass", "type": "string", "description": "Sound class name", "required": true },
-        { "name": "volume", "type": "number", "description": "Volume level 0.0-1.0", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "audioGetStats",
-      "description": "Get audio engine statistics",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "audioPlaySound",
-      "description": "Play a sound asset at a location",
-      "parameters": [
-        { "name": "soundName", "type": "string", "description": "Sound asset name or path", "required": true },
-        { "name": "location", "type": "object", "description": "Play location {x, y, z}" },
-        { "name": "volume", "type": "number", "description": "Volume multiplier (default: 1.0)" }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "audioStopSound",
-      "description": "Stop a playing sound",
-      "parameters": [
-        { "name": "soundName", "type": "string", "description": "Sound asset name to stop", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "audioSetListener",
-      "description": "Set the audio listener position and orientation",
-      "parameters": [
-        { "name": "location", "type": "object", "description": "Listener location {x, y, z}", "required": true },
-        { "name": "rotation", "type": "object", "description": "Listener rotation {pitch, yaw, roll}" }
-      ],
-      "annotations": { "destructiveHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
       "name": "audioDebugVisualize",
       "description": "Toggle audio debug visualization in the viewport",
       "parameters": [
-        { "name": "enabled", "type": "boolean", "description": "Whether to enable visualization", "required": true }
+        {
+          "name": "enable",
+          "type": "boolean",
+          "description": "enable parameter",
+          "required": false
+        }
       ],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "readOnlyHint": true
+      }
     },
     {
-      "name": "niagaraGetStatus",
-      "description": "Get Niagara particle system status overview",
+      "name": "audioGetDeviceInfo",
+      "description": "Get audio device information",
       "parameters": [],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "readOnlyHint": true
+      }
     },
     {
-      "name": "niagaraListSystems",
-      "description": "List all active Niagara systems in the scene",
+      "name": "audioGetStats",
+      "description": "Get audio engine statistics",
       "parameters": [],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "readOnlyHint": true
+      }
     },
     {
-      "name": "niagaraGetSystemInfo",
-      "description": "Get detailed info about a specific Niagara system",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name with the Niagara component", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "niagaraGetEmitters",
-      "description": "List emitters in a Niagara system",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "niagaraSetParameter",
-      "description": "Set a user parameter on a Niagara system",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true },
-        { "name": "paramName", "type": "string", "description": "Parameter name", "required": true },
-        { "name": "value", "type": "number", "description": "Parameter value", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "niagaraGetParameters",
-      "description": "Get all user parameters from a Niagara system",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true }
-      ],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "niagaraActivateSystem",
-      "description": "Activate or deactivate a Niagara system",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true },
-        { "name": "active", "type": "boolean", "description": "Whether to activate", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "niagaraSetEmitterEnable",
-      "description": "Enable or disable a specific emitter in a Niagara system",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true },
-        { "name": "emitterName", "type": "string", "description": "Emitter name", "required": true },
-        { "name": "enabled", "type": "boolean", "description": "Whether to enable", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "niagaraResetSystem",
-      "description": "Reset a Niagara system to its initial state",
-      "parameters": [
-        { "name": "actorName", "type": "string", "description": "Actor name", "required": true }
-      ],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "niagaraGetStats",
-      "description": "Get performance statistics for Niagara systems",
+      "name": "audioGetStatus",
+      "description": "Get the audio system status",
       "parameters": [],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "readOnlyHint": true
+      }
     },
     {
-      "name": "niagaraDebugHUD",
-      "description": "Toggle Niagara debug HUD overlay",
+      "name": "audioListActiveSounds",
+      "description": "List all currently playing sounds",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "audioListSoundClasses",
+      "description": "List all sound classes and their volumes",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "audioPlaySound",
+      "description": "Play a sound asset at a location",
       "parameters": [
-        { "name": "enabled", "type": "boolean", "description": "Whether to enable the debug HUD", "required": true }
+        {
+          "name": "sound",
+          "type": "string",
+          "description": "sound parameter",
+          "required": false
+        }
       ],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
-      "name": "pixelStreamingGetStatus",
-      "description": "Get Pixel Streaming status",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "pixelStreamingStart",
-      "description": "Start Pixel Streaming",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "pixelStreamingStop",
-      "description": "Stop Pixel Streaming",
-      "parameters": [],
-      "annotations": { "destructiveHint": true }
-    },
-    {
-      "name": "pixelStreamingListStreamers",
-      "description": "List active Pixel Streaming streamers",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "pixelStreamingGetCodec",
-      "description": "Get the current video codec settings",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "pixelStreamingSetCodec",
-      "description": "Set the video codec for Pixel Streaming",
+      "name": "audioSetListener",
+      "description": "Set the audio listener position and orientation",
       "parameters": [
-        { "name": "codec", "type": "string", "description": "Codec name (e.g. H264, VP8, VP9)", "required": true }
+        {
+          "name": "location",
+          "type": "object",
+          "description": "Listener location {x, y, z}",
+          "required": false
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "X coordinate",
+          "required": false
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "Y coordinate",
+          "required": false
+        },
+        {
+          "name": "z",
+          "type": "number",
+          "description": "Z coordinate",
+          "required": false
+        },
+        {
+          "name": "rotation",
+          "type": "object",
+          "description": "Listener rotation {pitch, yaw, roll}",
+          "required": false
+        },
+        {
+          "name": "pitch",
+          "type": "number",
+          "description": "pitch parameter",
+          "required": false
+        },
+        {
+          "name": "yaw",
+          "type": "number",
+          "description": "yaw parameter",
+          "required": false
+        },
+        {
+          "name": "roll",
+          "type": "number",
+          "description": "roll parameter",
+          "required": false
+        }
       ],
-      "annotations": { "destructiveHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
     },
     {
-      "name": "pixelStreamingListPlayers",
-      "description": "List connected Pixel Streaming players",
-      "parameters": [],
-      "annotations": { "readOnlyHint": true }
-    },
-    {
-      "name": "renderDocCapture",
-      "description": "Trigger a RenderDoc frame capture",
+      "name": "audioSetVolume",
+      "description": "Set the volume of a sound class",
       "parameters": [
-        { "name": "frames", "type": "number", "description": "Number of frames to capture (default: 1)" }
+        {
+          "name": "soundClass",
+          "type": "string",
+          "description": "Sound class name",
+          "required": false
+        },
+        {
+          "name": "volume",
+          "type": "number",
+          "description": "Volume level 0.0-1.0",
+          "required": false
+        }
       ],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "audioStopSound",
+      "description": "Stop a playing sound",
+      "parameters": [
+        {
+          "name": "all",
+          "type": "boolean",
+          "description": "all parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "beginTransaction",
+      "description": "Begin an undo transaction",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "blueprint",
+      "description": "Get detailed info about a Blueprint (variables, graphs, components)",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Blueprint name or package path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "blueprintSnapshot",
+      "description": "Take a full snapshot of a Blueprint including all graphs",
+      "parameters": [
+        {
+          "name": "asset",
+          "type": "string",
+          "description": "Asset name or path",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "clearDebug",
+      "description": "Clear all debug draw shapes",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "collisionTrace",
+      "description": "Perform a line trace / raycast in the scene",
+      "parameters": [
+        {
+          "name": "start",
+          "type": "array",
+          "description": "Start position {x, y, z}",
+          "required": false
+        },
+        {
+          "name": "end",
+          "type": "array",
+          "description": "End position {x, y, z}",
+          "required": false
+        },
+        {
+          "name": "traceComplex",
+          "type": "string",
+          "description": "traceComplex parameter",
+          "required": false
+        },
+        {
+          "name": "drawDebug",
+          "type": "string",
+          "description": "drawDebug parameter",
+          "required": false
+        },
+        {
+          "name": "debugDuration",
+          "type": "string",
+          "description": "debugDuration parameter",
+          "required": false
+        },
+        {
+          "name": "channel",
+          "type": "string",
+          "description": "Trace channel (default: Visibility)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "compileBlueprint",
+      "description": "Compile a Blueprint and report errors",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "connectPins",
+      "description": "Connect two pins between nodes in a Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "sourceNodeId",
+          "type": "string",
+          "description": "sourceNodeId parameter",
+          "required": false
+        },
+        {
+          "name": "sourcePinName",
+          "type": "string",
+          "description": "Source pin name",
+          "required": false
+        },
+        {
+          "name": "targetNodeId",
+          "type": "string",
+          "description": "targetNodeId parameter",
+          "required": false
+        },
+        {
+          "name": "targetPinName",
+          "type": "string",
+          "description": "Target pin name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "createBlueprint",
+      "description": "Create a new Blueprint asset",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Blueprint name",
+          "required": true
+        },
+        {
+          "name": "parentClass",
+          "type": "string",
+          "description": "Parent class (default: Actor)",
+          "required": false
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Package path (default: /Game/Blueprints)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "createGraph",
+      "description": "Create a new function graph in a Blueprint",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "New graph name",
+          "required": false
+        },
+        {
+          "name": "graphType",
+          "type": "string",
+          "description": "Graph type: function or macro (default: function)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "dataTableRead",
+      "description": "Read rows from a DataTable asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "path parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "dataTableWrite",
+      "description": "Write or update rows in a DataTable asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "path parameter",
+          "required": false
+        },
+        {
+          "name": "rowName",
+          "type": "string",
+          "description": "rowName parameter",
+          "required": false
+        },
+        {
+          "name": "values",
+          "type": "object",
+          "description": "values parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "deleteActor",
+      "description": "Delete an actor from the level",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name to delete",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "deleteGraph",
+      "description": "Delete a graph from a Blueprint",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "Graph name to delete",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "deleteNode",
+      "description": "Delete a node from a Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Unique identifier of the blueprint node",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "diffState",
+      "description": "Compare current Blueprint state against a saved state",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "disconnectPin",
+      "description": "Disconnect all connections from a pin",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Unique identifier of the blueprint node",
+          "required": false
+        },
+        {
+          "name": "pinName",
+          "type": "string",
+          "description": "Pin name to disconnect",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "drawDebug",
+      "description": "Draw debug shapes in the viewport (lines, spheres, boxes)",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type filter (e.g. 'blueprint', 'map', 'all')",
+          "required": false
+        },
+        {
+          "name": "color",
+          "type": "string",
+          "description": "color parameter",
+          "required": false
+        },
+        {
+          "name": "duration",
+          "type": "string",
+          "description": "Duration in seconds (default: 5)",
+          "required": false
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "description": "Target identifier or name",
+          "required": false
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "X coordinate",
+          "required": false
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "Y coordinate",
+          "required": false
+        },
+        {
+          "name": "z",
+          "type": "number",
+          "description": "Z coordinate",
+          "required": false
+        },
+        {
+          "name": "radius",
+          "type": "string",
+          "description": "radius parameter",
+          "required": false
+        },
+        {
+          "name": "startTarget",
+          "type": "string",
+          "description": "startTarget parameter",
+          "required": false
+        },
+        {
+          "name": "startX",
+          "type": "number",
+          "description": "startX parameter",
+          "required": false
+        },
+        {
+          "name": "startY",
+          "type": "number",
+          "description": "startY parameter",
+          "required": false
+        },
+        {
+          "name": "startZ",
+          "type": "number",
+          "description": "startZ parameter",
+          "required": false
+        },
+        {
+          "name": "endTarget",
+          "type": "string",
+          "description": "endTarget parameter",
+          "required": false
+        },
+        {
+          "name": "endX",
+          "type": "number",
+          "description": "endX parameter",
+          "required": false
+        },
+        {
+          "name": "endY",
+          "type": "number",
+          "description": "endY parameter",
+          "required": false
+        },
+        {
+          "name": "endZ",
+          "type": "number",
+          "description": "endZ parameter",
+          "required": false
+        },
+        {
+          "name": "thickness",
+          "type": "string",
+          "description": "thickness parameter",
+          "required": false
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "description": "text parameter",
+          "required": false
+        },
+        {
+          "name": "scale",
+          "type": "string",
+          "description": "Scale vector {x, y, z}",
+          "required": false
+        },
+        {
+          "name": "extentX",
+          "type": "string",
+          "description": "extentX parameter",
+          "required": false
+        },
+        {
+          "name": "extentY",
+          "type": "string",
+          "description": "extentY parameter",
+          "required": false
+        },
+        {
+          "name": "extentZ",
+          "type": "string",
+          "description": "extentZ parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "duplicateNodes",
+      "description": "Duplicate nodes within a Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        },
+        {
+          "name": "nodeIds",
+          "type": "array",
+          "description": "nodeIds parameter",
+          "required": false
+        },
+        {
+          "name": "offsetX",
+          "type": "string",
+          "description": "X offset for duplicated nodes (default: 200)",
+          "required": false
+        },
+        {
+          "name": "offsetY",
+          "type": "string",
+          "description": "Y offset for duplicated nodes (default: 200)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "endTransaction",
+      "description": "End the current undo transaction",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "executeConsole",
+      "description": "Execute a console command in the editor",
+      "parameters": [
+        {
+          "name": "command",
+          "type": "string",
+          "description": "Console command to execute",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "executePython",
+      "description": "Execute Python code or a Python file in the editor",
+      "parameters": [
+        {
+          "name": "script",
+          "type": "string",
+          "description": "Inline Python code to execute",
+          "required": false
+        },
+        {
+          "name": "file",
+          "type": "string",
+          "description": "Path to a .py file to execute",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "focusActor",
+      "description": "Focus the viewport camera on a specific actor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or ref ID",
+          "required": false
+        },
+        {
+          "name": "ref",
+          "type": "string",
+          "description": "ref parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getActor",
+      "description": "Get detailed info about a specific actor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getCamera",
+      "description": "Get the current viewport camera position and orientation",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getCVar",
+      "description": "Get the value of a console variable",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "CVar name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getLevelBlueprint",
+      "description": "Get the level Blueprint for the current or specified level",
+      "parameters": [
+        {
+          "name": "level",
+          "type": "string",
+          "description": "level parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getPIEState",
+      "description": "Get the current PIE session state",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getPinInfo",
+      "description": "Get detailed pin info for a specific node",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Unique identifier of the blueprint node",
+          "required": false
+        },
+        {
+          "name": "pinName",
+          "type": "string",
+          "description": "Name of the pin on the node",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "getSelection",
+      "description": "Get the currently selected actors in the editor",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "graph",
+      "description": "Get all nodes and connections in a Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        },
+        {
+          "name": "graph",
+          "type": "string",
+          "description": "Graph name (default: EventGraph)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list",
+      "description": "List all Blueprint assets in the project",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type filter (e.g. 'blueprint', 'map', 'all')",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listActors",
+      "description": "List all actors in the current level",
+      "parameters": [
+        {
+          "name": "classFilter",
+          "type": "string",
+          "description": "Filter by class name",
+          "required": false
+        },
+        {
+          "name": "nameFilter",
+          "type": "string",
+          "description": "Filter by actor name (substring match)",
+          "required": false
+        },
+        {
+          "name": "level",
+          "type": "string",
+          "description": "level parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listClasses",
+      "description": "List available UClasses filtered by parent class",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        },
+        {
+          "name": "parentClass",
+          "type": "string",
+          "description": "Parent class to filter by (e.g. Actor, Pawn)",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "string",
+          "description": "Maximum number of results to return",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
     },
     {
       "name": "listCVars",
       "description": "List console variables, optionally filtered by prefix",
       "parameters": [
-        { "name": "prefix", "type": "string", "description": "Filter CVars by prefix (e.g. r., sg., t.)" }
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        },
+        {
+          "name": "maxResults",
+          "type": "string",
+          "description": "maxResults parameter",
+          "required": false
+        }
       ],
-      "annotations": { "readOnlyHint": true }
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listFunctions",
+      "description": "List callable functions for a given class or Blueprint",
+      "parameters": [
+        {
+          "name": "className",
+          "type": "string",
+          "description": "Class or Blueprint name",
+          "required": true
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listLevels",
+      "description": "List all levels/sublevels in the current world",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listProperties",
+      "description": "List properties/variables for a given class or Blueprint",
+      "parameters": [
+        {
+          "name": "className",
+          "type": "string",
+          "description": "Class or Blueprint name",
+          "required": true
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listSequences",
+      "description": "List all Level Sequence assets in the project",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listStates",
+      "description": "List all saved Blueprint states",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "listViewports",
+      "description": "List all open viewport windows",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "loadLevel",
+      "description": "Load/open a level by name or path",
+      "parameters": [
+        {
+          "name": "levelPath",
+          "type": "string",
+          "description": "levelPath parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "materialSetParam",
+      "description": "Set a material parameter on an actor's mesh",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "paramName",
+          "type": "string",
+          "description": "Material parameter name",
+          "required": false
+        },
+        {
+          "name": "materialIndex",
+          "type": "string",
+          "description": "Material slot index (default: 0)",
+          "required": false
+        },
+        {
+          "name": "scalar",
+          "type": "string",
+          "description": "scalar parameter",
+          "required": false
+        },
+        {
+          "name": "float",
+          "type": "string",
+          "description": "float parameter",
+          "required": false
+        },
+        {
+          "name": "vector",
+          "type": "string",
+          "description": "vector parameter",
+          "required": false
+        },
+        {
+          "name": "color",
+          "type": "string",
+          "description": "color parameter",
+          "required": false
+        },
+        {
+          "name": "texture",
+          "type": "string",
+          "description": "texture parameter",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Scalar value to set",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "moveActor",
+      "description": "Move an actor by a relative offset or to an absolute position",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or ref ID",
+          "required": true
+        },
+        {
+          "name": "locationX",
+          "type": "string",
+          "description": "locationX parameter",
+          "required": false
+        },
+        {
+          "name": "locationY",
+          "type": "string",
+          "description": "locationY parameter",
+          "required": false
+        },
+        {
+          "name": "locationZ",
+          "type": "string",
+          "description": "locationZ parameter",
+          "required": false
+        },
+        {
+          "name": "rotationPitch",
+          "type": "string",
+          "description": "rotationPitch parameter",
+          "required": false
+        },
+        {
+          "name": "rotationYaw",
+          "type": "string",
+          "description": "rotationYaw parameter",
+          "required": false
+        },
+        {
+          "name": "rotationRoll",
+          "type": "string",
+          "description": "rotationRoll parameter",
+          "required": false
+        },
+        {
+          "name": "scaleX",
+          "type": "string",
+          "description": "scaleX parameter",
+          "required": false
+        },
+        {
+          "name": "scaleY",
+          "type": "string",
+          "description": "scaleY parameter",
+          "required": false
+        },
+        {
+          "name": "scaleZ",
+          "type": "string",
+          "description": "scaleZ parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "moveNode",
+      "description": "Move a node to a new position in the graph",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Unique identifier of the blueprint node",
+          "required": false
+        },
+        {
+          "name": "posX",
+          "type": "string",
+          "description": "New X position",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "string",
+          "description": "New Y position",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "niagaraActivateSystem",
+      "description": "Activate or deactivate a Niagara system",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "activate",
+          "type": "boolean",
+          "description": "activate parameter",
+          "required": false
+        },
+        {
+          "name": "resetSystem",
+          "type": "boolean",
+          "description": "resetSystem parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "niagaraDebugHUD",
+      "description": "Toggle Niagara debug HUD overlay",
+      "parameters": [
+        {
+          "name": "enable",
+          "type": "boolean",
+          "description": "enable parameter",
+          "required": false
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "mode parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraGetEmitters",
+      "description": "List emitters in a Niagara system",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraGetParameters",
+      "description": "Get all user parameters from a Niagara system",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraGetStats",
+      "description": "Get performance statistics for Niagara systems",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraGetStatus",
+      "description": "Get Niagara particle system status overview",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraGetSystemInfo",
+      "description": "Get detailed info about a specific Niagara system",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name with the Niagara component",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraListSystems",
+      "description": "List all active Niagara systems in the scene",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "niagaraResetSystem",
+      "description": "Reset a Niagara system to its initial state",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "niagaraSetEmitterEnable",
+      "description": "Enable or disable a specific emitter in a Niagara system",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "emitterName",
+          "type": "string",
+          "description": "Emitter name",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Whether to enable",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "niagaraSetParameter",
+      "description": "Set a user parameter on a Niagara system",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "parameterName parameter",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "description": "Parameter value",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "openAsset",
+      "description": "Open an asset in its default editor",
+      "parameters": [
+        {
+          "name": "assetPath",
+          "type": "string",
+          "description": "assetPath parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "outputLog",
+      "description": "Read recent entries from the Output Log",
+      "parameters": [
+        {
+          "name": "lines",
+          "type": "string",
+          "description": "lines parameter",
+          "required": false
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter by category or keyword",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "pausePIE",
+      "description": "Pause or resume the Play-In-Editor session",
+      "parameters": [
+        {
+          "name": "pause",
+          "type": "string",
+          "description": "pause parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingGetCodec",
+      "description": "Get the current video codec settings",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingGetStatus",
+      "description": "Get Pixel Streaming status",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingListPlayers",
+      "description": "List connected Pixel Streaming players",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingListStreamers",
+      "description": "List active Pixel Streaming streamers",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingSetCodec",
+      "description": "Set the video codec for Pixel Streaming",
+      "parameters": [
+        {
+          "name": "codec",
+          "type": "string",
+          "description": "Codec name (e.g. H264, VP8, VP9)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingStart",
+      "description": "Start Pixel Streaming",
+      "parameters": [
+        {
+          "name": "signallingUrl",
+          "type": "string",
+          "description": "signallingUrl parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pixelStreamingStop",
+      "description": "Stop Pixel Streaming",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "readSequence",
+      "description": "Read the tracks and keyframes of a Level Sequence",
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "sequencePath parameter",
+          "required": false
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "redo",
+      "description": "Redo the last undone transaction",
+      "parameters": [
+        {
+          "name": "count",
+          "type": "string",
+          "description": "count parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "references",
+      "description": "Find all references to a Blueprint asset",
+      "parameters": [
+        {
+          "name": "asset",
+          "type": "string",
+          "description": "Asset name or path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "refreshAllNodes",
+      "description": "Refresh all nodes in a Blueprint (reconstructs pins)",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "removeAudioTracks",
+      "description": "Remove audio tracks from a Level Sequence",
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "sequencePath parameter",
+          "required": false
+        },
+        {
+          "name": "all",
+          "type": "boolean",
+          "description": "all parameter",
+          "required": false
+        },
+        {
+          "name": "musicOnly",
+          "type": "boolean",
+          "description": "musicOnly parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "removeSublevel",
+      "description": "Remove a streaming sublevel from the current world",
+      "parameters": [
+        {
+          "name": "levelPath",
+          "type": "string",
+          "description": "levelPath parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "removeVariable",
+      "description": "Remove a variable from a Blueprint",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "renderDocCapture",
+      "description": "Trigger a RenderDoc frame capture",
+      "parameters": [
+        {
+          "name": "frameCount",
+          "type": "string",
+          "description": "frameCount parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "rescan",
+      "description": "Rescan the asset registry for new or changed assets",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "resolveRef",
+      "description": "Resolve a short ref ID (e.g. a3) to an actor name",
+      "parameters": [
+        {
+          "name": "ref",
+          "type": "string",
+          "description": "Short reference ID",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "restoreGraph",
+      "description": "Restore a Blueprint graph from a previous snapshot",
+      "parameters": [
+        {
+          "name": "snapshotId",
+          "type": "string",
+          "description": "Snapshot ID to restore",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "restoreState",
+      "description": "Restore a Blueprint to a previously saved state",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "saveState",
+      "description": "Save the current state of a Blueprint for later diffing",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "sceneSnapshot",
+      "description": "Get a structured snapshot of all actors in the scene",
+      "parameters": [
+        {
+          "name": "includeComponents",
+          "type": "string",
+          "description": "Include component details (default: true)",
+          "required": false
+        },
+        {
+          "name": "classFilter",
+          "type": "string",
+          "description": "Filter by actor class",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "screenshot",
+      "description": "Capture a viewport screenshot and return as base64 image",
+      "parameters": [
+        {
+          "name": "width",
+          "type": "string",
+          "description": "Target width in pixels (default: 1280)",
+          "required": false
+        },
+        {
+          "name": "height",
+          "type": "string",
+          "description": "Target height in pixels (default: 720)",
+          "required": false
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "description": "Image format: png or jpeg (default: jpeg)",
+          "required": false
+        },
+        {
+          "name": "quality",
+          "type": "string",
+          "description": "JPEG quality 1-100 (default: 75)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "search",
+      "description": "Search for nodes across all Blueprints by keyword",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "description": "Search keyword",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "number",
+          "description": "Maximum number of results to return",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "selectActor",
+      "description": "Select an actor in the editor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or ref ID",
+          "required": false
+        },
+        {
+          "name": "ref",
+          "type": "string",
+          "description": "ref parameter",
+          "required": false
+        },
+        {
+          "name": "addToSelection",
+          "type": "boolean",
+          "description": "Add to current selection instead of replacing",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "setActorProperty",
+      "description": "Set a property on an actor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "property",
+          "type": "string",
+          "description": "Property path (e.g. StaticMeshComponent.StaticMesh)",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Value to set",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "setActorTransform",
+      "description": "Set the transform (location/rotation/scale) of an actor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "locationX",
+          "type": "string",
+          "description": "locationX parameter",
+          "required": false
+        },
+        {
+          "name": "locationY",
+          "type": "string",
+          "description": "locationY parameter",
+          "required": false
+        },
+        {
+          "name": "locationZ",
+          "type": "string",
+          "description": "locationZ parameter",
+          "required": false
+        },
+        {
+          "name": "rotationPitch",
+          "type": "string",
+          "description": "rotationPitch parameter",
+          "required": false
+        },
+        {
+          "name": "rotationYaw",
+          "type": "string",
+          "description": "rotationYaw parameter",
+          "required": false
+        },
+        {
+          "name": "rotationRoll",
+          "type": "string",
+          "description": "rotationRoll parameter",
+          "required": false
+        },
+        {
+          "name": "scaleX",
+          "type": "string",
+          "description": "scaleX parameter",
+          "required": false
+        },
+        {
+          "name": "scaleY",
+          "type": "string",
+          "description": "scaleY parameter",
+          "required": false
+        },
+        {
+          "name": "scaleZ",
+          "type": "string",
+          "description": "scaleZ parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "setCVar",
+      "description": "Set the value of a console variable",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "CVar name",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Value to set",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "setNodeComment",
+      "description": "Set or update the comment on a node",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Unique identifier of the blueprint node",
+          "required": false
+        },
+        {
+          "name": "comment",
+          "type": "string",
+          "description": "Comment text",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "setPinDefault",
+      "description": "Set the default value of a pin",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Unique identifier of the blueprint node",
+          "required": false
+        },
+        {
+          "name": "pinName",
+          "type": "string",
+          "description": "Pin name",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Default value to set",
+          "required": false
+        },
+        {
+          "name": "defaultObject",
+          "type": "string",
+          "description": "defaultObject parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "setViewport",
+      "description": "Set the viewport camera position and orientation",
+      "parameters": [
+        {
+          "name": "locationX",
+          "type": "string",
+          "description": "locationX parameter",
+          "required": false
+        },
+        {
+          "name": "locationY",
+          "type": "string",
+          "description": "locationY parameter",
+          "required": false
+        },
+        {
+          "name": "locationZ",
+          "type": "string",
+          "description": "locationZ parameter",
+          "required": false
+        },
+        {
+          "name": "pitch",
+          "type": "string",
+          "description": "pitch parameter",
+          "required": false
+        },
+        {
+          "name": "yaw",
+          "type": "string",
+          "description": "yaw parameter",
+          "required": false
+        },
+        {
+          "name": "roll",
+          "type": "string",
+          "description": "roll parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "simulateInput",
+      "description": "Simulate keyboard or mouse input in the editor or PIE",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type filter (e.g. 'blueprint', 'map', 'all')",
+          "required": false
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "description": "Key name (e.g. W, A, S, D, SpaceBar, LeftMouseButton)",
+          "required": false
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "description": "action parameter",
+          "required": false
+        },
+        {
+          "name": "x",
+          "type": "string",
+          "description": "X coordinate",
+          "required": false
+        },
+        {
+          "name": "y",
+          "type": "string",
+          "description": "Y coordinate",
+          "required": false
+        },
+        {
+          "name": "button",
+          "type": "string",
+          "description": "button parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "snapshotGraph",
+      "description": "Take a snapshot of a Blueprint graph for later rollback",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description text",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "spawnActor",
+      "description": "Spawn a new actor in the level",
+      "parameters": [
+        {
+          "name": "className",
+          "type": "string",
+          "description": "Actor class to spawn (e.g. StaticMeshActor, PointLight, CameraActor)",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Display label for the object",
+          "required": false
+        },
+        {
+          "name": "locationX",
+          "type": "string",
+          "description": "locationX parameter",
+          "required": false
+        },
+        {
+          "name": "locationY",
+          "type": "string",
+          "description": "locationY parameter",
+          "required": false
+        },
+        {
+          "name": "locationZ",
+          "type": "string",
+          "description": "locationZ parameter",
+          "required": false
+        },
+        {
+          "name": "rotationPitch",
+          "type": "string",
+          "description": "rotationPitch parameter",
+          "required": false
+        },
+        {
+          "name": "rotationYaw",
+          "type": "string",
+          "description": "rotationYaw parameter",
+          "required": false
+        },
+        {
+          "name": "rotationRoll",
+          "type": "string",
+          "description": "rotationRoll parameter",
+          "required": false
+        },
+        {
+          "name": "scaleX",
+          "type": "string",
+          "description": "scaleX parameter",
+          "required": false
+        },
+        {
+          "name": "scaleY",
+          "type": "string",
+          "description": "scaleY parameter",
+          "required": false
+        },
+        {
+          "name": "scaleZ",
+          "type": "string",
+          "description": "scaleZ parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "startPIE",
+      "description": "Start Play-In-Editor session",
+      "parameters": [
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "PIE mode: viewport, newWindow, or VR (default: viewport)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "stepPIE",
+      "description": "Step one frame in a paused PIE session",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "stopPIE",
+      "description": "Stop the current Play-In-Editor session",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "storyAdvance",
+      "description": "Advance the story to the next beat",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "storyGoto",
+      "description": "Jump to a specific story beat or chapter",
+      "parameters": [
+        {
+          "name": "index",
+          "type": "string",
+          "description": "index parameter",
+          "required": false
+        },
+        {
+          "name": "stepName",
+          "type": "string",
+          "description": "stepName parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "storyPlay",
+      "description": "Play/resume story playback",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "storyState",
+      "description": "Get the current story/narrative state",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "streamingLevelVisibility",
+      "description": "Set visibility of a streaming sublevel",
+      "parameters": [
+        {
+          "name": "levelPath",
+          "type": "string",
+          "description": "levelPath parameter",
+          "required": true
+        },
+        {
+          "name": "visible",
+          "type": "boolean",
+          "description": "Whether the sublevel should be visible",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "undo",
+      "description": "Undo the last transaction",
+      "parameters": [
+        {
+          "name": "count",
+          "type": "string",
+          "description": "count parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "validateBlueprint",
+      "description": "Validate a Blueprint for errors without compiling",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "waitReady",
+      "description": "Wait for the editor to be ready (useful after level loads)",
+      "parameters": [
+        {
+          "name": "condition",
+          "type": "string",
+          "description": "condition parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "xrControllers",
+      "description": "Get controller tracking data and button states",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "xrGuardian",
+      "description": "Get the guardian/play area boundary info",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "xrHandTracking",
+      "description": "Get hand tracking data (joint positions, gestures)",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "xrPassthrough",
+      "description": "Get passthrough mode status",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "xrRecenter",
+      "description": "Recenter the XR tracking origin",
+      "parameters": [],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "xrSetDisplayFrequency",
+      "description": "Set the HMD display refresh rate",
+      "parameters": [
+        {
+          "name": "frequency",
+          "type": "number",
+          "description": "Refresh rate in Hz (e.g. 72, 90, 120)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "xrSetGuardianVisibility",
+      "description": "Show or hide the guardian boundary",
+      "parameters": [
+        {
+          "name": "visible",
+          "type": "boolean",
+          "description": "Whether to show the guardian",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "xrSetPassthrough",
+      "description": "Enable or disable passthrough mode",
+      "parameters": [
+        {
+          "name": "enable",
+          "type": "boolean",
+          "description": "enable parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "xrSetPerformanceLevels",
+      "description": "Set CPU and GPU performance levels for XR",
+      "parameters": [
+        {
+          "name": "cpuLevel",
+          "type": "string",
+          "description": "CPU performance level 0-4",
+          "required": false
+        },
+        {
+          "name": "gpuLevel",
+          "type": "string",
+          "description": "GPU performance level 0-4",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "xrStatus",
+      "description": "Get the current XR/VR headset and runtime status",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
+      }
     }
   ]
 }

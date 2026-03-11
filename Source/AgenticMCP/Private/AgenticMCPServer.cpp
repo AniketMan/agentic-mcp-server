@@ -1535,18 +1535,54 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				}
 
 				// Queue to game thread like all other handlers
-				TSharedPtr<FPendingRequest> Req = MakeShared<FPendingRequest>();
-				Req->Endpoint = ToolName;
-				Req->QueryParams = Request.QueryParams;
-				if (Request.Body.Num() > 0)
-				{
-					TArray<uint8> NullTerminated(Request.Body);
-					NullTerminated.Add(0);
-					Req->Body = UTF8_TO_TCHAR((const ANSICHAR*)NullTerminated.GetData());
-				}
-				Req->OnComplete = OnComplete;
-				RequestQueue.Enqueue(Req);
-				return true;
+					TSharedPtr<FPendingRequest> Req = MakeShared<FPendingRequest>();
+					Req->Endpoint = ToolName;
+					Req->QueryParams = Request.QueryParams;
+					if (Request.Body.Num() > 0)
+					{
+						TArray<uint8> NullTerminated(Request.Body);
+						NullTerminated.Add(0);
+						Req->Body = UTF8_TO_TCHAR((const ANSICHAR*)NullTerminated.GetData());
+
+						// Merge JSON body fields into QueryParams so handlers that
+						// read from Params (GET-style) also work via POST /mcp/tool.
+						// Only string/number values are merged; complex objects stay in Body.
+						TSharedPtr<FJsonObject> BodyJson;
+						TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Req->Body);
+						if (FJsonSerializer::Deserialize(Reader, BodyJson) && BodyJson.IsValid())
+						{
+							for (const auto& Field : BodyJson->Values)
+							{
+								if (!Req->QueryParams.Contains(Field.Key))
+								{
+									FString Val;
+									if (Field.Value->TryGetString(Val))
+									{
+										Req->QueryParams.Add(Field.Key, Val);
+									}
+									else
+									{
+										double NumVal;
+										if (Field.Value->TryGetNumber(NumVal))
+										{
+											Req->QueryParams.Add(Field.Key, FString::SanitizeFloat(NumVal));
+										}
+										else
+										{
+											bool BoolVal;
+											if (Field.Value->TryGetBool(BoolVal))
+											{
+												Req->QueryParams.Add(Field.Key, BoolVal ? TEXT("true") : TEXT("false"));
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					Req->OnComplete = OnComplete;
+					RequestQueue.Enqueue(Req);
+					return true;
 			}));
 
 	// ---- Bind all queued routes ----
@@ -1887,13 +1923,28 @@ bool FAgenticMCPServer::ProcessOneRequest()
 		return false;
 	}
 
-	// Dispatch to the registered handler
+	// Dispatch to the registered handler with crash protection.
+	// If a handler throws or crashes, we still send an error response
+	// so the HTTP connection doesn't hang indefinitely.
 	FString ResponseBody;
 
 	FRequestHandler* Handler = HandlerMap.Find(Req->Endpoint);
 	if (Handler)
 	{
+#if PLATFORM_WINDOWS
+		__try
+		{
+			ResponseBody = (*Handler)(Req->QueryParams, Req->Body);
+		}
+		__except(EXCEPTION_EXECUTE_HANDLER)
+		{
+			UE_LOG(LogTemp, Error, TEXT("AgenticMCP: SEH exception in handler '%s'"), *Req->Endpoint);
+			ResponseBody = MakeErrorJson(
+				FString::Printf(TEXT("Handler '%s' crashed with an unhandled exception"), *Req->Endpoint));
+		}
+#else
 		ResponseBody = (*Handler)(Req->QueryParams, Req->Body);
+#endif
 	}
 	else
 	{
