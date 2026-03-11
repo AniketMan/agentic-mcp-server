@@ -59,6 +59,168 @@ The AI lives in the **host application** (VS Code + Cline/Devmate, Claude Deskto
 
 ---
 
+## Auto-Context Injection on Connect
+
+When the AI first connects, it should **immediately receive all project context** without having to ask.
+
+### How Standard MCP Works (NOT what we want)
+
+```
+1. AI connects
+2. Server: "Here are my tools: [list of 50 tools]"
+3. AI: "What's the project context?"         ← Extra step
+4. Server: "Here's the context..."
+5. AI can now work
+```
+
+### What We Do Instead (Auto-Injection)
+
+```
+1. AI connects
+2. Server: "Here are my tools: [list]
+            AND here's your context:
+            - Project: MyGame
+            - Current level: Level_01
+            - Memory: [past decisions]
+            - Abilities: [what player can do]
+            - Custom endpoints: [project-specific]
+            - Test scenarios: [available tests]"
+3. AI can IMMEDIATELY work with full knowledge
+```
+
+### Implementation: MCP System Prompt Injection
+
+The Node.js bridge injects context into the **tools/list response** or uses MCP's **prompts** feature:
+
+```javascript
+// Tools/index.js
+
+// On initialization, load all context
+const projectContext = {
+  project: loadJson('Context/config.json'),
+  levels: loadJson('Context/levels.json'),
+  actors: loadJson('Context/actors.json'),
+  memory: {
+    decisions: loadJson('Memory/decisions.json'),
+    patterns: loadJson('Memory/patterns.json'),
+    lastSession: getLatestSession('Memory/sessions/')
+  },
+  tester: {
+    abilities: loadJson('Tester/abilities.json'),
+    gameRules: loadJson('Tester/game_rules.json'),
+    exposedData: loadJson('Tester/exposed_data.json')
+  },
+  customEndpoints: loadJson('Context/custom_endpoints.json')
+};
+
+// MCP prompts feature - auto-loaded by compatible clients
+const prompts = [
+  {
+    name: "project_context",
+    description: "Full project context - auto-injected on connect",
+    arguments: [],
+    messages: [
+      {
+        role: "system",
+        content: formatContextForAI(projectContext)
+      }
+    ]
+  }
+];
+
+// Alternative: Include in tool descriptions
+const tools = [
+  {
+    name: "get_full_context",
+    description: `
+      Returns full project context. CALL THIS FIRST.
+
+      Quick summary (always available):
+      - Project: ${projectContext.project.projectName}
+      - Engine: ${projectContext.project.engineVersion}
+      - Levels: ${projectContext.levels.length}
+      - Past decisions: ${projectContext.memory.decisions?.length || 0}
+      - Known patterns: ${projectContext.memory.patterns?.length || 0}
+      - Test scenarios: available
+
+      Call this tool to get the complete context.
+    `,
+    inputSchema: { type: "object", properties: {} }
+  },
+  // ... other tools
+];
+```
+
+### Context Format for AI
+
+```markdown
+# Project Context: MyGame
+
+## Project Info
+- **Name:** MyGame
+- **Engine:** UE 5.6
+- **AgenticMCP:** local (http://localhost:9847)
+
+## Current State
+- **Loaded Level:** Level_01
+- **Actor Count:** 1,523
+- **PIE Status:** stopped
+
+## Memory (Past Sessions)
+### Recent Decisions
+1. [2026-03-11] Added enemy pooling pattern - 10x spawn speedup
+2. [2026-03-10] Created preload system for Scene 9 assets
+
+### Known Patterns
+- `actor_pooling` - Reuse spawned actors instead of create/destroy
+- `level_preload` - Start loading next level before transition
+
+## Player Abilities (for testing)
+- move, jump, sprint, crouch
+- attack, block, dodge
+- interact, inventory, pause
+
+## Custom Endpoints
+- `/api/project/player-state` - Get health, mana, inventory
+- `/api/project/quest-status` - Get active quests
+- `/api/project/enemy-count` - Count active enemies
+
+## Available Test Scenarios
+- `happy_path` - Normal playthrough
+- `edge_cases` - Boundary conditions
+- `stress_test` - Performance limits
+- `break_attempts` - Try to break the game
+
+## Rules
+- Verify with screenshot before AND after actions
+- One action at a time, verify, then proceed
+- Log all decisions to Memory/
+```
+
+### MCP Clients That Support This
+
+| Client | Auto-Context Method |
+|--------|---------------------|
+| **Claude Desktop** | Uses `prompts` feature, auto-loads on connect |
+| **Cline (VS Code)** | Reads tool descriptions, can call `get_full_context` |
+| **Cursor** | Similar to Cline |
+| **Custom Tool** | Can implement any method |
+
+### Fallback: CLAUDE.md / .cursorrules
+
+For clients that don't support MCP prompts, we also generate:
+
+```
+{ProjectName}_MCP/
+├── CLAUDE.md           ← Claude Desktop reads this automatically
+├── .cursorrules        ← Cursor reads this automatically
+└── AI_CONTEXT.md       ← Generic, for any AI to read
+```
+
+These files contain the same context and are regenerated whenever context changes.
+
+---
+
 ## Architecture
 
 ```
