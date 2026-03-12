@@ -158,6 +158,34 @@ When assembling a scene from a screenplay:
 
 ---
 
+## Example: Bind a Delegate (OnGrabbed -> CustomEvent)
+
+```
+// Step 1: Snapshot
+snapshot_graph("BP_InteractableTeacup", "Before grab binding")
+
+// Step 2: Add the AddDelegate node for OnGrabbed
+add_node(blueprint="BP_InteractableTeacup", graph="EventGraph",
+  nodeType="AddDelegate", delegateName="OnGrabbed",
+  ownerClass="GrabbableComponent", posX=0, posY=0)
+// Returns: { nodeId: "AAA-111", pins: ["execute", "then", "Delegate", "self"] }
+
+// Step 3: Add a CustomEvent to handle the grab
+add_node(blueprint="BP_InteractableTeacup", graph="EventGraph",
+  nodeType="CustomEvent", eventName="HandleTeacupGrabbed", posX=0, posY=200)
+// Returns: { nodeId: "BBB-222", pins: ["then", "OutputDelegate"] }
+
+// Step 4: Wire the delegate pin to the custom event
+connect_pins(blueprint="BP_InteractableTeacup",
+  sourceNodeId="BBB-222", sourcePinName="OutputDelegate",
+  targetNodeId="AAA-111", targetPinName="Delegate")
+
+// Step 5: Now wire HandleTeacupGrabbed's exec to whatever comes next
+// (e.g. broadcast a GameplayMessage for the story step)
+```
+
+---
+
 ## Example: Add a BeginPlay -> PrintString Chain
 
 ```
@@ -219,6 +247,15 @@ compile_blueprint("MyBlueprint")
 | Delay | duration? | Delay node |
 | SetTimer | functionName, time? | Set Timer by Function Name |
 | LoadAsset | (none) | Async Load Asset |
+| AddDelegate | delegateName, ownerClass? | Bind Event to delegate (e.g. OnGrabbed, OnComponentBeginOverlap). Returns Delegate pin for wiring to CustomEvent. |
+| RemoveDelegate | delegateName, ownerClass? | Unbind Event from delegate |
+| ClearDelegate | delegateName, ownerClass? | Unbind All Events from delegate |
+| CreateDelegate | functionName? | Create a delegate reference (for Assign pattern) |
+| CallParentFunction | functionName | Call parent class implementation |
+| ForLoop | (none) | Standard for loop macro |
+| ForEachLoop | (none) | For each loop macro |
+| WhileLoop | (none) | While loop macro |
+| ForLoopWithBreak | (none) | For loop with break macro |
 
 ---
 

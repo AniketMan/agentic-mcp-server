@@ -78,7 +78,7 @@
       "description": "Add a node to a Blueprint graph",
       "parameters": [
         { "name": "blueprintName", "type": "string", "description": "Blueprint name", "required": true },
-        { "name": "nodeType", "type": "string", "description": "Node type (e.g. CallFunction, Event, CustomEvent, VariableGet, VariableSet, IfThenElse, Sequence, DynamicCast, MacroInstance, BreakStruct, MakeStruct, Knot, Comment)", "required": true },
+        { "name": "nodeType", "type": "string", "description": "Node type: CallFunction, Event, CustomEvent, VariableGet, VariableSet, Branch, Sequence, DynamicCast, MacroInstance, BreakStruct, MakeStruct, SpawnActorFromClass, Select, Comment, Reroute, ForLoop, ForEachLoop, WhileLoop, ForLoopWithBreak, CallParentFunction, OverrideEvent, AddDelegate, RemoveDelegate, ClearDelegate, CreateDelegate, Delay", "required": true },
         { "name": "graphName", "type": "string", "description": "Graph name (default: EventGraph)" },
         { "name": "posX", "type": "number", "description": "X position" },
         { "name": "posY", "type": "number", "description": "Y position" },
@@ -88,7 +88,12 @@
         { "name": "targetClass", "type": "string", "description": "Target class (for DynamicCast)" },
         { "name": "macroName", "type": "string", "description": "Macro name (for MacroInstance)" },
         { "name": "structType", "type": "string", "description": "Struct type (for BreakStruct/MakeStruct)" },
-        { "name": "commentText", "type": "string", "description": "Comment text (for Comment nodes)" }
+        { "name": "commentText", "type": "string", "description": "Comment text (for Comment nodes)" },
+        { "name": "delegateName", "type": "string", "description": "Multicast delegate property name (for AddDelegate/RemoveDelegate/ClearDelegate, e.g. OnComponentBeginOverlap, OnGrabbed)" },
+        { "name": "ownerClass", "type": "string", "description": "Class that owns the delegate (for AddDelegate/RemoveDelegate/ClearDelegate, e.g. PrimitiveComponent, GrabbableComponent)" },
+        { "name": "duration", "type": "number", "description": "Delay duration in seconds (for Delay node)" },
+        { "name": "actorClass", "type": "string", "description": "Actor class name (for SpawnActorFromClass)" },
+        { "name": "castTarget", "type": "string", "description": "Target class for cast (for DynamicCast)" }
       ],
       "annotations": { "destructiveHint": true }
     },
