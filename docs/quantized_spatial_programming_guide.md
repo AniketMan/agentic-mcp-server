@@ -67,7 +67,32 @@ NVIDIA GPUs have extreme raw compute power but suffer from the PCIe transfer bot
 *   **How to Code It (RTX 4080/5080):** These cards have massive VRAM (16GB - 32GB+). You can load large chunks of the quantized spatial graph directly into VRAM and leave it there. Write custom CUDA kernels to perform the math entirely on the card.
 *   **How to Code It (RTX 3080):** With lower VRAM (10GB), you cannot load the entire dataset. You must implement aggressive streaming. Use NVIDIA DirectStorage APIs to stream quantized data directly from the NVMe SSD to the GPU VRAM, bypassing the CPU entirely for the data payload. 
 
-### 5. Summary Checklist for AI Developers
+### 5. The Confidence Threshold Optimization Loop
+
+When applying adaptive quantized data to automated inference tasks (e.g., wiring Blueprints or spawning actors via AgenticMCP), the system must evaluate its own certainty before execution. This is achieved through a configurable, two-layer confidence threshold.
+
+#### The Two Confidence Signals
+1.  **Retrieval Confidence (The Data):** The cosine similarity score (0.0 to 1.0) returned by the FAISS vector index when retrieving the quantized manifest chunks. This measures how relevant and complete the retrieved data is.
+2.  **Generation Confidence (The Model):** The token log probabilities returned by the local LLM (e.g., Ollama serving Qwen) during inference. This measures how certain the model is about the specific code or tool call it is generating.
+
+#### The Threshold Configuration
+You must configure acceptable confidence thresholds based on the destructive potential or complexity of the task. High thresholds optimize for precision; low thresholds optimize for speed.
+
+*   `blueprint_wiring: 0.89` (Complex, highly destructive if wrong. Requires high-precision manifest data.)
+*   `level_sequence_binding: 0.85` (Complex, requires exact actor references.)
+*   `actor_spawning: 0.75` (Moderate. Wrong location is easy to fix visually.)
+*   `blockout_geometry: 0.60` (Low risk. Approximations are acceptable for blockouts.)
+
+#### The Execution Loop
+Before the system executes an AgenticMCP tool call:
+1.  **Evaluate:** If the combined confidence score is $\ge$ the task threshold, execute immediately.
+2.  **Halt and Report:** If the score is $<$ the threshold, halt execution.
+3.  **Targeted Request:** The system reads the precision tier of the retrieved chunks to identify exactly what is missing (e.g., "Retrieved Tier 3 manifest for SK_Heather; missing bone hierarchy"). It requests *only* the missing data from the user or the quantizer.
+4.  **Re-evaluate:** Once higher-precision data is ingested, re-run the retrieval and inference. If the score crosses the threshold, execute.
+
+This loop ensures the AI never hallucinates structural data. It replaces the "black box" guess with a mathematical certainty gate.
+
+### 6. Summary Checklist for AI Developers
 
 When a user asks you to build a tool for 3D/VFX manipulation:
 1.  **Does the perfect data already exist?** (Yes: use Adaptive Quantized Spatial Transfer. No: consider a Generative Model).
