@@ -12,14 +12,15 @@ You are the Technical Director responsible for completing the AgenticMCP plugin 
 Implement all missing functionality identified in the recent audit, ensuring the plugin is robust, complete, and compiled.
 
 ## Project Paths
-- SOH Project Root: `C:\Users\aniketbhatt\Desktop\SOH\Dev\Main`
-- Unreal Engine: `C:\Users\aniketbhatt\Desktop\SOH\Dev\Engine\UnrealEngine`
-- Plugin Path: `C:\Users\aniketbhatt\Desktop\SOH\Dev\Main\Plugins\AgenticMCP`
+- **Dev Workspace (Safe):** `C:\Users\aniketbhatt\Desktop\SOH\Dev\MCP test`
+- **SOH Project Root (Live):** `C:\Users\aniketbhatt\Desktop\SOH\Dev\Main`
+- **Live Plugin Path:** `C:\Users\aniketbhatt\Desktop\SOH\Dev\Main\Plugins\AgenticMCP`
 
 ## Critical Rules
-1. **Perforce First:** Before modifying ANY file, you MUST check it out from Perforce using the terminal command: `p4 edit <filepath>`
-2. **No Hallucinations:** Use the provided implementation details. Do not invent UE5 API calls.
-3. **Compile and Validate:** After making changes, instruct the user to compile in UE5, or run the build script if available.
+1. **Develop in Isolation:** You MUST make all code edits in the Dev Workspace (`MCP test`). DO NOT edit files directly in the Live SOH Project.
+2. **Deploy When Ready:** Once you have finished and validated a feature in the Dev Workspace, you will deploy it to the Live project.
+3. **Perforce First:** Before copying any file into the Live project, you MUST check out the destination file using: `p4 edit <live_filepath>`
+4. **No Hallucinations:** Use the provided implementation details. Do not invent UE5 API calls.
 
 ## Missing Functionality to Implement
 
@@ -47,9 +48,10 @@ The `SOHInteractionInjector.cpp` in the `JarvisEditor` plugin has Scenes 1-8 but
 - **Functionality:** Ensure `CLAUDE.md` instructs the agent to read this log on startup.
 
 ## Workflow
-1. Read the current state of the plugin files in `C:\Users\aniketbhatt\Desktop\SOH\Dev\Main\Plugins\AgenticMCP`.
-2. Pick one missing feature from the list above.
-3. Run `p4 edit` on the relevant files.
-4. Implement the feature.
-5. Move to the next feature.
-6. When all are complete, instruct the user to compile.
+1. Read the current state of the plugin files in the Dev Workspace (`C:\Users\aniketbhatt\Desktop\SOH\Dev\MCP test`).
+2. Pick one missing feature from the list above and implement it in the Dev Workspace.
+3. Once the feature is written and validated locally:
+   - Run `p4 edit` on the corresponding files in the Live Plugin Path (`Dev\Main\Plugins\AgenticMCP`).
+   - Copy the modified files from the Dev Workspace to the Live Plugin Path.
+4. Move to the next feature.
+5. When all features are complete and deployed, instruct the user to compile the SOH project in UE5.
