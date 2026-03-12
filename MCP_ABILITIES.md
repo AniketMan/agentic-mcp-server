@@ -26,7 +26,24 @@ EVERY ACTION REQUIRES:
 
 ---
 
-## Complete Endpoint Reference (107 endpoints)
+### Discovery
+
+#### GET /api/capabilities
+Returns the full list of registered endpoint names and total count.
+
+**Response:**
+```json
+{
+  "server": "AgenticMCP",
+  "version": "1.0.0",
+  "endpointCount": 129,
+  "endpoints": [{"name": "list"}, {"name": "graph"}, ...]
+}
+```
+
+---
+
+## Complete Endpoint Reference (129 endpoints)
 
 ### Health & Lifecycle
 | Endpoint | Method | Purpose |

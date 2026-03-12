@@ -1423,6 +1423,29 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				return true;
 			}));
 
+	// ---- /api/capabilities -- lists all registered endpoints ----
+	Router->BindRoute(FHttpPath(TEXT("/api/capabilities")), EHttpServerRequestVerbs::VERB_GET,
+		FHttpRequestHandler::CreateLambda(
+			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+			{
+				TArray<TSharedPtr<FJsonValue>> EndpointsArray;
+				for (const auto& Pair : HandlerMap)
+				{
+					TSharedRef<FJsonObject> EP = MakeShared<FJsonObject>();
+					EP->SetStringField(TEXT("name"), Pair.Key);
+					EndpointsArray.Add(MakeShared<FJsonValueObject>(EP));
+				}
+				TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+				J->SetStringField(TEXT("server"), TEXT("AgenticMCP"));
+				J->SetStringField(TEXT("version"), TEXT("1.0.0"));
+				J->SetNumberField(TEXT("endpointCount"), EndpointsArray.Num());
+				J->SetArrayField(TEXT("endpoints"), EndpointsArray);
+				TUniquePtr<FHttpServerResponse> R = FHttpServerResponse::Create(
+					JsonToString(J), TEXT("application/json"));
+				OnComplete(MoveTemp(R));
+				return true;
+			}));
+
 	// ---- /api/shutdown — commandlet only ----
 	Router->BindRoute(FHttpPath(TEXT("/api/shutdown")), EHttpServerRequestVerbs::VERB_POST,
 		FHttpRequestHandler::CreateLambda(
@@ -1704,6 +1727,8 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("getCVar")));
 	Router->BindRoute(FHttpPath(TEXT("/api/set-cvar")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("setCVar")));
+	Router->BindRoute(FHttpPath(TEXT("/api/list-cvars")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("listCVars")));
 
 	// Input Simulation (POST)
 	Router->BindRoute(FHttpPath(TEXT("/api/simulate-input")), EHttpServerRequestVerbs::VERB_POST,

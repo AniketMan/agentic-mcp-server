@@ -48,6 +48,12 @@
 #include "K2Node_Select.h"
 #include "K2Node_Knot.h"
 #include "K2Node_EditablePinBase.h"
+#include "K2Node_AddDelegate.h"
+#include "K2Node_CreateDelegate.h"
+#include "K2Node_BaseMCDelegate.h"
+#include "K2Node_ClearDelegate.h"
+#include "K2Node_RemoveDelegate.h"
+#include "GameFramework/GameplayStatics.h"
 #include "GameFramework/Actor.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -624,13 +630,271 @@ FString FAgenticMCPServer::HandleAddNode(const FString& Body)
 		MacroNode->AllocateDefaultPins();
 		NewNode = MacroNode;
 	}
+	// ---- AddDelegate (Bind Event) ----
+	// Creates a "Bind Event to ..." node for wiring delegates to CustomEvents.
+	// Required fields: delegateName (e.g. "OnComponentBeginOverlap"), ownerClass (e.g. "PrimitiveComponent")
+	// The delegate is identified by its FMulticastDelegateProperty name on the owning class.
+	else if (NodeType == TEXT("AddDelegate"))
+	{
+		FString DelegateName = Json->GetStringField(TEXT("delegateName"));
+		FString OwnerClassName = Json->GetStringField(TEXT("ownerClass"));
+
+		if (DelegateName.IsEmpty())
+		{
+			return MakeErrorJson(TEXT("Missing required field 'delegateName' for AddDelegate"));
+		}
+
+		// Find the owner class
+		UClass* OwnerClass = nullptr;
+		if (!OwnerClassName.IsEmpty())
+		{
+			OwnerClass = FindClassByName(OwnerClassName);
+		}
+		if (!OwnerClass)
+		{
+			// Search all classes for the delegate property
+			for (TObjectIterator<UClass> It; It; ++It)
+			{
+				for (TFieldIterator<FMulticastDelegateProperty> PropIt(*It); PropIt; ++PropIt)
+				{
+					if (PropIt->GetName() == DelegateName)
+					{
+						OwnerClass = *It;
+						break;
+					}
+				}
+				if (OwnerClass) break;
+			}
+		}
+
+		if (!OwnerClass)
+		{
+			return MakeErrorJson(FString::Printf(
+				TEXT("Could not find delegate '%s' on any class. Specify 'ownerClass' to narrow search."),
+				*DelegateName));
+		}
+
+		// Find the multicast delegate property
+		FMulticastDelegateProperty* DelegateProp = nullptr;
+		for (TFieldIterator<FMulticastDelegateProperty> PropIt(OwnerClass); PropIt; ++PropIt)
+		{
+			if (PropIt->GetName() == DelegateName)
+			{
+				DelegateProp = *PropIt;
+				break;
+			}
+		}
+
+		if (!DelegateProp)
+		{
+			// List available delegates for debugging
+			TArray<TSharedPtr<FJsonValue>> AvailableDelegates;
+			for (TFieldIterator<FMulticastDelegateProperty> PropIt(OwnerClass); PropIt; ++PropIt)
+			{
+				AvailableDelegates.Add(MakeShared<FJsonValueString>(PropIt->GetName()));
+			}
+			TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
+			E->SetStringField(TEXT("error"),
+				FString::Printf(TEXT("Delegate '%s' not found on class '%s'"),
+					*DelegateName, *OwnerClass->GetName()));
+			E->SetArrayField(TEXT("availableDelegates"), AvailableDelegates);
+			return JsonToString(E);
+		}
+
+		UK2Node_AddDelegate* AddDelegateNode = NewObject<UK2Node_AddDelegate>(TargetGraph);
+		AddDelegateNode->SetFromProperty(DelegateProp, false, OwnerClass);
+		AddDelegateNode->NodePosX = PosX;
+		AddDelegateNode->NodePosY = PosY;
+		TargetGraph->AddNode(AddDelegateNode, false, false);
+		AddDelegateNode->AllocateDefaultPins();
+		NewNode = AddDelegateNode;
+	}
+	// ---- RemoveDelegate (Unbind Event) ----
+	else if (NodeType == TEXT("RemoveDelegate"))
+	{
+		FString DelegateName = Json->GetStringField(TEXT("delegateName"));
+		FString OwnerClassName = Json->GetStringField(TEXT("ownerClass"));
+
+		if (DelegateName.IsEmpty())
+		{
+			return MakeErrorJson(TEXT("Missing required field 'delegateName' for RemoveDelegate"));
+		}
+
+		UClass* OwnerClass = nullptr;
+		if (!OwnerClassName.IsEmpty())
+		{
+			OwnerClass = FindClassByName(OwnerClassName);
+		}
+		if (!OwnerClass)
+		{
+			for (TObjectIterator<UClass> It; It; ++It)
+			{
+				for (TFieldIterator<FMulticastDelegateProperty> PropIt(*It); PropIt; ++PropIt)
+				{
+					if (PropIt->GetName() == DelegateName)
+					{
+						OwnerClass = *It;
+						break;
+					}
+				}
+				if (OwnerClass) break;
+			}
+		}
+
+		if (!OwnerClass)
+		{
+			return MakeErrorJson(FString::Printf(
+				TEXT("Could not find delegate '%s' on any class"), *DelegateName));
+		}
+
+		FMulticastDelegateProperty* DelegateProp = nullptr;
+		for (TFieldIterator<FMulticastDelegateProperty> PropIt(OwnerClass); PropIt; ++PropIt)
+		{
+			if (PropIt->GetName() == DelegateName)
+			{
+				DelegateProp = *PropIt;
+				break;
+			}
+		}
+
+		if (!DelegateProp)
+		{
+			return MakeErrorJson(FString::Printf(
+				TEXT("Delegate '%s' not found on class '%s'"),
+				*DelegateName, *OwnerClass->GetName()));
+		}
+
+		UK2Node_RemoveDelegate* RemoveDelegateNode = NewObject<UK2Node_RemoveDelegate>(TargetGraph);
+		RemoveDelegateNode->SetFromProperty(DelegateProp, false, OwnerClass);
+		RemoveDelegateNode->NodePosX = PosX;
+		RemoveDelegateNode->NodePosY = PosY;
+		TargetGraph->AddNode(RemoveDelegateNode, false, false);
+		RemoveDelegateNode->AllocateDefaultPins();
+		NewNode = RemoveDelegateNode;
+	}
+	// ---- ClearDelegate (Unbind All Events) ----
+	else if (NodeType == TEXT("ClearDelegate"))
+	{
+		FString DelegateName = Json->GetStringField(TEXT("delegateName"));
+		FString OwnerClassName = Json->GetStringField(TEXT("ownerClass"));
+
+		if (DelegateName.IsEmpty())
+		{
+			return MakeErrorJson(TEXT("Missing required field 'delegateName' for ClearDelegate"));
+		}
+
+		UClass* OwnerClass = nullptr;
+		if (!OwnerClassName.IsEmpty())
+		{
+			OwnerClass = FindClassByName(OwnerClassName);
+		}
+		if (!OwnerClass)
+		{
+			for (TObjectIterator<UClass> It; It; ++It)
+			{
+				for (TFieldIterator<FMulticastDelegateProperty> PropIt(*It); PropIt; ++PropIt)
+				{
+					if (PropIt->GetName() == DelegateName)
+					{
+						OwnerClass = *It;
+						break;
+					}
+				}
+				if (OwnerClass) break;
+			}
+		}
+
+		if (!OwnerClass)
+		{
+			return MakeErrorJson(FString::Printf(
+				TEXT("Could not find delegate '%s' on any class"), *DelegateName));
+		}
+
+		FMulticastDelegateProperty* DelegateProp = nullptr;
+		for (TFieldIterator<FMulticastDelegateProperty> PropIt(OwnerClass); PropIt; ++PropIt)
+		{
+			if (PropIt->GetName() == DelegateName)
+			{
+				DelegateProp = *PropIt;
+				break;
+			}
+		}
+
+		if (!DelegateProp)
+		{
+			return MakeErrorJson(FString::Printf(
+				TEXT("Delegate '%s' not found on class '%s'"),
+				*DelegateName, *OwnerClass->GetName()));
+		}
+
+		UK2Node_ClearDelegate* ClearDelegateNode = NewObject<UK2Node_ClearDelegate>(TargetGraph);
+		ClearDelegateNode->SetFromProperty(DelegateProp, false, OwnerClass);
+		ClearDelegateNode->NodePosX = PosX;
+		ClearDelegateNode->NodePosY = PosY;
+		TargetGraph->AddNode(ClearDelegateNode, false, false);
+		ClearDelegateNode->AllocateDefaultPins();
+		NewNode = ClearDelegateNode;
+	}
+	// ---- CreateDelegate ----
+	// Creates a delegate reference node (the "Assign" pattern).
+	// Required fields: delegateName, ownerClass
+	else if (NodeType == TEXT("CreateDelegate"))
+	{
+		UK2Node_CreateDelegate* CreateDelegateNode = NewObject<UK2Node_CreateDelegate>(TargetGraph);
+		CreateDelegateNode->NodePosX = PosX;
+		CreateDelegateNode->NodePosY = PosY;
+		TargetGraph->AddNode(CreateDelegateNode, false, false);
+		CreateDelegateNode->AllocateDefaultPins();
+
+		// If a function name is provided, set it as the selected function
+		FString FunctionName = Json->GetStringField(TEXT("functionName"));
+		if (!FunctionName.IsEmpty())
+		{
+			CreateDelegateNode->SetFunction(FName(*FunctionName));
+		}
+
+		NewNode = CreateDelegateNode;
+	}
+	// ---- Delay ----
+	else if (NodeType == TEXT("Delay"))
+	{
+		UFunction* DelayFunc = UGameplayStatics::StaticClass()->FindFunctionByName(FName(TEXT("Delay")));
+		if (!DelayFunc)
+		{
+			return MakeErrorJson(TEXT("Could not find UGameplayStatics::Delay function"));
+		}
+
+		UK2Node_CallFunction* DelayNode = NewObject<UK2Node_CallFunction>(TargetGraph);
+		DelayNode->SetFromFunction(DelayFunc);
+		DelayNode->NodePosX = PosX;
+		DelayNode->NodePosY = PosY;
+		TargetGraph->AddNode(DelayNode, false, false);
+		DelayNode->AllocateDefaultPins();
+
+		// Set default duration if provided
+		if (Json->HasField(TEXT("duration")))
+		{
+			double Duration = Json->GetNumberField(TEXT("duration"));
+			for (UEdGraphPin* Pin : DelayNode->Pins)
+			{
+				if (Pin && Pin->PinName == TEXT("Duration"))
+				{
+					Pin->DefaultValue = FString::SanitizeFloat(Duration);
+					break;
+				}
+			}
+		}
+
+		NewNode = DelayNode;
+	}
 	else
 	{
 		return MakeErrorJson(FString::Printf(
 			TEXT("Unsupported nodeType '%s'. Supported: BreakStruct, MakeStruct, CallFunction, "
 				 "VariableGet, VariableSet, DynamicCast, OverrideEvent, CallParentFunction, "
 				 "CustomEvent, Branch, Sequence, ForLoop, ForEachLoop, ForLoopWithBreak, "
-				 "WhileLoop, SpawnActorFromClass, Select, Comment, Reroute, MacroInstance"),
+				 "WhileLoop, SpawnActorFromClass, Select, Comment, Reroute, MacroInstance, "
+				 "AddDelegate, RemoveDelegate, ClearDelegate, CreateDelegate, Delay"),
 			*NodeType));
 	}
 
