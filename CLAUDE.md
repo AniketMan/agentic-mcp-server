@@ -112,7 +112,22 @@ Always start by calling `unreal_status` to determine which mode is active and wh
 
 ---
 
-## Standard Workflow
+## The Quantized Inference Path (Primary Workflow)
+
+You are equipped with the **Quantized Inference Layer**, which replaces brute-force asset scanning with cached, deterministic scene wiring.
+
+When asked to wire a scene (e.g., via the `wireSceneQuantized` command):
+1. **Initialize**: Call `unreal_quantize_project` to generate/refresh the Adaptive Asset Manifest. This caches the entire project state.
+2. **Check Status**: Call `unreal_get_wiring_status` to see which scenes need work.
+3. **Get Plan**: Call `unreal_get_scene_plan` for the target scene. **Always review the confidence scores.**
+   - `1.0`: Safe to execute.
+   - `< 1.0`: Review missing references before proceeding.
+4. **Execute**: For each pending step, call `unreal_execute_scene_step`. This returns the exact MCP call sequence.
+5. **Persist**: After successfully executing a step's calls, call `unreal_mark_step_complete` to save progress.
+
+---
+
+## Standard Workflow (Manual Operations)
 
 ```
 1. unreal_status                              // Check connection

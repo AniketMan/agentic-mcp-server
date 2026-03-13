@@ -8,3 +8,4 @@ DerivedDataCache/
 Saved/
 *.sln
 *.vcxproj*
+.quantized_cache/

@@ -69,6 +69,13 @@ import {
   executeVisualAgentCommand,
 } from "./visual-agent.js";
 
+// Quantized Inference Layer -- deterministic scene wiring via cached manifests
+import {
+  QUANTIZED_TOOLS,
+  handleQuantizedTool,
+  getManifest,
+} from "./quantized-inference.js";
+
 // ---------------------------------------------------------------------------
 // Configuration with defaults
 // ---------------------------------------------------------------------------
@@ -237,6 +244,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     });
   }
 
+  // Quantized Inference tools -- always available (work with cached data + live editor)
+  for (const qTool of QUANTIZED_TOOLS) {
+    mcpTools.push({
+      name: `unreal_${qTool.name}`,
+      description: `[Quantized Inference] ${qTool.description}`,
+      inputSchema: qTool.inputSchema,
+      annotations: {
+        readOnlyHint: qTool.annotations?.readOnlyHint || false,
+        destructiveHint: qTool.annotations?.destructiveHint || false,
+        idempotentHint: qTool.annotations?.readOnlyHint || false,
+        openWorldHint: false,
+      },
+    });
+  }
+
   log.info("Tools listed", {
     count: mcpTools.length,
     editorConnected,
@@ -271,6 +293,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   const toolName = name.substring(7); // strip "unreal_" prefix
+
+  // ---- Quantized Inference tools ----
+  const quantizedToolNames = QUANTIZED_TOOLS.map((t) => t.name);
+  if (quantizedToolNames.includes(toolName)) {
+    // Create a callUnreal wrapper for the quantized layer
+    const callUnreal = async (endpoint, method = "POST", body = {}) => {
+      if (!editorConnected) return null;
+      try {
+        const url = `${CONFIG.unrealMcpUrl}${endpoint}`;
+        const options = {
+          method,
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(CONFIG.requestTimeoutMs),
+        };
+        if (method !== "GET") {
+          options.body = JSON.stringify(body);
+        }
+        const response = await fetch(url, options);
+        return await response.json();
+      } catch (error) {
+        log.error("callUnreal failed", { endpoint, error: error.message });
+        return null;
+      }
+    };
+    return handleQuantizedTool(toolName, args, callUnreal, CONFIG);
+  }
 
   // ---- VisualAgent unified CLI ----
   if (toolName === "cli") {
