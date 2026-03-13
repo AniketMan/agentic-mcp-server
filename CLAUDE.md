@@ -550,11 +550,17 @@ You MUST bind these specific animations to the corresponding Level Sequences.
 If an animation is not listed above, use the `match` tool (glob/grep) to search the `Tools/AnimationScreenshots/ANIMATION_CATALOG.md` and `animation_catalog.csv` files to find the correct asset name before binding it to a Level Sequence track.
 
 **Animation Binding Workflow:**
+The animation catalog CSV does not contain duration data. You MUST query the `AnimSequence` asset length at runtime via Python before setting the Level Sequence section length.
 ```
 Step 1: Open the Level Sequence -> ls_open({ sequencePath: "/Game/Path/To/LS" })
 Step 2: Bind the character actor -> ls_bind_actor({ sequencePath: "/Game/Path/To/LS", actorName: "BP_HeatherChild" })
-Step 3: Add the animation track -> ls_add_track({ sequencePath: "/Game/Path/To/LS", bindingId: "GUID", trackType: "animation" })
-Step 4: Add the animation asset -> ls_add_section({ sequencePath: "/Game/Path/To/LS", trackId: "GUID", assetPath: "/Game/Assets/Characters/Heathers/HeatherChild/Animations/1_1_02_ue5_Heather_Child_gm01__1_" })
+Step 3: Query the animation length via execute_python:
+        ```python
+        anim_asset = unreal.EditorAssetLibrary.load_asset("/Game/Assets/Characters/Heathers/HeatherChild/Animations/1_1_02_ue5_Heather_Child_gm01__1_")
+        print(f"DURATION:{anim_asset.get_play_length()}")
+        ```
+Step 4: Add the animation track -> ls_add_track({ sequencePath: "/Game/Path/To/LS", bindingId: "GUID", trackType: "animation" })
+Step 5: Add the animation asset using the queried duration -> ls_add_section({ sequencePath: "/Game/Path/To/LS", trackId: "GUID", assetPath: "...", duration: [QUERIED_LENGTH] })
 ```
 
 ---
