@@ -202,6 +202,113 @@ After passing the confidence gate, every mutation goes through two checks:
 
 ---
 
+## MANDATORY POST-WIRING VERIFICATION (NON-NEGOTIABLE)
+
+**YOU ARE NOT DONE WITH A SCENE UNTIL `verify_scene` RETURNS `passed: true`.**
+
+After you finish wiring a scene, you MUST call `unreal_verify_scene({ sceneId: N })`. This tool queries the LIVE UE5 editor and checks:
+
+1. **Every required actor** exists in the level (spawned, not just referenced)
+2. **Every [makeTempBP] Blueprint** was actually created (not just planned)
+3. **Every level sequence** exists and is bound to the correct actors
+4. **The level blueprint has nodes** (not empty -- zero nodes = you did nothing)
+5. **Listener nodes exist** for every interaction (gaze, grab, trigger, activate)
+6. **Broadcast nodes exist** for every story step
+7. **MakeStruct nodes have correct Step values** (NOT all zeros)
+8. **No dangling nodes** (nodes with zero connections = dead code)
+9. **Audio/music loop** is wired to BeginPlay
+10. **Blueprint compiles** without errors
+
+If ANY check fails, the verifier returns a detailed failure report with:
+- What's missing
+- What's wrong
+- Exact instructions to fix it
+
+**DO NOT call `mark_step_complete` or update STATUS.json until `verify_scene` passes.**
+**DO NOT move to the next scene until the current scene passes verification.**
+**DO NOT tell the user "done" until verification passes.**
+
+### Pre-Wiring: Get Requirements First
+Before starting work on a scene, call `unreal_get_scene_requirements({ sceneId: N })` to get the complete checklist of everything that must exist. Build to this checklist.
+
+### Final Sweep
+After all 10 scenes are wired, call `unreal_verify_all_scenes()` for a full project validation sweep.
+
+---
+
+## COMPLETE INTERACTION CHAIN PATTERN (MANDATORY)
+
+Every interaction in this game follows this pattern. If you skip any step, the interaction is broken.
+
+### Pattern: Trigger Volume → Story Progression
+```
+1. spawn_actor(BP_LocationMarker, position)     ← The physical trigger in the world
+2. add_node(K2Node_AsyncAction_ListenForGameplayMessages)
+   → Channel: Message.Event.TeleportPoint       ← Listens for the trigger event
+3. add_node(CallFunction: GetSubsystem)          ← Gets the message subsystem
+4. add_node(CallFunction: BroadcastMessage)      ← Broadcasts story progression
+5. add_node(MakeStruct: Msg_StoryStep)           ← Creates the step struct
+6. set_pin_default(Step pin, correct_value)      ← Sets the EXACT step number
+7. connect_pins: Listen.OnMessage → GetSubsystem → Broadcast
+8. connect_pins: MakeStruct.output → Broadcast.Message
+```
+
+### Pattern: Gaze Interaction → Story Progression
+```
+1. spawn_actor(BP_GazeText or target, position)  ← The gaze target
+2. set_actor_property: UObservableComponent.SetInteractable(true)
+3. add_node(K2Node_AsyncAction_ListenForGameplayMessages)
+   → Channel: Message.Event.GazeComplete         ← Listens for gaze completion
+4-8. Same as trigger pattern above
+```
+
+### Pattern: Grab Interaction → Story Progression
+```
+1. spawn_actor(BP_Interactable, position)         ← The grabbable object
+2. set_actor_property: UGrabbableComponent.SetInteractable(true)
+3. add_node(K2Node_AsyncAction_ListenForGameplayMessages)
+   → Channel: Message.Event.GripGrab              ← Listens for grab event
+4-8. Same as trigger pattern above
+```
+
+### Pattern: Level Sequence Trigger
+```
+1. ls_open(sequence_name)                          ← Open the sequence
+2. ls_bind_actor(actor_label, sequence)            ← Bind actors
+3. In level BP: add_node(PlaySequence) after the listener fires
+4. connect_pins: Listener.OnMessage → PlaySequence.execute
+```
+
+### Pattern: Audio Loop on BeginPlay
+```
+1. add_node(Event BeginPlay) in level BP
+2. add_node(SpawnSound2D or PlaySound)
+3. set_pin_default: SoundAsset = ambient track
+4. set_pin_default: bLoop = true
+5. connect_pins: BeginPlay.then → SpawnSound.execute
+```
+
+**EVERY SCENE MUST HAVE ALL APPLICABLE PATTERNS WIRED. NO EXCEPTIONS.**
+
+---
+
+## [makeTempBP] CREATION RULES
+
+When the roadmap specifies `[makeTempBP]`, you MUST create a fully functional Blueprint:
+
+1. `create_blueprint` with the exact name from the roadmap
+2. Add ALL components listed in the roadmap (UGrabbableComponent, UObservableComponent, etc.)
+3. Add ALL variables listed in the roadmap
+4. Wire ALL logic from the pseudocode (BeginPlay, event handlers, delegates)
+5. `compile_blueprint` — it MUST compile clean
+6. `spawn_actor` in the level at the correct position
+7. Verify with `get_blueprint` that the graph is not empty
+
+**An empty Blueprint is worse than no Blueprint. It means you created a shell and moved on.**
+**A Blueprint with 0 nodes in its EventGraph means you did NOTHING.**
+
+---
+
 ## Critical Rules
 1. **Always read project state on connection.**
 2. **Always check out files via Perforce before mutating.**
@@ -212,3 +319,7 @@ After passing the confidence gate, every mutation goes through two checks:
 7. **Level blueprints use map names.** Pass the `.umap` name (e.g., `"MyLevel"`), not a Blueprint path.
 8. **Use Python for anything the C++ handlers do not cover.**
 9. **NEVER EXECUTE WITHOUT 99% CONFIDENCE.** If the Roadmap, Script, and Project State don't align, do not proceed.
+10. **NEVER MARK A SCENE COMPLETE WITHOUT RUNNING `verify_scene`.** This is the only way to prove your work is real.
+11. **NEVER CREATE AN EMPTY BLUEPRINT.** If you `create_blueprint`, you MUST add nodes, components, and logic. An empty BP = a broken game.
+12. **EVERY STEP VALUE MUST BE UNIQUE AND SEQUENTIAL.** Step 0 is invalid. Step values come from the roadmap. If you set all steps to 0, nothing works.
+13. **EVERY LISTENER MUST BE CONNECTED TO A BROADCAST.** A listener with no output connection does nothing. A broadcast with no input trigger never fires.

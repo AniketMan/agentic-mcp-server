@@ -76,6 +76,12 @@ import {
   getManifest,
 } from "./quantized-inference.js";
 
+// Scene Verifier -- exhaustive post-wiring validation per scene
+import {
+  VERIFIER_TOOLS,
+  handleVerifierTool,
+} from "./scene-verifier.js";
+
 // Confidence Gate -- enforces quantized inference propagation path
 // Reads and plans pass freely. Mutations are gated by confidence threshold.
 import {
@@ -283,6 +289,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     });
   }
 
+  // Scene Verifier tools -- post-wiring validation (always available)
+  for (const vTool of VERIFIER_TOOLS) {
+    mcpTools.push({
+      name: `unreal_${vTool.name}`,
+      description: `[Scene Verifier] ${vTool.description}`,
+      inputSchema: vTool.inputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    });
+  }
+
   log.info("Tools listed", {
     count: mcpTools.length,
     editorConnected,
@@ -317,6 +338,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   const toolName = name.substring(7); // strip "unreal_" prefix
+
+  // ---- Scene Verifier tools ----
+  const verifierToolNames = VERIFIER_TOOLS.map((t) => t.name);
+  if (verifierToolNames.includes(toolName)) {
+    const callUnreal = async (endpoint, method = "POST", body = {}) => {
+      if (!editorConnected) return null;
+      try {
+        const url = `${CONFIG.unrealMcpUrl}${endpoint}`;
+        const options = {
+          method,
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(CONFIG.requestTimeoutMs),
+        };
+        if (method !== "GET") {
+          options.body = JSON.stringify(body);
+        }
+        const response = await fetch(url, options);
+        return await response.json();
+      } catch (error) {
+        log.error("callUnreal failed", { endpoint, error: error.message });
+        return null;
+      }
+    };
+    return handleVerifierTool(toolName, args, callUnreal);
+  }
 
   // ---- Quantized Inference tools ----
   const quantizedToolNames = QUANTIZED_TOOLS.map((t) => t.name);
