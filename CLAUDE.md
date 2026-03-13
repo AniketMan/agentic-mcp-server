@@ -11,11 +11,12 @@ On your very first connection, before touching a single actor, node, or pin:
 3. Read the **Implementation Roadmap** (`reference/source_truth/OC_VR_Implementation_Roadmap.md`) -- cover to cover.
 4. Read the **Script** (`reference/source_truth/script_v2_ocvr.md`) -- cover to cover.
 5. Read the **Content Browser Hierarchy** (`reference/source_truth/ContentBrowser_Hierarchy.txt`).
-6. Call `get_project_state` -- understand what exists vs what is missing.
-7. Call `get_recent_actions` -- understand what was done last session.
-8. Call `unreal_status` -- confirm the editor is live.
-9. **CHECK PERFORCE**: Call `execute_python` with `unreal.SourceControl.is_enabled()`. If P4 is disconnected, STOP and tell the user. Do not proceed.
-10. **RUN `unreal_verify_all_scenes()`** -- get a full baseline of what passes and what fails.
+6. Read the **Level Sequence Master Reference** (`reference/source_truth/LevelSequence_Master_Reference.md`) -- every LS, every script beat, every actor, every trigger.
+7. Call `get_project_state` -- understand what exists vs what is missing.
+8. Call `get_recent_actions` -- understand what was done last session.
+9. Call `unreal_status` -- confirm the editor is live.
+10. **CHECK PERFORCE**: Call `execute_python` with `unreal.SourceControl.is_enabled()`. If P4 is disconnected, STOP and tell the user. Do not proceed.
+11. **RUN `unreal_verify_all_scenes()`** -- get a full baseline of what passes and what fails.
 
 Then, and ONLY then, produce a gap report:
 - List every scene that failed verification and why.
@@ -99,7 +100,14 @@ Before you touch Scene N, you MUST complete ALL of these steps. No exceptions.
    -> Find exact asset paths for every actor, Blueprint, sound, animation
    -> Identify what EXISTS vs what must be CREATED
 
-4. Call unreal_get_scene_requirements({ sceneId: N })
+4. Read the LEVEL SEQUENCE MASTER REFERENCE for Scene N:
+   reference/source_truth/LevelSequence_Master_Reference.md
+   -> Find every LS for this scene
+   -> Note which actors MUST be spawned BEFORE each LS
+   -> Note the trigger chain (what starts each LS)
+   -> Note the On Complete action (what happens after each LS)
+
+5. Call unreal_get_scene_requirements({ sceneId: N })
    -> Get the verification checklist BEFORE building
    -> This tells you exactly what the verifier will check
 ```
@@ -166,6 +174,70 @@ You must implement **EVERYTHING** described in the source truth. This means:
 3. Connect the listener to the story step broadcast (`MakeStruct` -> `Broadcast`)
 4. Set the exact step value on the struct pin.
 **A half-wired node is a broken game.**
+
+---
+
+## LEVEL SEQUENCE MASTER REFERENCE
+
+**THIS IS THE MOST CRITICAL SECTION. READ IT BEFORE EVERY SCENE. RE-READ IT AFTER EVERY SCENE.**
+
+The full Level Sequence Master Reference is stored at:
+`reference/source_truth/LevelSequence_Master_Reference.md`
+
+**YOU MUST READ THIS FILE BEFORE WIRING ANY SCENE.** It maps every single Level Sequence to:
+- The exact script beat it represents (what happens narratively)
+- The VO/dialogue that plays during it
+- Every actor that MUST be spawned and visible BEFORE the LS plays
+- The exact trigger condition that starts the LS
+- What happens when the LS completes (On Complete)
+- What it transitions to next
+
+### MANDATORY LS VERIFICATION PER SCENE
+
+For EVERY Level Sequence in the scene you are building:
+
+1. **CHECK EXISTENCE:** Call `list_sequences` to verify the LS asset exists. If it does not exist, FLAG IT to the user.
+2. **CHECK ACTORS:** Cross-reference the "Actors That MUST Be Spawned" list. Call `list_actors` to verify every single one is in the level. If any are missing, spawn them BEFORE wiring the LS.
+3. **CHECK TRIGGER:** Verify the trigger condition is wired in the Level Blueprint. The LS does not play itself -- something must START it (BeginPlay, OnInteractionStart, previous LS OnFinished, etc.).
+4. **CHECK BINDINGS:** Use `execute_python` to verify the LS is bound to the correct actors. An unbound LS plays animations on nothing.
+5. **CHECK ON-COMPLETE:** Verify the OnFinished delegate is wired to the next action (play next LS, enable interaction, transition scene, etc.). An LS that plays but does nothing afterward is a dead end.
+6. **CHECK TRANSITIONS:** Verify the transition to the next LS or scene is wired. The experience must flow continuously.
+7. **RE-READ THE REFERENCE:** After wiring all LS for a scene, re-read `LevelSequence_Master_Reference.md` for that scene to confirm you did not miss anything.
+
+### LS WIRING PATTERN
+
+Every Level Sequence follows this wiring pattern in the Level Blueprint:
+
+```
+[Trigger Event] -> [Create Level Sequence Player] -> [Play] -> [OnFinished Delegate] -> [Next Action]
+```
+
+For chained sequences:
+```
+BeginPlay -> CreateLSPlayer(LS_1_1) -> Play -> OnFinished -> CreateLSPlayer(LS_1_2) -> Play -> OnFinished -> ...
+```
+
+For interaction-triggered sequences:
+```
+ListenForGameplayMessages(GripGrab) -> OnMessage -> CreateLSPlayer(LS_1_2) -> Play -> OnFinished -> [Enable Next Interaction]
+```
+
+### SCENE-BY-SCENE LS SUMMARY (Quick Reference)
+
+| Scene | LS Count | Key Trigger Chain |
+|-------|----------|-------------------|
+| 00 Tutorial | 0 | Event-driven only (markers, gaze, grip, trigger) |
+| 01 Home/Child | 5 | BeginPlay -> LS_1_1 -> Gaze -> LS_1_2(grip) -> LS_1_3 -> LS_1_4(crossfade) |
+| 02 Home/PreTeen | 4 | LS_2_1(auto) -> Walk to marker -> LS_2_2R(grab illustration) -> LS_2_3(auto) |
+| 03 Home/Teen | 7 | Door grab -> LS_3_1 -> Fridge grab -> LS_3_2/3_5 -> Pour -> LS_3_3_v2 -> LS_3_7 |
+| 04 Home/Adult | 4 | LS_4_1(auto) -> Phone grab -> LS_4_2 -> Trigger advance -> LS_4_3 -> Drop phone -> LS_4_4 |
+| 05 Restaurant | 6 | BeginPlay -> LS_5_1 -> Walk to marker -> LS_5_2 -> LS_5_3 -> Hand hold -> LS_5_3_grip -> LS_5_4(fade) |
+| 06 Rally | 5 | Shape select -> LS_6_1 -> Weight place -> LS_6_2 -> Cradle pull1 -> LS_6_3 -> Pull2 -> LS_6_4 -> Sign grab -> LS_6_5 |
+| 07 Hospital | 6 | BeginPlay -> LS_7_1 -> Marker overlap -> LS_7_2 -> Card grab -> LS_7_3 -> LS_7_4(guided) -> LS_7_5 -> LS_7_6(news) |
+| 08 Memory | 6 | BeginPlay -> LS_8_1 -> Match teapot -> LS_8_2 -> Match illustration -> LS_8_3 -> Match pitcher -> LS_8_4 -> Match phone -> LS_8_5 -> Both hands -> LS_8_Final |
+| 09 Legacy | 6 | BeginPlay -> LS_9_1 -> LS_9_2 -> LS_9_3 -> LS_9_4 -> LS_9_5 -> LS_9_6(sunrise, end) |
+
+**TOTAL: 49 named Level Sequences + variants. If you wire fewer than this, you missed something.**
 
 ---
 
