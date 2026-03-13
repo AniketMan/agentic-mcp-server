@@ -527,6 +527,38 @@ Ambisonic versions also exist at `/Game/Sounds/Test_Music/AMBIX/SceneN_Mix02_Mus
 
 ---
 
+## ANIMATION ASSET MAPPING (MANDATORY BINDINGS)
+
+Mocap animations are located in `Content/Assets/Characters/Heathers/{Character}/Animations/`.
+You MUST bind these specific animations to the corresponding Level Sequences.
+
+| Scene | Sequence | Character | Animation Asset Name |
+|-------|----------|-----------|----------------------|
+| 1 | `LS_1_1` | HeatherChild | `1_1_02_ue5_Heather_Child_gm01__1_` (Opening) |
+| 1 | `LS_1_3` | HeatherChild | `1_3_01_ue5_Heather_Child_gm01_Anim` (Runs to kitchen) |
+| 1 | `LS_1_Full` | HeatherChild | `Full_Scene_1_V2_ue5_Anim` (Master take) |
+| 1 | `LS_HugLoop` | HeatherChild | `Hug_Loop_2_Anim` (Looping hug) |
+| 2 | `LS_2_1` | HeatherChild | `2_1_04_ue5__1__Anim1` (Transition moment) |
+| 2 | `LS_2_1` | HeatherPreTeen | `2_1_05_ue5_Heather_Preteen_gm01` (Drawing at table) |
+| 2 | `LS_2_2R` | HeatherPreTeen | `2_2_05_ue5_Heather_Preteen_gm01` (Runs out door) |
+| Adult | Various | HeatherAdult | `HEATHER__ADULT__sits__excitedly_waiting-__2_ue5` (Idle) |
+| Adult | Various | HeatherAdult | `Heather_takes_a_sip_of_her_whisky_and_coke-__ue5` (Action) |
+| Adult | Various | HeatherAdult | `Livelyhands` (Gesture loop) |
+| Adult | Various | HeatherAdult | `triggers_Heather_to_place_her_hand_in_Susan_ue5` (Interaction) |
+
+**Animation Discovery Workflow:**
+If an animation is not listed above, use the `match` tool (glob/grep) to search the `Tools/AnimationScreenshots/ANIMATION_CATALOG.md` and `animation_catalog.csv` files to find the correct asset name before binding it to a Level Sequence track.
+
+**Animation Binding Workflow:**
+```
+Step 1: Open the Level Sequence -> ls_open({ sequencePath: "/Game/Path/To/LS" })
+Step 2: Bind the character actor -> ls_bind_actor({ sequencePath: "/Game/Path/To/LS", actorName: "BP_HeatherChild" })
+Step 3: Add the animation track -> ls_add_track({ sequencePath: "/Game/Path/To/LS", bindingId: "GUID", trackType: "animation" })
+Step 4: Add the animation asset -> ls_add_section({ sequencePath: "/Game/Path/To/LS", trackId: "GUID", assetPath: "/Game/Assets/Characters/Heathers/HeatherChild/Animations/1_1_02_ue5_Heather_Child_gm01__1_" })
+```
+
+---
+
 ## PIE TESTING WORKFLOW (MANDATORY AFTER EVERY SCENE)
 
 ```
@@ -1436,23 +1468,29 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 37. **USE `scene_snapshot` FOR VERIFICATION, NOT JUST `list_actors`.** `scene_snapshot` returns component details. `list_actors` only returns names. You need component data to verify makeTempBP components were added correctly.
 38. **USE `add_component` FOR EVERY [makeTempBP].** Creating a Blueprint with `create_blueprint` gives you an empty actor. You MUST then call `add_component` to add StaticMeshComponent, AudioComponent, etc. An empty Blueprint is a failed Blueprint.
 
+### Headless Execution Protocol (Crash Prevention & Optimization)
+39. **RUN UNREAL ENGINE HEADLESS FOR AUTOMATED WIRING.** The `FAssetThumbnailPool` UI crashes occur because the editor UI tries to render thumbnails for thousands of assets during automated operations. To prevent this and drastically speed up execution, instruct the user to launch the editor in headless mode when performing automated wiring.
+    - Command: `UnrealEditor.exe "Path\To\SOH.uproject" -game -server -log -NoUI` (or equivalent flags for Oculus fork)
+    - If UI is required for specific operations, instruct the user to close all Content Browser tabs and Viewports before proceeding.
+    - Rely on `scene-verifier.js` progress output and the MCP server's HTTP responses instead of visual confirmation.
+
 ### Level Editing Rules
-39. **OPEN THE CORRECT LEVEL BEFORE EDITING.** Use `execute_python` with `unreal.EditorLevelLibrary.load_level('/Game/Maps/Game/X/ML_X')` to switch to the correct master level. Do NOT use `load_level` (which adds a streaming sublevel to the current world). If you are in a test level and call `load_level`, the scene streams INTO the test level -- this is the bug that causes the "huge mess." **ALWAYS verify you are in the correct persistent level before editing.**
-40. **YOU CAN ONLY EDIT A LEVEL'S OWN STREAMED SUBLEVELS.** Do not stream Scene 3's sublevel into Scene 7's master level. Each master level has its own sublevels already configured. Use `list_levels` to see what's loaded.
-41. **VERIFY CURRENT LEVEL BEFORE EVERY SCENE.** Call `list_levels` and confirm the persistent level matches the scene you are about to edit. If it doesn't, switch levels first.
+40. **OPEN THE CORRECT LEVEL BEFORE EDITING.** Use `execute_python` with `unreal.EditorLevelLibrary.load_level('/Game/Maps/Game/X/ML_X')` to switch to the correct master level. Do NOT use `load_level` (which adds a streaming sublevel to the current world). If you are in a test level and call `load_level`, the scene streams INTO the test level -- this is the bug that causes the "huge mess." **ALWAYS verify you are in the correct persistent level before editing.**
+41. **YOU CAN ONLY EDIT A LEVEL'S OWN STREAMED SUBLEVELS.** Do not stream Scene 3's sublevel into Scene 7's master level. Each master level has its own sublevels already configured. Use `list_levels` to see what's loaded.
+42. **VERIFY CURRENT LEVEL BEFORE EVERY SCENE.** Call `list_levels` and confirm the persistent level matches the scene you are about to edit. If it doesn't, switch levels first.
 
 ### Actor Inspection Rules
-42. **INSPECT ACTOR BLUEPRINTS, NOT JUST NAMES.** Use `scene_snapshot` to get component details. Check the Blueprint class, components, and properties. A teleport point might not be named "TeleportPoint" -- its Blueprint class tells you what it is.
-43. **USE `collision_trace` FOR SURFACE PLACEMENT.** Fire downward rays to find exact collision surface heights. Do not guess Z values.
-44. **USE `read_sequence` TO VERIFY AUDIO BINDINGS.** After wiring a Level Sequence, call `read_sequence` and check that the correct VO/sound asset is bound to the audio track. The response includes sound_name, sound_path, and sound_duration.
+43. **INSPECT ACTOR BLUEPRINTS, NOT JUST NAMES.** Use `scene_snapshot` to get component details. Check the Blueprint class, components, and properties. A teleport point might not be named "TeleportPoint" -- its Blueprint class tells you what it is.
+44. **USE `collision_trace` FOR SURFACE PLACEMENT.** Fire downward rays to find exact collision surface heights. Do not guess Z values.
+45. **USE `read_sequence` TO VERIFY AUDIO BINDINGS.** After wiring a Level Sequence, call `read_sequence` and check that the correct VO/sound asset is bound to the audio track. The response includes sound_name, sound_path, and sound_duration.
 
 ### Plugin and Engine Rules
-45. **CHECK ENABLED PLUGINS BEFORE USING PLUGIN APIs.** Call `execute_python` to list enabled plugins. If a plugin is not enabled, its classes and functions do not exist. Do not call them.
-46. **THIS PROJECT USES UE 5.6 OCULUS FORK.** Not mainline Epic. Some APIs may differ from public documentation. When in doubt, use `list_classes` and `list_functions` to verify what actually exists in this build.
-47. **USceneManager SUBSYSTEM VERIFICATION.** The path `/Script/SOH.SceneManager` is plausible but MUST be verified at runtime before use. Use `execute_python` with `unreal.SystemLibrary.get_engine_subsystem(unreal.SceneManager)` or `unreal.SystemLibrary.get_game_instance_subsystem(...)` to confirm the class exists and the exact module path is correct.
+46. **CHECK ENABLED PLUGINS BEFORE USING PLUGIN APIs.** Call `execute_python` to list enabled plugins. If a plugin is not enabled, its classes and functions do not exist. Do not call them.
+47. **THIS PROJECT USES UE 5.6 OCULUS FORK.** Not mainline Epic. Some APIs may differ from public documentation. When in doubt, use `list_classes` and `list_functions` to verify what actually exists in this build.
+48. **USceneManager SUBSYSTEM VERIFICATION.** The path `/Script/SOH.SceneManager` is plausible but MUST be verified at runtime before use. Use `execute_python` with `unreal.SystemLibrary.get_engine_subsystem(unreal.SceneManager)` or `unreal.SystemLibrary.get_game_instance_subsystem(...)` to confirm the class exists and the exact module path is correct.
 
 ### Decision-Making Rules
-48. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
+49. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
     a. **Load ALL relevant data** -- roadmap section, script section, content browser paths, UE context docs, pin info, actor components.
     b. **Assign weight to each data source**: Source truth files (roadmap, script) = highest weight. Content Browser dump = high weight. UE5 context docs = medium weight. Your training data = ZERO weight.
     c. **Document the reasoning** in your session log: "Chose X because roadmap says Y (weight: 10/10), content browser confirms Z exists (weight: 9/10), UE docs say approach A is correct (weight: 7/10)."
