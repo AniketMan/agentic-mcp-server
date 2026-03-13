@@ -76,6 +76,23 @@ import {
   getManifest,
 } from "./quantized-inference.js";
 
+// Confidence Gate -- enforces quantized inference propagation path
+// Reads and plans pass freely. Mutations are gated by confidence threshold.
+import {
+  evaluateGate,
+  recordSnapshot,
+  registerWiringPlan,
+  CONFIDENCE_THRESHOLD,
+} from "./confidence-gate.js";
+
+// Project State Validator -- cross-validates mutations against live project data
+// Every mutation is verified against the actual UE5 project state before execution.
+// Accuracy at all costs.
+import {
+  validateMutation,
+  formatValidationFailure,
+} from "./project-state-validator.js";
+
 // ---------------------------------------------------------------------------
 // Configuration with defaults
 // ---------------------------------------------------------------------------
@@ -370,11 +387,84 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  // ---- Confidence Gate: evaluate before mutation ----
+  const gateResult = evaluateGate(toolName, args);
+  if (!gateResult.allowed) {
+    log.info("Confidence gate BLOCKED mutation", {
+      tool: toolName,
+      confidence: gateResult.confidence,
+      threshold: gateResult.threshold,
+    });
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            blocked: true,
+            tool: toolName,
+            confidence: gateResult.confidence,
+            threshold: gateResult.threshold,
+            reason: gateResult.reason,
+            suggestion: gateResult.suggestion,
+            message: `Mutation blocked: confidence ${gateResult.confidence.toFixed(2)} is below threshold ${gateResult.threshold}. ` +
+              `Claude can freely read and plan -- adapt your approach to increase confidence, then retry.`,
+          }, null, 2),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Record snapshot calls for confidence tracking
+  if (toolName === "snapshotGraph" || toolName === "snapshot_graph") {
+    recordSnapshot();
+  }
+
+  // ---- Project State Validator: cross-validate against live project ----
+  // Only runs when the editor is connected (needs live read access).
+  // Every mutation is verified against actual project state before execution.
+  if (editorConnected) {
+    const validationResult = await validateMutation(
+      toolName,
+      args,
+      // Pass the read-only tool executor so the validator can query the editor
+      async (readToolName, readArgs) => {
+        return await executeUnrealTool(readToolName, readArgs);
+      }
+    );
+
+    if (!validationResult.valid) {
+      log.info("Project state validator BLOCKED mutation", {
+        tool: toolName,
+        checksRun: validationResult.checksRun,
+        failures: validationResult.failures.length,
+        failedChecks: validationResult.failures.map((f) => f.check),
+      });
+
+      const failureResponse = formatValidationFailure(toolName, args, validationResult);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(failureResponse, null, 2),
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    log.debug("Project state validation PASSED", {
+      tool: toolName,
+      checksRun: validationResult.checksRun,
+    });
+  }
+
   // ---- Route to appropriate path ----
   let result;
 
   if (editorConnected) {
-    // Primary path: live editor
+    // Primary path: live editor (already validated against project state)
     result = await executeLiveTool(request, toolName, args);
   } else if (fallbackAvailable) {
     // Fallback path: binary injector

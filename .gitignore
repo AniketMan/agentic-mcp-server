@@ -9,3 +9,5 @@ Saved/
 *.sln
 *.vcxproj*
 .quantized_cache/
+reference/ue5_api/en-US/
+*.tgz

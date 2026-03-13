@@ -112,18 +112,90 @@ Always start by calling `unreal_status` to determine which mode is active and wh
 
 ---
 
+## Source Truth
+
+The script is the input. Everything you build traces back to it.
+
+- **Script**: `reference/source_truth/script_v2_ocvr.md` -- read this FIRST for any scene work
+- **Game Design Flowchart**: `reference/game_design/SOHGameDesign.webp` -- interaction flow validation
+- **UE5 API Docs**: `Engine\Documentation\Builds` (relative to engine root, already on disk)
+- **API Index**: `reference/ue5_api/vr_relevant_api_index.json` -- searchable catalog of 190 VR-relevant Blueprint API categories
+- **Build Config**: `reference/project_config/*.Target.cs`
+
+You fill in the blanks. What the script defines explicitly is non-negotiable. What it does not define, you infer and adapt until confidence is high.
+
+---
+
 ## The Quantized Inference Path (Primary Workflow)
 
 You are equipped with the **Quantized Inference Layer**, which replaces brute-force asset scanning with cached, deterministic scene wiring.
 
+### Confidence Gate
+
+All mutation tools (addNode, connectPins, spawnActor, etc.) are gated by a confidence threshold of **0.7**. You can read and plan freely -- no restrictions. But the MCP server will **reject** any mutation call below the threshold.
+
+Confidence is calculated from four signals:
+
+| Signal | Weight | How to earn it |
+|--------|--------|----------------|
+| Planned through quantized path | +0.4 | Use `unreal_get_scene_plan` + `unreal_execute_scene_step` |
+| Asset verified in manifest | +0.3 | Call `unreal_quantize_project` first |
+| Snapshot safety net | +0.2 | Call `unreal_snapshotGraph` before mutating |
+| Script-aligned | +0.1 | Operation references a scene/event from the script |
+
+If a mutation is blocked, the response includes a `suggestion` field telling you exactly what to do to increase confidence. **Adapt and retry.**
+
+### Workflow
+
 When asked to wire a scene (e.g., via the `wireSceneQuantized` command):
-1. **Initialize**: Call `unreal_quantize_project` to generate/refresh the Adaptive Asset Manifest. This caches the entire project state.
-2. **Check Status**: Call `unreal_get_wiring_status` to see which scenes need work.
-3. **Get Plan**: Call `unreal_get_scene_plan` for the target scene. **Always review the confidence scores.**
-   - `1.0`: Safe to execute.
-   - `< 1.0`: Review missing references before proceeding.
-4. **Execute**: For each pending step, call `unreal_execute_scene_step`. This returns the exact MCP call sequence.
-5. **Persist**: After successfully executing a step's calls, call `unreal_mark_step_complete` to save progress.
+1. **Read the script** for the target scene from `reference/source_truth/script_v2_ocvr.md`.
+2. **Initialize**: Call `unreal_quantize_project` to generate/refresh the Adaptive Asset Manifest.
+3. **Check Status**: Call `unreal_get_wiring_status` to see which scenes need work.
+4. **Get Plan**: Call `unreal_get_scene_plan` for the target scene. Review confidence scores.
+5. **Snapshot**: Call `unreal_snapshotGraph` on the target blueprint before any mutations.
+6. **Execute**: For each pending step, call `unreal_execute_scene_step`. This returns the exact MCP call sequence.
+7. **Adapt**: If the gate blocks a call, read the suggestion, adjust, and retry.
+8. **Persist**: After successfully executing a step's calls, call `unreal_mark_step_complete` to save progress.
+
+You are free to try different approaches. The gate only blocks execution, never exploration.
+
+### Project State Validator
+
+After passing the confidence gate, every mutation is **cross-validated against the live UE5 project** before execution. The validator makes read-only calls to the editor to verify that what you claim exists actually exists. If it doesn't, the mutation is blocked and you receive:
+
+- **What you claimed** vs **what actually exists** in the project
+- The **exact read-only tool** to call to get the real data
+- The **engine doc path** (`Engine/Documentation/Builds/...`) for the relevant API
+
+This means you cannot hallucinate Blueprints, nodes, pins, actors, or sequences. Every mutation is ground-truth verified.
+
+**Validation checks by tool:**
+
+| Tool | Checks | What Gets Verified |
+|------|--------|--------------------|
+| `addNode` | 3 | Blueprint exists, graph exists, node class valid |
+| `deleteNode` | 1 | Node exists in graph |
+| `connectPins` | 3 | Source node exists, target node exists, pins exist and are compatible |
+| `disconnectPin` | 1 | Node exists, pin exists, pin is connected |
+| `setPinDefault` | 1 | Pin exists, value type matches, pin is input |
+| `moveNode` | 1 | Node exists in graph |
+| `createBlueprint` | 1 | Blueprint does NOT already exist |
+| `createGraph` | 1 | Blueprint exists, graph name not taken |
+| `deleteGraph` | 1 | Blueprint exists, graph exists |
+| `addVariable` | 1 | Blueprint exists, variable name unique |
+| `removeVariable` | 1 | Blueprint exists, variable exists |
+| `compileBlueprint` | 1 | Blueprint exists |
+| `spawnActor` | 3 | Level loaded, actor class valid, transform sane |
+| `deleteActor` | 1 | Actor exists in level |
+| `setActorProperty` | 1 | Actor exists, property exists |
+| `setActorTransform` | 2 | Actor exists, transform sane |
+| `ls_bind_actor` | 2 | Sequence exists, actor exists |
+| `ls_add_track` | 1 | Sequence exists, binding valid |
+| `ls_add_section` | 1 | Sequence exists |
+| `ls_create` | 1 | Sequence does NOT already exist |
+| `executePython` | 1 | No dangerous operations (rm, subprocess, eval) |
+
+When a validation fails, read the failure response carefully. It tells you exactly what to do. Call the suggested read-only tool, get the real data, adjust your call, and retry.
 
 ---
 
