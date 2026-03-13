@@ -1,0 +1,31 @@
+{
+  "patterns": {
+    "MessageSubsystem_to_Broadcast": {
+      "sourceNode": "CallFunction:GetSubsystem",
+      "targetNode": "CallFunction:BroadcastMessage",
+      "sourcePin": "ReturnValue",
+      "targetPin": "Target",
+      "weight": 0.5,
+      "successCount": 0,
+      "failureCount": 0
+    },
+    "MakeStruct_to_Broadcast": {
+      "sourceNode": "MakeStruct:Msg_StoryStep",
+      "targetNode": "CallFunction:BroadcastMessage",
+      "sourcePin": "Msg_StoryStep",
+      "targetPin": "Message",
+      "weight": 0.5,
+      "successCount": 0,
+      "failureCount": 0
+    },
+    "InteractionStart_to_PlaySequence": {
+      "sourceNode": "CustomEvent:OnInteractionStart",
+      "targetNode": "CallFunction:Play",
+      "sourcePin": "then",
+      "targetPin": "execute",
+      "weight": 0.5,
+      "successCount": 0,
+      "failureCount": 0
+    }
+  }
+}

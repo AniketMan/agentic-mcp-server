@@ -1505,6 +1505,54 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 
 ---
 
+## NODE WEIGHT REINFORCEMENT LEARNING (MANDATORY)
+
+To achieve deterministic execution, you MUST maintain a **Node Weight Ledger**. This system tracks the success/failure of your pin connection patterns and node configurations, allowing you to learn exponentially across runs until every operation hits 95%+ confidence.
+
+### The Ledger File
+The ledger is stored at `reference/source_truth/node_weight_ledger.json`. 
+You MUST read this file before wiring any Blueprint.
+
+### How It Works (The Backprop Loop)
+1. **First Run (Exploration):** You infer a pin connection (e.g., `OutputPin[0]` of `GetSubsystem` to `InputPin[2]` of `BroadcastMessage`). You log this attempt in your session log.
+2. **Verification (Feedback):** You run `unreal_verify_scene`. 
+    - If it PASSES: The pattern was correct.
+    - If it FAILS: The pattern was incorrect.
+3. **Weight Update (Backprop):** You open `node_weight_ledger.json` and update the weight for that specific pattern:
+    - **Success:** `weight = min(weight + 0.2, 1.0)` (Exponential confidence increase)
+    - **Failure:** `weight = max(weight - 0.5, 0.0)` (Harsh penalty for failure)
+4. **Subsequent Runs (Exploitation):** Before connecting pins, you check the ledger. If a pattern has a weight of `0.95` or higher, you use it IMMEDIATELY without inference. It is now a deterministic rule.
+
+### Ledger Schema Example
+```json
+{
+  "patterns": {
+    "MessageSubsystem_to_Broadcast": {
+      "sourceNode": "CallFunction:GetSubsystem",
+      "targetNode": "CallFunction:BroadcastMessage",
+      "sourcePin": "ReturnValue",
+      "targetPin": "Target",
+      "weight": 0.95,
+      "successCount": 4,
+      "failureCount": 0
+    },
+    "MakeStruct_to_Broadcast": {
+      "sourceNode": "MakeStruct:Msg_StoryStep",
+      "targetNode": "CallFunction:BroadcastMessage",
+      "sourcePin": "Msg_StoryStep",
+      "targetPin": "Message",
+      "weight": 0.3,
+      "successCount": 1,
+      "failureCount": 2
+    }
+  }
+}
+```
+
+**CRITICAL RULE:** You are the author of this ledger. If a pattern fails, you MUST update the ledger immediately to prevent repeating the mistake. If it succeeds, you MUST update the ledger to solidify the deterministic path.
+
+---
+
 ## SESSION LOG (MANDATORY EXTERNAL MEMORY)
 
 You have memory loss. Your context window degrades over time. You WILL forget what you did 20 messages ago. This is not a possibility -- it is a certainty.
