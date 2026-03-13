@@ -1958,3 +1958,103 @@ FString FAgenticMCPServer::HandleExecutePython(const FString& Body)
 
 	return JsonToString(Result);
 }
+
+// ============================================================
+// Safe Blueprint Modification Wrappers
+// ============================================================
+//
+// All MCP mutation handlers MUST use these instead of calling
+// FBlueprintEditorUtils::MarkBlueprintAs*Modified() directly.
+//
+// The problem: When called from the editor Tick() context (which is
+// how ALL MCP requests are processed), the FSlowTask system can crash
+// with EXCEPTION_ACCESS_VIOLATION in FText::Rebuild() because there's
+// no valid parent FText scope for progress dialogs.
+//
+// The fix: Wrap in an editor transaction (provides valid FText scope)
+// and SEH handler (catches any remaining crashes from corrupt BPs).
+// ============================================================
+
+#include "Misc/ScopedSlowTask.h"
+
+bool FAgenticMCPServer::SafeMarkStructurallyModified(UBlueprint* BP, const TCHAR* TransactionDesc)
+{
+	if (!BP || !GEditor)
+	{
+		return false;
+	}
+
+	bool bSuccess = true;
+
+	// Create a slow task scope to prevent FText::Rebuild crashes
+	FScopedSlowTask SlowTask(1.0f,
+		FText::FromString(FString::Printf(TEXT("AgenticMCP: %s"), TransactionDesc)));
+
+	// Wrap in editor transaction for valid FText scope + undo support
+	GEditor->BeginTransaction(
+		FText::FromString(FString::Printf(TEXT("AgenticMCP: %s"), TransactionDesc)));
+
+#if PLATFORM_WINDOWS
+	__try
+	{
+#endif
+		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+#if PLATFORM_WINDOWS
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		bSuccess = false;
+		UE_LOG(LogTemp, Warning,
+			TEXT("AgenticMCP: Blueprint compile crashed (SEH caught) during '%s' on '%s' - "
+				 "node was created but compile deferred. Blueprint may need manual recompile."),
+			TransactionDesc, *BP->GetName());
+	}
+#endif
+
+	GEditor->EndTransaction();
+
+	if (!bSuccess)
+	{
+		// Even if compile crashed, try to mark as just modified (no recompile)
+		// so the editor knows the BP is dirty
+		BP->MarkPackageDirty();
+	}
+
+	return bSuccess;
+}
+
+bool FAgenticMCPServer::SafeMarkModified(UBlueprint* BP, const TCHAR* TransactionDesc)
+{
+	if (!BP || !GEditor)
+	{
+		return false;
+	}
+
+	bool bSuccess = true;
+
+	FScopedSlowTask SlowTask(1.0f,
+		FText::FromString(FString::Printf(TEXT("AgenticMCP: %s"), TransactionDesc)));
+
+	GEditor->BeginTransaction(
+		FText::FromString(FString::Printf(TEXT("AgenticMCP: %s"), TransactionDesc)));
+
+#if PLATFORM_WINDOWS
+	__try
+	{
+#endif
+		FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+#if PLATFORM_WINDOWS
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		bSuccess = false;
+		UE_LOG(LogTemp, Warning,
+			TEXT("AgenticMCP: Blueprint modification crashed (SEH caught) during '%s' on '%s'"),
+			TransactionDesc, *BP->GetName());
+	}
+#endif
+
+	GEditor->EndTransaction();
+
+	return bSuccess;
+}

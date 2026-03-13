@@ -361,6 +361,21 @@ private:
 	/** Find a UClass by name, searching all loaded modules. */
 	static UClass* FindClassByName(const FString& ClassName);
 
+	// ---- Safe Blueprint modification (crash-proof) ----
+	/**
+	 * Safely mark a Blueprint as structurally modified with full crash protection.
+	 * Wraps MarkBlueprintAsStructurallyModified in an editor transaction
+	 * (provides valid FText scope) and SEH handler (catches any remaining crashes).
+	 * Returns true if compilation succeeded, false if it crashed (node was still created).
+	 */
+	static bool SafeMarkStructurallyModified(UBlueprint* BP, const TCHAR* TransactionDesc = TEXT("MCP Mutation"));
+
+	/**
+	 * Safely mark a Blueprint as modified (non-structural, no recompile).
+	 * Same crash protection as above but for lightweight modifications.
+	 */
+	static bool SafeMarkModified(UBlueprint* BP, const TCHAR* TransactionDesc = TEXT("MCP Mutation"));
+
 	// ---- Snapshot storage ----
 	TMap<FString, FAgenticGraphSnapshot> Snapshots;
 	static const int32 MaxSnapshots = 50;

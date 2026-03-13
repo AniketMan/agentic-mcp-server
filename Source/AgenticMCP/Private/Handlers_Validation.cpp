@@ -265,7 +265,7 @@ FString FAgenticMCPServer::HandleRestoreGraph(const FString& Body)
 		}
 	}
 
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Restore Graph"));
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);

@@ -909,8 +909,8 @@ FString FAgenticMCPServer::HandleAddNode(const FString& Body)
 		NewNode->CreateNewGuid();
 	}
 
-	// Mark as modified and save
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	// Mark as modified and save (crash-proof wrapper)
+	SafeMarkStructurallyModified(BP, TEXT("Add Node"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Added %s node '%s' in graph '%s' of '%s', save %s"),
@@ -965,7 +965,7 @@ FString FAgenticMCPServer::HandleDeleteNode(const FString& Body)
 	}
 
 	Graph->RemoveNode(Node);
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Deleted node '%s' (%s) from '%s'"),
@@ -1114,7 +1114,7 @@ FString FAgenticMCPServer::HandleDisconnectPin(const FString& Body)
 	int32 BrokenCount = Pin->LinkedTo.Num();
 	Pin->BreakAllPinLinks();
 
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1193,7 +1193,7 @@ FString FAgenticMCPServer::HandleSetPinDefault(const FString& Body)
 		}
 	}
 
-	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+	SafeMarkModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1232,7 +1232,7 @@ FString FAgenticMCPServer::HandleMoveNode(const FString& Body)
 	if (Json->HasField(TEXT("posY")))
 		Node->NodePosY = (int32)Json->GetNumberField(TEXT("posY"));
 
-	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+	SafeMarkModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1391,7 +1391,7 @@ FString FAgenticMCPServer::HandleCreateGraph(const FString& Body)
 	if (!NewGraph)
 		return MakeErrorJson(TEXT("Failed to create graph"));
 
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1465,7 +1465,7 @@ FString FAgenticMCPServer::HandleAddVariable(const FString& Body)
 
 	// Add variable
 	FBlueprintEditorUtils::AddMemberVariable(BP, FName(*VarName), PinType);
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1497,7 +1497,7 @@ FString FAgenticMCPServer::HandleRemoveVariable(const FString& Body)
 	if (!BP) return MakeErrorJson(LoadError);
 
 	FBlueprintEditorUtils::RemoveMemberVariable(BP, FName(*VarName));
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1641,7 +1641,7 @@ FString FAgenticMCPServer::HandleSetNodeComment(const FString& Body)
 	Node->bCommentBubbleVisible = !Comment.IsEmpty();
 	Node->bCommentBubblePinned = !Comment.IsEmpty();
 
-	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+	SafeMarkModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
@@ -1726,7 +1726,7 @@ FString FAgenticMCPServer::HandleAddComponent(const FString& Body)
 	SCS->AddNode(NewNode);
 
 	// Mark as modified
-	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 
 	// Compile and save
 	bool bSaved = SaveBlueprintPackage(BP);

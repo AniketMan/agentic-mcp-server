@@ -5,6 +5,8 @@
 
 #include "AgenticMCPEditorSubsystem.h"
 #include "AgenticMCPServer.h"
+#include "Misc/FeedbackContext.h"
+#include "Misc/ScopedSlowTask.h"
 
 void UAgenticMCPEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -49,6 +51,19 @@ void UAgenticMCPEditorSubsystem::Tick(float DeltaTime)
 {
 	if (Server)
 	{
+		// FIX: Create a root FScopedSlowTask scope for ALL MCP operations.
+		// Without this, any engine code that internally creates an FSlowTask
+		// (Blueprint compilation, level loading, asset streaming) will crash
+		// with EXCEPTION_ACCESS_VIOLATION in FText::Rebuild() because the
+		// FSlowTask system expects a valid parent FText scope, which doesn't
+		// exist when called from Tick() context.
+		//
+		// This single scope covers ALL handlers dispatched during this tick.
+		// Child FSlowTasks created by engine subsystems inherit this scope
+		// and get a valid FText instead of hitting null.
+		FScopedSlowTask RootSlowTask(0.0f,
+			NSLOCTEXT("AgenticMCP", "MCPTickOperation", "AgenticMCP Processing..."));
+
 		// Process up to 4 requests per tick to improve throughput
 		// while keeping frame time impact minimal
 		for (int32 i = 0; i < 4; ++i)

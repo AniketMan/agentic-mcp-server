@@ -159,19 +159,37 @@ FString FAgenticMCPServer::HandleLoadLevel(const FString& Body)
 	}
 
 	// Add the sublevel via editor utilities
+	// Wrapped in SEH to catch FSlowTask crashes during level loading
 	ULevelStreaming* NewLevel = nullptr;
 
+#if PLATFORM_WINDOWS
+	__try
+	{
+#endif
+
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
-	// UE 5.6+ uses struct-based API with constructor
-	UEditorLevelUtils::FAddLevelToWorldParams AddParams(
-		ULevelStreamingDynamic::StaticClass(),
-		FName(*LevelPath)
-	);
-	NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
+		// UE 5.6+ uses struct-based API with constructor
+		UEditorLevelUtils::FAddLevelToWorldParams AddParams(
+			ULevelStreamingDynamic::StaticClass(),
+			FName(*LevelPath)
+		);
+		NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
 #else
-	// UE 5.4-5.5 uses the 3-param overload
-	NewLevel = EditorLevelUtils::AddLevelToWorld(
-		World, *LevelPath, ULevelStreamingDynamic::StaticClass());
+		// UE 5.4-5.5 uses the 3-param overload
+		NewLevel = EditorLevelUtils::AddLevelToWorld(
+			World, *LevelPath, ULevelStreamingDynamic::StaticClass());
+#endif
+
+#if PLATFORM_WINDOWS
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("AgenticMCP: AddLevelToWorld crashed (SEH caught) for '%s' - "
+				 "FSlowTask/FText issue during level streaming. Level may still be partially loaded."),
+			*LevelPath);
+		NewLevel = nullptr;
+	}
 #endif
 
 	if (!NewLevel)
@@ -307,7 +325,21 @@ FString FAgenticMCPServer::HandleSetStreamingLevelVisibility(const FString& Body
 	FoundLevel->SetShouldBeVisible(bVisible);
 
 	// Force update streaming
-	World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
+	// Wrapped in SEH - FlushLevelStreaming can trigger FSlowTask crashes
+#if PLATFORM_WINDOWS
+	__try
+	{
+#endif
+		World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
+#if PLATFORM_WINDOWS
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("AgenticMCP: FlushLevelStreaming crashed (SEH caught) - "
+				 "visibility change may not be fully applied"));
+	}
+#endif
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetBoolField(TEXT("success"), true);
