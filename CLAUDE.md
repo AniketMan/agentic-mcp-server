@@ -12,11 +12,14 @@ On your very first connection, before touching a single actor, node, or pin:
 4. Read the **Script** (`reference/source_truth/script_v2_ocvr.md`) -- cover to cover.
 5. Read the **Content Browser Hierarchy** (`reference/source_truth/ContentBrowser_Hierarchy.txt`).
 6. Read the **Level Sequence Master Reference** (`reference/source_truth/LevelSequence_Master_Reference.md`) -- every LS, every script beat, every actor, every trigger.
-7. Call `get_project_state` -- understand what exists vs what is missing.
-8. Call `get_recent_actions` -- understand what was done last session.
-9. Call `unreal_status` -- confirm the editor is live.
-10. **CHECK PERFORCE**: Call `execute_python` with `unreal.SourceControl.is_enabled()`. If P4 is disconnected, STOP and tell the user. Do not proceed.
-11. **RUN `unreal_verify_all_scenes()`** -- get a full baseline of what passes and what fails.
+7. Read the **MCP Node Type Reference** (`reference/source_truth/MCP_Node_Type_Reference.md`) -- exact node type strings, pin param names, and API formats.
+8. Read the **UE5 Python API Reference** (`reference/source_truth/UE5_Python_API_Reference.txt`) -- method signatures for execute_python calls.
+9. Call `get_project_state` -- understand what exists vs what is missing.
+10. Call `get_recent_actions` -- understand what was done last session.
+11. Call `unreal_status` -- confirm the editor is live.
+12. **CHECK PERFORCE**: Call `execute_python` with `unreal.SourceControl.is_enabled()`. If P4 is disconnected, STOP and tell the user. Do not proceed.
+13. **CHECK ENABLED PLUGINS**: Call `execute_python` with `unreal.PluginManager.get_enabled_plugins()` or list plugins from .uproject file. Know what is available. Do NOT call APIs from disabled plugins.
+14. **RUN `unreal_verify_all_scenes()`** -- get a full baseline of what passes and what fails.
 
 Then, and ONLY then, produce a gap report:
 - List every scene that failed verification and why.
@@ -426,6 +429,55 @@ Step 6: If position looks wrong, adjust:
 
 **NEVER spawn at (0, 0, 0). That is the world origin and almost certainly wrong.**
 
+### Collision-Based Placement (Preferred for Surface Placement)
+Use `collision_trace` to find exact surface positions:
+```
+Step 1: Identify the area where the object should go (from roadmap description).
+Step 2: Get a reference actor in that area: get_actor({ name: "KitchenTable" })
+Step 3: Fire a downward ray from above the reference to find the surface:
+        collision_trace({ start: { x: 1200, y: -400, z: 500 }, end: { x: 1200, y: -400, z: 0 }, channel: "Visibility" })
+        -> Returns: { hit: true, location: { x: 1200, y: -400, z: 82.5 }, normal: { x: 0, y: 0, z: 1 } }
+Step 4: Spawn at the hit location + small Z offset:
+        spawn_actor({ blueprint: "BP_Object", location: { x: 1200, y: -400, z: 85 } })
+```
+This gives you the EXACT collision surface height instead of guessing Z values.
+
+### Actor Blueprint Inspection (MANDATORY Before Placement)
+Do NOT rely only on actor names. Inspect the actor's Blueprint class and components to understand what it IS:
+```
+Step 1: scene_snapshot -> get all actors with component details
+Step 2: For each actor, check:
+        - Blueprint class (e.g., BP_TeleportPoint, BP_InteractionMarker)
+        - Components (StaticMeshComponent, TriggerBoxComponent, AudioComponent)
+        - Properties (bIsInteractable, GrabMode, etc.)
+Step 3: A "BP_Marker_01" might be a teleport point, interaction zone, or spawn marker.
+        The Blueprint class and components tell you what it actually does.
+```
+**If an actor's name doesn't match what the roadmap expects, check its Blueprint class before assuming it's wrong.**
+
+### Bone and Socket Discovery (For Character Attachments)
+When items need to be attached to characters (weapons, held objects, accessories):
+```
+Step 1: Get the character actor: get_actor({ name: "BP_Susan" })
+Step 2: Find the SkeletalMeshComponent via scene_snapshot
+Step 3: Query bones via execute_python:
+        import unreal
+        actor = unreal.EditorActorSubsystem().get_actor_reference('/Game/Path/To/Actor')
+        mesh = actor.get_component_by_class(unreal.SkeletalMeshComponent)
+        skeleton = mesh.skeletal_mesh.skeleton
+        for i in range(skeleton.get_num_bones()):
+            print(skeleton.get_bone_name(i))
+Step 4: Attach using the discovered bone/socket name:
+        execute_python: actor.attach_to_component(parent_mesh, socket_name='hand_r')
+```
+
+### Missing Actor Auto-Creation Rule
+If an actor referenced in the roadmap does NOT exist in the scene:
+1. **Check Content Browser** -- maybe it exists as an asset but isn't spawned.
+2. **If the asset exists**: Spawn it using `spawn_actor` with the correct /Game/ path.
+3. **If the asset does NOT exist**: Create a temp Blueprint with `create_blueprint`, add a **primitive mesh** (Cube, Sphere, Cylinder) via `add_component` as a visual placeholder, add ALL required logic (interactions, events, variables), compile it, spawn it, and **flag to the user**: "Created BP_X with placeholder mesh. Replace the mesh when ready."
+4. **NEVER skip an actor because it doesn't exist.** Create it with a placeholder and full logic.
+
 ---
 
 ## MUSIC TRACK TABLE (MANDATORY -- EXACT ASSET PATHS)
@@ -705,6 +757,10 @@ The script is the input. The roadmap is the blueprint. Everything you build trac
 - **Content Browser Hierarchy**: `reference/source_truth/ContentBrowser_Hierarchy.txt` -- Full project asset dump. Cross-reference against the roadmap to know what exists vs what needs to be created.
 - **Game Design Flowchart**: `reference/game_design/SOHGameDesign.webp` -- Interaction flow validation.
 - **UE5 API Docs**: Available via `unreal_get_ue_context` tool. Categories: animation, blueprint, actor, assets, enhanced_input, character, material, level_sequence, python_scripting, scene_awareness, parallel_workflows.
+- **MCP Node Type Reference**: `reference/source_truth/MCP_Node_Type_Reference.md` -- Exact node type strings accepted by the C++ plugin's `addNode` handler. Every nodeType, every required param, every pin name format. **READ THIS BEFORE ADDING ANY NODE.**
+- **UE5 Python API Reference**: `reference/source_truth/UE5_Python_API_Reference.txt` -- Method signatures for key Python classes (EditorLevelLibrary, EditorActorSubsystem, GameplayStatics, NiagaraComponent, MaterialInstanceDynamic, etc.). **READ THIS BEFORE ANY `execute_python` CALL.**
+- **UE5 C++ API Docs (Online)**: `https://dev.epicgames.com/documentation/en-us/unreal-engine/API` -- For engine class details not covered in local files. **NOTE: This project uses UE 5.6 Oculus Fork, NOT mainline Epic. Some APIs may differ.**
+- **UE5 Python API Docs (Online)**: `https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/?application_version=5.7` -- For Python API details not in the local reference.
 
 You fill in the blanks. What the script and roadmap define explicitly is non-negotiable.
 
@@ -811,6 +867,17 @@ If ANY check fails, the verifier returns a detailed failure report with:
 **DO NOT call `mark_step_complete` or update STATUS.json until `verify_scene` returns `passed: true`.**
 **DO NOT move to the next scene until the current scene passes verification.**
 **DO NOT tell the user "done" until verification passes.**
+
+### Audio Binding Verification Workflow (MANDATORY)
+In addition to the scene verifier, you must manually verify that every Level Sequence has the correct audio tracks bound to it.
+```
+Step 1: Wire the Level Sequence and add the audio track.
+Step 2: Call `read_sequence({ sequencePath: "/Game/Path/To/LS_Scene" })`.
+Step 3: Check the `audio_tracks` array in the response.
+Step 4: Verify that `sound_path` matches the expected VO or music asset from the roadmap.
+Step 5: Verify that `start_time` and `duration` are correct.
+```
+If the audio track is missing or the wrong asset is bound, the sequence is incomplete.
 
 ### Pre-Wiring: Get Requirements First
 Before starting work on a scene, call `unreal_get_scene_requirements({ sceneId: N })` to get the complete checklist of everything that must exist. Build to this checklist.
@@ -1348,6 +1415,28 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 36. **TEST WITH PIE AFTER EVERY SCENE.** After verification passes, call `start_pie` to test the scene in Play-In-Editor. Check that the first Level Sequence plays. Call `stop_pie` when done. If PIE crashes, log it and report to user.
 37. **USE `scene_snapshot` FOR VERIFICATION, NOT JUST `list_actors`.** `scene_snapshot` returns component details. `list_actors` only returns names. You need component data to verify makeTempBP components were added correctly.
 38. **USE `add_component` FOR EVERY [makeTempBP].** Creating a Blueprint with `create_blueprint` gives you an empty actor. You MUST then call `add_component` to add StaticMeshComponent, AudioComponent, etc. An empty Blueprint is a failed Blueprint.
+
+### Level Editing Rules
+39. **OPEN THE CORRECT LEVEL BEFORE EDITING.** Use `execute_python` with `unreal.EditorLevelLibrary.load_level('/Game/Maps/Game/X/ML_X')` to switch to the correct master level. Do NOT use `load_level` (which adds a streaming sublevel to the current world). If you are in a test level and call `load_level`, the scene streams INTO the test level -- this is the bug that causes the "huge mess." **ALWAYS verify you are in the correct persistent level before editing.**
+40. **YOU CAN ONLY EDIT A LEVEL'S OWN STREAMED SUBLEVELS.** Do not stream Scene 3's sublevel into Scene 7's master level. Each master level has its own sublevels already configured. Use `list_levels` to see what's loaded.
+41. **VERIFY CURRENT LEVEL BEFORE EVERY SCENE.** Call `list_levels` and confirm the persistent level matches the scene you are about to edit. If it doesn't, switch levels first.
+
+### Actor Inspection Rules
+42. **INSPECT ACTOR BLUEPRINTS, NOT JUST NAMES.** Use `scene_snapshot` to get component details. Check the Blueprint class, components, and properties. A teleport point might not be named "TeleportPoint" -- its Blueprint class tells you what it is.
+43. **USE `collision_trace` FOR SURFACE PLACEMENT.** Fire downward rays to find exact collision surface heights. Do not guess Z values.
+44. **USE `read_sequence` TO VERIFY AUDIO BINDINGS.** After wiring a Level Sequence, call `read_sequence` and check that the correct VO/sound asset is bound to the audio track. The response includes sound_name, sound_path, and sound_duration.
+
+### Plugin and Engine Rules
+45. **CHECK ENABLED PLUGINS BEFORE USING PLUGIN APIs.** Call `execute_python` to list enabled plugins. If a plugin is not enabled, its classes and functions do not exist. Do not call them.
+46. **THIS PROJECT USES UE 5.6 OCULUS FORK.** Not mainline Epic. Some APIs may differ from public documentation. When in doubt, use `list_classes` and `list_functions` to verify what actually exists in this build.
+
+### Decision-Making Rules
+47. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
+    a. **Load ALL relevant data** -- roadmap section, script section, content browser paths, UE context docs, pin info, actor components.
+    b. **Assign weight to each data source**: Source truth files (roadmap, script) = highest weight. Content Browser dump = high weight. UE5 context docs = medium weight. Your training data = ZERO weight.
+    c. **Document the reasoning** in your session log: "Chose X because roadmap says Y (weight: 10/10), content browser confirms Z exists (weight: 9/10), UE docs say approach A is correct (weight: 7/10)."
+    d. **If data sources conflict**, the higher-weight source wins. Roadmap > Content Browser > UE Docs > Training Data.
+    e. **If you don't have enough data to make the decision with 95%+ confidence**, STOP and gather more data before proceeding.
 
 ---
 
