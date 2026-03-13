@@ -349,8 +349,6 @@ Scenes share sublevels. You MUST load the correct sublevel before wiring a scene
 
 **Scenes 01-04 share the SAME sublevel (SL_Main_Logic).** Actors from all 4 scenes coexist in this level. Use visibility and enable/disable to control what the player sees per scene.
 
-**Scene 05 (SL_Restaurant_Logic) is CORRUPT.** Use Python-only path for all mutations. Never use C++ handlers.
-
 ---
 
 ## VR PAWN AND CONTROLLER REFERENCE
@@ -622,24 +620,7 @@ import unreal
 unreal.SystemLibrary.execute_console_command(None, 'r.ThumbnailPoolSize 0')
 ```
 
-### 2. Scene 5 (SL_Restaurant_Logic) Corrupt Blueprint
-
-**Problem:** The C++ compiler crashes on this specific level blueprint.
-
-**Solution (you MUST do this):**
-- NEVER use `add_node`, `connect_pins`, `set_pin_default`, or `compile_blueprint` on Scene 5's level blueprint.
-- Use ONLY the Python fallback for ALL modifications:
-```python
-import unreal
-bp = unreal.EditorAssetLibrary.load_asset('/Game/Maps/Game/Restaurant/Levels/SLs/SL_Restaurant_Logic')
-blueprint = unreal.BlueprintEditorLibrary.get_blueprint_asset(bp)
-event_graph = unreal.BlueprintEditorLibrary.find_event_graph(blueprint)
-# ... add nodes and connections via Python API ...
-unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
-unreal.EditorAssetLibrary.save_asset('/Game/Maps/Game/Restaurant/Levels/SLs/SL_Restaurant_Logic')
-```
-
-### 3. Perforce Lock Contention
+### 2. Perforce Lock Contention
 
 **Problem:** If P4 is disconnected or a file is locked by another user, mutations will fail silently or crash.
 
@@ -1491,12 +1472,13 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 45. **USE `read_sequence` TO VERIFY AUDIO BINDINGS.** After wiring a Level Sequence, call `read_sequence` and check that the correct VO/sound asset is bound to the audio track. The response includes sound_name, sound_path, and sound_duration.
 
 ### Plugin and Engine Rules
-46. **CHECK ENABLED PLUGINS BEFORE USING PLUGIN APIs.** Call `execute_python` to list enabled plugins. If a plugin is not enabled, its classes and functions do not exist. Do not call them.
-47. **THIS PROJECT USES UE 5.6 OCULUS FORK.** Not mainline Epic. Some APIs may differ from public documentation. When in doubt, use `list_classes` and `list_functions` to verify what actually exists in this build.
-48. **USceneManager SUBSYSTEM VERIFICATION.** The path `/Script/SOH.SceneManager` is plausible but MUST be verified at runtime before use. Use `execute_python` with `unreal.SystemLibrary.get_engine_subsystem(unreal.SceneManager)` or `unreal.SystemLibrary.get_game_instance_subsystem(...)` to confirm the class exists and the exact module path is correct.
+46. **DO NOT MODIFY C++ PLUGIN SOURCE.** You are forbidden from modifying any C++ source files (`.cpp`, `.h`) inside the `Source/AgenticMCP/` directory. You are a pipeline agent, not a C++ plugin developer. If the plugin crashes, report it to the user. Do not attempt to rewrite the handlers.
+47. **CHECK ENABLED PLUGINS BEFORE USING PLUGIN APIs.** Call `execute_python` to list enabled plugins. If a plugin is not enabled, its classes and functions do not exist. Do not call them.
+48. **THIS PROJECT USES UE 5.6 OCULUS FORK.** Not mainline Epic. Some APIs may differ from public documentation. When in doubt, use `list_classes` and `list_functions` to verify what actually exists in this build.
+49. **USceneManager SUBSYSTEM VERIFICATION.** The path `/Script/SOH.SceneManager` is plausible but MUST be verified at runtime before use. Use `execute_python` with `unreal.SystemLibrary.get_engine_subsystem(unreal.SceneManager)` or `unreal.SystemLibrary.get_game_instance_subsystem(...)` to confirm the class exists and the exact module path is correct.
 
 ### Decision-Making Rules
-49. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
+50. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
     a. **Load ALL relevant data** -- roadmap section, script section, content browser paths, UE context docs, pin info, actor components.
     b. **Assign weight to each data source**: Source truth files (roadmap, script) = highest weight. Content Browser dump = high weight. UE5 context docs = medium weight. Your training data = ZERO weight.
     c. **Document the reasoning** in your session log: "Chose X because roadmap says Y (weight: 10/10), content browser confirms Z exists (weight: 9/10), UE docs say approach A is correct (weight: 7/10)."

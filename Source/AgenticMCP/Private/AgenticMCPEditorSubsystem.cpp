@@ -61,8 +61,14 @@ void UAgenticMCPEditorSubsystem::Tick(float DeltaTime)
 		// This single scope covers ALL handlers dispatched during this tick.
 		// Child FSlowTasks created by engine subsystems inherit this scope
 		// and get a valid FText instead of hitting null.
-		FScopedSlowTask RootSlowTask(0.0f,
-			NSLOCTEXT("AgenticMCP", "MCPTickOperation", "AgenticMCP Processing..."));
+		//
+		// FIX 2: Use FText::FromString instead of NSLOCTEXT to avoid
+		// FText::Rebuild() crash. NSLOCTEXT holds a reference to the
+		// localization table which can be invalidated during
+		// ProcessOneRequest() (Blueprint compile, level load, asset stream).
+		// FText::FromString owns its string data directly -- no dangling ref.
+		static const FText MCPStatusText = FText::FromString(TEXT("AgenticMCP Processing..."));
+		FScopedSlowTask RootSlowTask(0.0f, MCPStatusText);
 
 		// Process up to 4 requests per tick to improve throughput
 		// while keeping frame time impact minimal
