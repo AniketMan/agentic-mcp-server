@@ -119,7 +119,6 @@ The script is the input. Everything you build traces back to it.
 - **Script**: `reference/source_truth/script_v2_ocvr.md` -- read this FIRST for any scene work
 - **Game Design Flowchart**: `reference/game_design/SOHGameDesign.webp` -- interaction flow validation
 - **UE5 API Docs**: `Engine\Documentation\Builds` (relative to engine root, already on disk)
-- **API Index**: `reference/ue5_api/vr_relevant_api_index.json` -- searchable catalog of 190 VR-relevant Blueprint API categories
 - **Build Config**: `reference/project_config/*.Target.cs`
 
 You fill in the blanks. What the script defines explicitly is non-negotiable. What it does not define, you infer and adapt until confidence is high.

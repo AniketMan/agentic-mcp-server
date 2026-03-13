@@ -17,10 +17,6 @@ reference/
     UnrealEditor.Target.cs      # UE5 build target: Editor
     UnrealGame.Target.cs        # UE5 build target: Game (UnrealGame module)
     UnrealServer.Target.cs      # UE5 build target: Server
-  ue5_api/
-    blueprint_api_index.json    # Searchable index of all 662 Blueprint API categories
-    vr_relevant_api_index.json  # Focused subset: 190 VR-relevant categories
-    ConsoleHelpTemplate.html    # UE5 console command reference
 ```
 
 ## UE5 Engine Documentation
@@ -31,21 +27,24 @@ The full UE5 API docs (C++, Blueprint, DocSource) ship with the engine and are N
 Engine\Documentation\Builds
 ```
 
-The index files (`blueprint_api_index.json`, `vr_relevant_api_index.json`) provide a lightweight searchable catalog so Claude can locate the right doc page, then read the full HTML from the engine path.
+This contains the complete C++ API reference, Blueprint API reference, and DocSource. When you need to look up a UE5 class, function, or node, read the HTML directly from that path. No indexes, no shortcuts -- read the actual docs.
 
 ## How Claude Uses This
 
 1. **Script is source truth**: Every Blueprint graph, level sequence, and interaction traces back to `script_v2_ocvr.md`. If the script says "GAZE at Heather photo", the implementation must create a gaze trigger that activates the specified level sequence. The script is the input. The output is code, Blueprint graphs, and MCP calls that implement it.
 
-2. **API index for lookup**: Claude searches `vr_relevant_api_index.json` to find the right Blueprint nodes/functions, then reads the full doc from `Engine\Documentation\Builds`.
+2. **Engine docs for API lookup**: Read the full UE5 API documentation directly from `Engine\Documentation\Builds`. C++ API, Blueprint API, and DocSource are all there.
 
 3. **Game design for validation**: The flowchart confirms interaction flow and dependencies between scenes.
 
 4. **Target.cs for build config**: Confirms the project uses `UnrealGame` module with `BuildEnvironment.Shared`.
 
-## Confidence Gate
+## Confidence Gate + Project State Validator
 
-The MCP server enforces a confidence gate on all mutation operations. Claude can read and plan freely, but execution is blocked when inference confidence is below 0.7. See `Tools/confidence-gate.js` for the scoring breakdown:
+The MCP server enforces a two-layer defense on all mutation operations:
+
+**Layer 1 -- Confidence Gate** (`Tools/confidence-gate.js`):
+Claude can read and plan freely, but execution is blocked when inference confidence is below 0.7.
 
 | Signal | Weight | Description |
 |--------|--------|-------------|
@@ -53,3 +52,8 @@ The MCP server enforces a confidence gate on all mutation operations. Claude can
 | Asset verified in manifest | +0.3 | Referenced Blueprint/actor exists in cached manifest |
 | Snapshot safety net active | +0.2 | A graph snapshot was taken before mutation |
 | Script-aligned | +0.1 | Operation traces back to a scene in the script |
+
+**Layer 2 -- Project State Validator** (`Tools/project-state-validator.js`):
+Every mutation is cross-validated against the live UE5 project state. The validator makes read-only calls to the editor to verify that what Claude claims exists actually exists. 20 mutation tools covered, 29 total validation checks.
+
+When blocked, Claude receives: what it claimed vs what actually exists, the exact read-only tool to call, and the relevant engine doc path at `Engine\Documentation\Builds`.

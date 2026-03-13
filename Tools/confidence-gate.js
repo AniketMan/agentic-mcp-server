@@ -41,93 +41,77 @@ const GATE_LOG_DIR = join(__dirname, "..", ".quantized_cache", "gate_log");
 // Claude resolves this against the engine install on the local machine
 const ENGINE_DOCS_RELATIVE_PATH = "Engine/Documentation/Builds";
 
-// VR-relevant API index for doc lookup
-const VR_API_INDEX_PATH = join(__dirname, "..", "reference", "ue5_api", "vr_relevant_api_index.json");
-let _vrApiIndex = null;
+// Engine docs path mapping -- no scraped indexes, point directly to engine docs
+// Claude reads the actual HTML from Engine\Documentation\Builds on the local machine
 
 /**
- * Load the VR-relevant API index (cached after first load).
- */
-function getVrApiIndex() {
-  if (_vrApiIndex) return _vrApiIndex;
-  try {
-    if (existsSync(VR_API_INDEX_PATH)) {
-      _vrApiIndex = JSON.parse(readFileSync(VR_API_INDEX_PATH, "utf-8"));
-    }
-  } catch (error) {
-    log.error("Failed to load VR API index", { error: error.message });
-  }
-  return _vrApiIndex;
-}
-
-/**
- * Find relevant API doc categories for a given tool call.
- * Maps the mutation tool + args to Blueprint API categories that Claude
- * should read from Engine/Documentation/Builds before retrying.
+ * Map a mutation tool + args to the relevant engine doc paths.
+ * Points directly to Engine\Documentation\Builds -- no scraped indexes.
+ * Claude reads the actual HTML from the engine install.
  *
  * @param {string} toolName - The mutation tool
  * @param {object} args - Tool arguments
- * @returns {object[]} Array of { category, functions, docHint }
+ * @returns {string[]} Array of relative engine doc paths
  */
-function findRelevantApiDocs(toolName, args) {
-  const index = getVrApiIndex();
-  if (!index || !index.categories) return [];
+function getRelevantEngineDocs(toolName, args) {
+  const docs = [];
+  const docsRoot = ENGINE_DOCS_RELATIVE_PATH;
 
-  const results = [];
-
-  // Build search terms from tool name and args
-  const searchTerms = new Set();
-
-  // From tool name
-  if (toolName.includes("Node") || toolName.includes("Pin")) searchTerms.add("blueprint");
-  if (toolName.includes("Actor") || toolName.includes("spawn")) searchTerms.add("actor");
-  if (toolName.includes("ls_")) searchTerms.add("sequence");
-  if (toolName.includes("Level") || toolName.includes("level")) searchTerms.add("level");
-
-  // From args -- extract class names, node types, etc.
-  const nodeClass = args?.nodeClass || args?.className || "";
-  const nodeType = args?.nodeType || "";
-  const actorClass = args?.actorClass || args?.class || "";
-  const allArgValues = [nodeClass, nodeType, actorClass].filter(Boolean);
-
-  for (const val of allArgValues) {
-    // Extract meaningful keywords from class names like K2Node_CallFunction
-    const parts = val.replace(/^K2Node_/, "").replace(/^U/, "").replace(/^A/, "").split(/(?=[A-Z])/);
-    for (const part of parts) {
-      if (part.length > 2) searchTerms.add(part.toLowerCase());
-    }
+  // Blueprint node operations -> Blueprint API docs
+  if (
+    toolName.includes("Node") ||
+    toolName.includes("Pin") ||
+    toolName.includes("Graph") ||
+    toolName.includes("Variable") ||
+    toolName === "compileBlueprint" ||
+    toolName === "createBlueprint"
+  ) {
+    docs.push(`${docsRoot}/BlueprintAPI/index.html`);
   }
 
-  // VR-specific terms based on the OC VR project
-  if (args?.eventName) {
-    const ev = args.eventName.toLowerCase();
-    if (ev.includes("gaze")) searchTerms.add("gaze");
-    if (ev.includes("grip")) searchTerms.add("grip");
-    if (ev.includes("trigger")) searchTerms.add("trigger");
-    if (ev.includes("navigation") || ev.includes("teleport")) searchTerms.add("navigation");
-    if (ev.includes("haptic")) searchTerms.add("haptic");
-    if (ev.includes("animation") || ev.includes("anim")) searchTerms.add("animation");
-    if (ev.includes("audio") || ev.includes("sound")) searchTerms.add("audio");
-    if (ev.includes("sequence")) searchTerms.add("sequence");
+  // Actor operations -> Actor API docs
+  if (
+    toolName.includes("Actor") ||
+    toolName.includes("spawn") ||
+    toolName.includes("destroy")
+  ) {
+    docs.push(`${docsRoot}/BlueprintAPI/Actor/index.html`);
+    docs.push(`${docsRoot}/CppAPI/Runtime/Engine/AActor/index.html`);
   }
 
-  // Search the index
-  for (const cat of index.categories) {
-    const catLower = cat.category.toLowerCase();
-    for (const term of searchTerms) {
-      if (catLower.includes(term)) {
-        results.push({
-          category: cat.category,
-          functions: cat.functions.slice(0, 10), // Top 10 most relevant
-          totalFunctions: cat.total,
-          docPath: `${ENGINE_DOCS_RELATIVE_PATH}/BlueprintAPI/${cat.category}/index.html`,
-        });
-        break; // Don't double-add same category
-      }
-    }
+  // Level sequence operations -> Sequencer docs
+  if (toolName.startsWith("ls_")) {
+    docs.push(`${docsRoot}/BlueprintAPI/Sequencer/index.html`);
+    docs.push(`${docsRoot}/CppAPI/Runtime/MovieScene/index.html`);
   }
 
-  return results.slice(0, 5); // Cap at 5 most relevant categories
+  // VR-specific hints from args
+  const eventName = (args?.eventName || "").toLowerCase();
+  if (eventName.includes("gaze")) {
+    docs.push(`${docsRoot}/BlueprintAPI/Input/index.html`);
+  }
+  if (eventName.includes("grip") || eventName.includes("trigger")) {
+    docs.push(`${docsRoot}/BlueprintAPI/Input/MotionController/index.html`);
+  }
+  if (eventName.includes("haptic")) {
+    docs.push(`${docsRoot}/BlueprintAPI/Input/Haptics/index.html`);
+  }
+  if (eventName.includes("audio") || eventName.includes("sound")) {
+    docs.push(`${docsRoot}/BlueprintAPI/Audio/index.html`);
+  }
+  if (eventName.includes("anim")) {
+    docs.push(`${docsRoot}/BlueprintAPI/Animation/index.html`);
+  }
+  if (eventName.includes("navigation") || eventName.includes("teleport")) {
+    docs.push(`${docsRoot}/BlueprintAPI/AI/Navigation/index.html`);
+  }
+
+  // Python execution -> Python API docs
+  if (toolName === "executePython") {
+    docs.push(`${docsRoot}/CppAPI/Developer/PythonScriptPlugin/index.html`);
+  }
+
+  return docs;
 }
 
 // Mutation tools -- these are the tools that modify the UE5 project
@@ -572,18 +556,13 @@ function buildAdaptationSuggestion(toolName, args, confidence) {
     );
   }
 
-  // --- Engine docs lookup: point Claude to relevant API documentation ---
-  const relevantDocs = findRelevantApiDocs(toolName, args);
-  if (relevantDocs.length > 0) {
-    const docLines = relevantDocs.map(
-      (d) => `  - ${d.category} (${d.totalFunctions} functions): ${d.docPath}`
-    );
+  // --- Engine docs: point Claude to the actual engine documentation ---
+  const engineDocs = getRelevantEngineDocs(toolName, args);
+  if (engineDocs.length > 0) {
     suggestions.push(
-      "Read the following UE5 API docs from the engine before retrying. " +
-      "These are the most relevant categories for this operation:\n" +
-      docLines.join("\n") +
-      "\nKey functions to review: " +
-      relevantDocs.flatMap((d) => d.functions.slice(0, 3)).join(", ") + "."
+      "Read the following UE5 engine docs before retrying:\n" +
+      engineDocs.map((d) => `  - ${d}`).join("\n") +
+      "\nThese are at Engine\\Documentation\\Builds relative to the engine root."
     );
   }
 
