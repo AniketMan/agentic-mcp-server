@@ -674,6 +674,34 @@ Do NOT skip checkout. Do NOT skip save. The `check_out_file` method accepts: ful
 - `list_properties` -- List UProperties on a class.
 - `get_pin_info` -- Inspect pin types and connections.
 - `rescan_assets` -- Force asset registry refresh.
+- `validate_blueprint` -- Validate a Blueprint for errors WITHOUT compiling (safer than compile).
+- `snapshot_graph` -- Take a snapshot of a Blueprint graph for later rollback. **USE BEFORE RISKY OPERATIONS.**
+- `scene_snapshot` -- Get a structured snapshot of ALL actors in the scene with components. Better than list_actors for verification.
+- `output_log` -- Read recent entries from the Output Log. Use for debugging compile errors.
+- `screenshot` -- Capture a viewport screenshot. Use for visual verification.
+- `get_camera` -- Get current viewport camera position.
+- `list_viewports` -- List all open viewport windows.
+- `get_selection` -- Get currently selected actors.
+- `list_sequences` -- List all Level Sequence assets in the project.
+- `read_sequence` -- Read tracks and keyframes of a Level Sequence.
+- `blueprint_snapshot` -- Take a full snapshot of a Blueprint including all graphs.
+- `list_states` -- List all saved Blueprint states.
+- `resolve_ref` -- Resolve a short ref ID to an actor name.
+- `get_pie_state` -- Get current Play-In-Editor session state.
+- `xr_status` -- Get XR/VR headset and runtime status.
+- `xr_controllers` -- Get controller tracking data and button states.
+- `xr_hand_tracking` -- Get hand tracking joint positions and gestures.
+- `audio_get_status` -- Get audio system status.
+- `audio_list_active_sounds` -- List all currently playing sounds.
+- `audio_list_sound_classes` -- List all sound classes and volumes.
+- `niagara_get_status` -- Get Niagara particle system status.
+- `niagara_list_systems` -- List all active Niagara systems in the scene.
+- `niagara_get_system_info` -- Get detailed info about a Niagara system.
+- `niagara_get_emitters` -- List emitters in a Niagara system.
+- `niagara_get_parameters` -- Get user parameters from a Niagara system.
+- `story_state` -- Get the current story/narrative state. **USE TO VERIFY STORY PROGRESSION.**
+- `data_table_read` -- Read rows from a DataTable asset.
+- `collision_trace` -- Perform a line trace / raycast in the scene.
 
 ### Mutation (Modifies Blueprints)
 - `add_node` -- Add a node to a graph. Returns nodeId and all pins.
@@ -690,6 +718,13 @@ Do NOT skip checkout. Do NOT skip save. The `check_out_file` method accepts: ful
 - `remove_variable` -- Remove a variable.
 - `compile_blueprint` -- Compile and save.
 - `set_node_comment` -- Set comment bubble on a node.
+- `add_component` -- **CRITICAL: Add a component to a Blueprint (StaticMeshComponent, AudioComponent, PointLightComponent, etc.).** Required for every [makeTempBP].
+- `duplicate_nodes` -- Duplicate nodes within a graph. Useful for repeating interaction chains.
+- `restore_graph` -- Restore a Blueprint graph from a previous snapshot. **USE FOR CRASH RECOVERY.**
+- `save_state` -- Save current Blueprint state for later diffing.
+- `diff_state` -- Compare current Blueprint against a saved state.
+- `restore_state` -- Restore a Blueprint to a previously saved state.
+- `remove_audio_tracks` -- Remove audio tracks from a Level Sequence.
 
 ### World (Actors and Levels)
 - `list_actors` -- List actors with optional filters.
@@ -698,9 +733,68 @@ Do NOT skip checkout. Do NOT skip save. The `check_out_file` method accepts: ful
 - `delete_actor` -- Remove an actor.
 - `set_actor_property` -- Set a property on an actor.
 - `set_actor_transform` -- Move/rotate/scale an actor.
+- `move_actor` -- Move an actor by relative offset or to absolute position.
 - `list_levels` -- List persistent and streaming levels.
-- `load_level` -- Load a sublevel.
+- `load_level` -- Load a sublevel. **ALWAYS call `wait_ready` after this.**
+- `remove_sublevel` -- Remove a streaming sublevel from the world.
 - `get_level_blueprint` -- Get level blueprint details. **NOTE: POST endpoint. Body param is `level` (not `levelName`).**
+- `streaming_level_visibility` -- **CRITICAL: Set visibility of a streaming sublevel.** Required for Scenes 01-04 which share SL_SusanHome_Logic. Toggle visibility per scene.
+- `focus_actor` -- Focus the viewport camera on a specific actor.
+- `select_actor` -- Select an actor in the editor.
+- `set_viewport` -- Set viewport camera position and orientation.
+- `wait_ready` -- **CRITICAL: Wait for editor to be ready after level loads.** Always call after `load_level` before querying actors.
+- `open_asset` -- Open an asset in its default editor (e.g., Level Sequence in Sequencer).
+
+### Undo/Transaction System
+- `begin_transaction` -- **CRITICAL: Begin an undo transaction BEFORE any mutation sequence.** If something crashes, you can undo.
+- `end_transaction` -- End the current undo transaction.
+- `undo` -- Undo the last transaction.
+- `redo` -- Redo the last undone transaction.
+
+### Story System
+- `story_state` -- Get current story/narrative state.
+- `story_advance` -- Advance the story to the next beat.
+- `story_goto` -- Jump to a specific story beat or chapter. **USE FOR TESTING.**
+- `story_play` -- Play/resume story playback.
+
+### Material and Visual
+- `material_set_param` -- **Set a material parameter on an actor's mesh.** Required for: BP_Glass FillLevel (pour effect), highlight materials on interactables.
+
+### Animation
+- `animation_play` -- Play an animation on an actor's skeletal mesh.
+- `animation_stop` -- Stop animation playback on an actor.
+
+### Audio
+- `audio_play_sound` -- Play a sound asset at a location. Use for testing audio loops.
+- `audio_stop_sound` -- Stop a playing sound.
+- `audio_set_volume` -- Set volume of a sound class.
+- `audio_set_listener` -- Set audio listener position.
+
+### Niagara Particle Systems
+- `niagara_set_parameter` -- Set a user parameter on a Niagara system.
+- `niagara_activate_system` -- **Activate or deactivate a Niagara system.** Required for NS_MemoryStream and NS_JoyfulAura in Scene 01.
+- `niagara_set_emitter_enable` -- Enable/disable a specific emitter.
+- `niagara_reset_system` -- Reset a Niagara system to initial state.
+
+### Play-In-Editor (Testing)
+- `start_pie` -- **Start a Play-In-Editor session.** Use after wiring to test. Modes: viewport, newWindow, VR.
+- `stop_pie` -- Stop the PIE session.
+- `pause_pie` -- Pause/resume PIE.
+- `step_pie` -- Step one frame in paused PIE.
+- `simulate_input` -- Simulate keyboard/mouse input in PIE.
+
+### Console
+- `execute_console` -- Execute a console command in the editor.
+- `get_cvar` -- Get value of a console variable.
+- `set_cvar` -- Set value of a console variable.
+
+### DataTable
+- `data_table_read` -- Read rows from a DataTable asset.
+- `data_table_write` -- Write or update rows in a DataTable.
+
+### Debug
+- `draw_debug` -- Draw debug shapes in viewport (lines, spheres, boxes).
+- `clear_debug` -- Clear all debug shapes.
 
 ### Python Execution
 - `execute_python` -- Run arbitrary Python in the editor's Python environment. Use this for anything the C++ handlers do not cover, and for all Perforce operations.
@@ -780,6 +874,15 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 27. **IF ANYTHING FAILS, TELL THE USER EXACTLY WHAT FAILED AND WHY.** Do not silently continue. Do not guess. Do not retry mutations without understanding the failure.
 28. **NEVER FABRICATE AN ASSET PATH.** If you cannot find it in the Content Browser dump, it does not exist. Ask the user.
 29. **NEVER SKIP THE PRE-FLIGHT.** Every scene gets the full pre-flight sequence. No shortcuts. No "I already read it." Read it again.
+30. **WRAP EVERY MUTATION SEQUENCE IN A TRANSACTION.** Call `begin_transaction` before starting mutations. Call `end_transaction` when done. If something crashes mid-sequence, you can `undo` to recover.
+31. **ALWAYS CALL `wait_ready` AFTER `load_level`.** The editor needs time to load. If you query actors before the level is ready, you get stale or empty data. No exceptions.
+32. **ACTIVATE NIAGARA SYSTEMS EXPLICITLY.** NS_MemoryStream and NS_JoyfulAura in Scene 01 are Niagara particle systems. Use `niagara_activate_system` to turn them on. They do NOT auto-activate.
+33. **SET MATERIAL PARAMETERS FOR VISUAL EFFECTS.** BP_Glass needs `material_set_param` with `FillLevel` for the pour effect. Highlight materials on interactables need parameter setup. Do not skip visual feedback.
+34. **USE `streaming_level_visibility` FOR SCENES 01-04.** These scenes share SL_SusanHome_Logic. You MUST toggle sublevel visibility so only the correct scene's actors are visible. Otherwise all 4 scenes render simultaneously.
+35. **SNAPSHOT BEFORE RISKY OPERATIONS.** Before any complex mutation sequence (10+ nodes), call `snapshot_graph` first. If the wiring goes wrong, use `restore_graph` to roll back instead of manually deleting nodes.
+36. **TEST WITH PIE AFTER EVERY SCENE.** After verification passes, call `start_pie` to test the scene in Play-In-Editor. Check that the first Level Sequence plays. Call `stop_pie` when done. If PIE crashes, log it and report to user.
+37. **USE `scene_snapshot` FOR VERIFICATION, NOT JUST `list_actors`.** `scene_snapshot` returns component details. `list_actors` only returns names. You need component data to verify makeTempBP components were added correctly.
+38. **USE `add_component` FOR EVERY [makeTempBP].** Creating a Blueprint with `create_blueprint` gives you an empty actor. You MUST then call `add_component` to add StaticMeshComponent, AudioComponent, etc. An empty Blueprint is a failed Blueprint.
 
 ---
 
