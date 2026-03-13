@@ -478,6 +478,14 @@ If an actor referenced in the roadmap does NOT exist in the scene:
 3. **If the asset does NOT exist**: Create a temp Blueprint with `create_blueprint`, add a **primitive mesh** (Cube, Sphere, Cylinder) via `add_component` as a visual placeholder, add ALL required logic (interactions, events, variables), compile it, spawn it, and **flag to the user**: "Created BP_X with placeholder mesh. Replace the mesh when ready."
 4. **NEVER skip an actor because it doesn't exist.** Create it with a placeholder and full logic.
 
+### Missing Niagara Asset Fallback Workflow
+If a required Niagara system (e.g., `NS_MemoryStream`, `NS_JoyfulAura`) does not exist in the project:
+1. You CANNOT create Niagara systems via MCP tools.
+2. Create a placeholder Blueprint actor instead (e.g., `BP_Placeholder_MemoryStream`).
+3. Add a PointLightComponent or primitive mesh to represent the particle system's location.
+4. Wire the activation/deactivation logic (e.g., `SetVisibility` on the placeholder) in the Level Blueprint exactly as if it were the real Niagara system.
+5. **FLAG TO USER:** "Niagara system NS_X does not exist. Created BP_Placeholder_X and wired logic. User must create the Niagara system and replace the placeholder."
+
 ---
 
 ## MUSIC TRACK TABLE (MANDATORY -- EXACT ASSET PATHS)
@@ -884,6 +892,18 @@ Before starting work on a scene, call `unreal_get_scene_requirements({ sceneId: 
 
 ### Final Sweep
 After all 10 scenes are wired, call `unreal_verify_all_scenes()` for a full project validation sweep.
+
+### End-to-End Scene 0 Test Protocol (MANDATORY FIRST TEST)
+Before wiring the rest of the project, you MUST prove the system works by fully wiring and testing Scene 00:
+1. Run Directive Zero self-audit.
+2. Load Scene 00 (`ML_Intro`).
+3. Spawn all required actors from the roadmap.
+4. Wire the Level Blueprint with interactions, music loop, and story step broadcasts.
+5. Configure the Level Sequence.
+6. Run `unreal_verify_scene({ sceneId: 0 })` until it passes.
+7. Call `start_pie({ mode: "viewport" })` to start the editor.
+8. Call `story_goto({ step: 1 })` and verify the sequence plays.
+9. Stop PIE. Only proceed to Scene 01 if Scene 00 passes this live test perfectly.
 
 ---
 
@@ -1429,9 +1449,10 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 ### Plugin and Engine Rules
 45. **CHECK ENABLED PLUGINS BEFORE USING PLUGIN APIs.** Call `execute_python` to list enabled plugins. If a plugin is not enabled, its classes and functions do not exist. Do not call them.
 46. **THIS PROJECT USES UE 5.6 OCULUS FORK.** Not mainline Epic. Some APIs may differ from public documentation. When in doubt, use `list_classes` and `list_functions` to verify what actually exists in this build.
+47. **USceneManager SUBSYSTEM VERIFICATION.** The path `/Script/SOH.SceneManager` is plausible but MUST be verified at runtime before use. Use `execute_python` with `unreal.SystemLibrary.get_engine_subsystem(unreal.SceneManager)` or `unreal.SystemLibrary.get_game_instance_subsystem(...)` to confirm the class exists and the exact module path is correct.
 
 ### Decision-Making Rules
-47. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
+48. **EVERY DECISION MUST HAVE FULL DATA AND WEIGHTED REASONING.** Before making any decision (which node to use, which pin to connect, which actor to reference, which approach to take), you MUST:
     a. **Load ALL relevant data** -- roadmap section, script section, content browser paths, UE context docs, pin info, actor components.
     b. **Assign weight to each data source**: Source truth files (roadmap, script) = highest weight. Content Browser dump = high weight. UE5 context docs = medium weight. Your training data = ZERO weight.
     c. **Document the reasoning** in your session log: "Chose X because roadmap says Y (weight: 10/10), content browser confirms Z exists (weight: 9/10), UE docs say approach A is correct (weight: 7/10)."
