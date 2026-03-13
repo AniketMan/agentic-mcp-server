@@ -585,6 +585,117 @@ unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
 
 ---
 
+## ROADMAP DISCREPANCIES (READ THIS BEFORE READING THE ROADMAP)
+
+The roadmap has stale level names. **CLAUDE.md overrides the roadmap for level names.** Use these corrections:
+
+| Roadmap Says | Actual (Content Browser) | Where |
+|---|---|---|
+| `SL_SusanHome_Logic` (line 70) | `SL_Main_Logic` | Scene 01 level header |
+| "Same home sublevel" (line 439) | `ML_Trailer` / `SL_TrailerScene8_Logic` | Scene 08 level header -- Scene 08 is NOT in the home sublevel |
+
+**When the roadmap says a level name, cross-check it against the SUBLEVEL LOADING ORDER table in this file. If they conflict, THIS FILE WINS.**
+
+---
+
+## SUBTITLE SYSTEM (MANDATORY)
+
+Every scene has VO narration. The subtitle system is:
+
+```
+BP_VoiceSource (plays audio) -> FSubtitleManager (broadcasts) -> UVrSubtitlesComponent (receives) -> BP_SubtitlesActor (displays)
+```
+
+VO lines are embedded in SoundWave assets via the `Subtitles` property. When `BP_VoiceSource` plays the audio, subtitles appear automatically IF the system is wired.
+
+For each scene:
+1. Spawn `BP_VoiceSource` at the narrator position (or attach to the speaking character)
+2. Spawn `BP_SubtitlesActor` in the player's view (typically attached to VR pawn or floating in front)
+3. Wire `BP_VoiceSource` to play the scene's VO track on the appropriate trigger
+4. The `FSubtitleManager` handles the rest automatically
+
+**If a scene has VO (all scenes do), you MUST have BP_VoiceSource and BP_SubtitlesActor spawned.**
+
+---
+
+## C++ COMPONENT TYPE REFERENCE (MANDATORY)
+
+The roadmap references these C++ component types. Use the EXACT class names when calling `add_component`:
+
+| Component | Class Name | Purpose | Used In |
+|---|---|---|---|
+| Observable | `UObservableComponent` | Gaze tracking -- fires when player looks at actor long enough | Gaze words, Heather gaze |
+| Grabbable | `UGrabbableComponent` | VR grip interaction -- fires on grip press/release | Doors, phone, fridge, objects |
+| Trigger Box | `UTriggerBoxComponent` | Overlap detection -- fires when player enters volume | Location markers, thresholds |
+| VR Movement | `USohVrMovementComponent` | Player movement control | BP_PlayerPawn |
+| Voice Source | `UVoiceSourceComponent` | Audio playback with subtitle integration | BP_VoiceSource |
+
+### Key Methods on These Components
+
+| Method | Component | What It Does |
+|---|---|---|
+| `SetTeleportationEnabled(bool)` | `USohVrMovementComponent` | Enable/disable teleport movement. Scene 00 disables it at Marker 1. |
+| `SetInteractable(bool)` | `UGrabbableComponent` | Enable/disable grab interaction. Use to gate interactions until the right moment. |
+| `SetObservable(bool)` | `UObservableComponent` | Enable/disable gaze tracking. Use to gate gaze interactions. |
+| `OnInteractionStart` | `UGrabbableComponent` | Delegate fired when player grips the object. |
+| `OnObservationComplete` | `UObservableComponent` | Delegate fired when gaze accumulation reaches threshold. |
+| `OnActorBeginOverlap` | `UTriggerBoxComponent` | Delegate fired when player enters the trigger volume. |
+
+---
+
+## DESPAWN AND VISIBILITY WORKFLOW (MANDATORY)
+
+The roadmap specifies "Despawn" conditions for many actors. Here is how to handle them:
+
+```
+Method 1: Destroy Actor (permanent removal)
+  execute_python: actor.destroy_actor()
+  Use when: Actor is never needed again in this scene
+
+Method 2: Set Visibility (temporary hide)
+  set_actor_property({ name: "ActorName", property: "bHidden", value: true })
+  Use when: Actor may need to reappear later
+
+Method 3: Disable Interaction (keep visible but non-interactive)
+  execute_python: component.set_interactable(False)
+  Use when: Actor should be visible but player cannot interact
+
+Method 4: Move Off-Screen (fallback)
+  set_actor_transform({ name: "ActorName", location: { x: 99999, y: 99999, z: -99999 } })
+  Use when: Other methods fail
+```
+
+**Wire despawn logic in the Level Blueprint using the trigger specified in the roadmap's "Despawn" column.**
+
+---
+
+## SCENE MANAGER API REFERENCE (MANDATORY)
+
+Scene transitions use the `USceneManager` C++ class. The key function is:
+
+```
+USceneManager::SwitchToSceneLatent(int32 SceneIndex)
+```
+
+In Blueprints, this is a latent action node. In Python:
+```python
+import unreal
+scene_manager = unreal.GameplayStatics.get_game_instance(unreal.EditorLevelLibrary.get_editor_world()).get_subsystem(unreal.SceneManagerSubsystem)
+scene_manager.switch_to_scene_latent(target_scene_index)
+```
+
+**Scene indices:** 0=Tutorial, 1=Home/Child, 2=Home/PreTeen, 3=Home/Teen, 4=Home/Adult, 5=Restaurant, 6=Rally, 7=Hospital, 8=Memory, 9=Legacy
+
+When wiring transitions in the Level Blueprint:
+1. Add the trigger event (door grab OnFinished, LS OnFinished, threshold overlap)
+2. Add a `FadeOut` node on `BP_PlayerCameraManager`
+3. Add a `SwitchToSceneLatent` node with the target scene index
+4. Connect: Trigger -> FadeOut -> SwitchToSceneLatent
+
+**If the transition does not use SwitchToSceneLatent, the next scene will not load.**
+
+---
+
 ## Source Truth (The ONLY Things That Matter)
 
 The script is the input. The roadmap is the blueprint. Everything you build traces back to them.

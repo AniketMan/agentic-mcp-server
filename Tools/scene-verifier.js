@@ -44,7 +44,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCENE_REQUIREMENTS = {
   0: {
     name: "Tutorial",
-    level: "ML_Main",
+    level: "SL_Main_Logic",
     actors: [
       { name: "BP_FloatingOrb", required: true, desc: "Floating orbs along path" },
       { name: "BP_LocationMarker", required: true, desc: "Position 1 and 2 markers", count: 2 },
@@ -71,7 +71,7 @@ const SCENE_REQUIREMENTS = {
 
   1: {
     name: "Home - Larger Than Life",
-    level: "SL_SusanHome_Logic",
+    level: "SL_Main_Logic",
     actors: [
       { name: "BP_HeatherChild", required: true, desc: "Child Heather character" },
       { name: "BP_AmbienceSound", required: true, desc: "Refrigerator hum" },
@@ -97,7 +97,7 @@ const SCENE_REQUIREMENTS = {
 
   2: {
     name: "Standing Up For Others",
-    level: "SL_SusanHome_Logic",
+    level: "SL_Main_Logic",
     actors: [
       { name: "BP_HeatherPreTeen2", required: true, desc: "PreTeen Heather at table" },
       { name: "BP_TeleportPoint", required: true, desc: "Table teleport point", count: 2 },
@@ -127,7 +127,7 @@ const SCENE_REQUIREMENTS = {
 
   3: {
     name: "Rescuers",
-    level: "SL_SusanHome_Logic",
+    level: "SL_Main_Logic",
     actors: [
       { name: "BP_Heather_Teen", required: true, desc: "Teen Heather" },
       { name: "BP_FriendMale", required: true, desc: "Male friend" },
@@ -144,9 +144,12 @@ const SCENE_REQUIREMENTS = {
     ],
     levelSequences: [
       { name: "LS_3_1", desc: "Friends enter, sit at table", bound: ["BP_Heather_Teen", "BP_FriendMale", "BP_FriendFemale"] },
+      { name: "LS_3_1_v2", desc: "Friends enter variant 2", bound: ["BP_Heather_Teen", "BP_FriendMale", "BP_FriendFemale"] },
       { name: "LS_3_2", desc: "Heather gets glasses from cabinet", bound: ["BP_Heather_Teen"] },
+      { name: "LS_3_2_v2", desc: "Cabinet variant 2", bound: ["BP_Heather_Teen"] },
       { name: "LS_3_3_v2", desc: "Cheers animation", bound: [] },
       { name: "LS_3_5", desc: "Heather retrieves glasses", bound: ["BP_Heather_Teen"] },
+      { name: "LS_3_5_V2", desc: "Glasses variant 2", bound: ["BP_Heather_Teen"] },
       { name: "LS_3_6", desc: "Pour interaction sequence", bound: [] },
       { name: "LS_3_7", desc: "Cheers complete, friends leave, transition to Scene 04", bound: ["BP_Heather_Teen", "BP_FriendMale", "BP_FriendFemale"] },
     ],
@@ -161,7 +164,7 @@ const SCENE_REQUIREMENTS = {
 
   4: {
     name: "Stepping Into Adulthood",
-    level: "SL_SusanHome_Logic",
+    level: "SL_Main_Logic",
     actors: [
       { name: "BP_PhoneInteraction", required: true, desc: "Phone with text messages" },
       { name: "BP_SimpleWorldWidget", required: true, desc: "3D text message widgets" },
@@ -200,6 +203,7 @@ const SCENE_REQUIREMENTS = {
     blueprints: [],
     levelSequences: [
       { name: "LS_5_1", desc: "Establish scene, Heather waiting", bound: ["BP_Heather_Adult"] },
+      { name: "LS_5_1_intro_loop", desc: "Ambient waiting loop until player arrives", bound: ["BP_Heather_Adult"] },
       { name: "LS_5_2", desc: "Heather talking energetically", bound: ["BP_Heather_Adult"] },
       { name: "LS_5_3", desc: "Heather sips, reaches out", bound: ["BP_Heather_Adult"] },
       { name: "LS_5_3_grip", desc: "Hand-hold grip variant with heartbeat haptic", bound: ["BP_Heather_Adult", "BP_HandPlacement"] },
@@ -216,7 +220,7 @@ const SCENE_REQUIREMENTS = {
 
   6: {
     name: "Dynamic Environment (Rally)",
-    level: "ML_DynamicEnvironment",
+    level: "SL_Scene6_Logic",
     actors: [
       { name: "BP_car", required: true, desc: "Dodge Challenger on chain, center suspended" },
       { name: "BP_PCrotate", required: true, desc: "Computer station, rotates until approached" },
@@ -269,7 +273,7 @@ const SCENE_REQUIREMENTS = {
 
   7: {
     name: "Hospital",
-    level: "ML_Hospital",
+    level: "SL_Hospital_Logic",
     actors: [
       { name: "BP_PlayerStartPoint", required: true, desc: "Hospital lobby entrance spawn" },
       { name: "BP_Recepcionist", required: true, desc: "Receptionist behind desk" },
@@ -302,7 +306,7 @@ const SCENE_REQUIREMENTS = {
 
   8: {
     name: "Memory Matching",
-    level: "ML_Main",
+    level: "SL_TrailerScene8_Logic",
     actors: [
       { name: "BP_MemoryMatching", required: true, desc: "Manages matching logic and match count" },
       { name: "BP_Teapot_Grabbable", required: true, desc: "Teapot for childhood match [makeTempBP]" },
