@@ -117,11 +117,13 @@ Always start by calling `unreal_status` to determine which mode is active and wh
 The script is the input. Everything you build traces back to it.
 
 - **Script**: `reference/source_truth/script_v2_ocvr.md` -- read this FIRST for any scene work
+- **Implementation Roadmap**: `reference/source_truth/OC_VR_Implementation_Roadmap.md` -- technical translation of the script. Maps every beat to assets, components, triggers, VO lines, level sequences. Includes all `[makeTempBP]` specs with full logic pseudocode. Scenes 0-9.
+- **Content Browser Hierarchy**: `reference/source_truth/ContentBrowser_Hierarchy.txt` -- full project asset dump. 3500+ lines. Every asset path. Cross-reference against the roadmap to know what exists vs what needs to be created.
 - **Game Design Flowchart**: `reference/game_design/SOHGameDesign.webp` -- interaction flow validation
 - **UE5 API Docs**: `Engine\Documentation\Builds` (relative to engine root, already on disk)
 - **Build Config**: `reference/project_config/*.Target.cs`
 
-You fill in the blanks. What the script defines explicitly is non-negotiable. What it does not define, you infer and adapt until confidence is high.
+You fill in the blanks. What the script defines explicitly is non-negotiable. The roadmap tells you exactly how to implement it. The Content Browser tells you what already exists. What is not covered, you infer and adapt until confidence is high.
 
 ---
 
