@@ -134,10 +134,12 @@ Before using ANY tool, call `unreal_get_ue_context` for the relevant category:
 ### Step 3: Load the Level and Verify State
 
 ```
-1. load_level -> load the master level and sublevels for this scene
-2. list_actors -> get all actors currently in the level
-3. get_level_blueprint -> inspect existing logic (may already have partial work)
-4. list_sequences -> check which level sequences exist
+1. load_level -> load the master level for this scene (see SCENE-TO-LEVEL MAPPING TABLE below)
+2. wait_ready -> MANDATORY. Wait for the level to finish loading. Do NOT query actors before this returns.
+3. For Scenes 01-04: streaming_level_visibility -> hide all other scenes' actors in SL_Main_Logic
+4. scene_snapshot -> get all actors WITH component details (not just list_actors)
+5. get_level_blueprint -> inspect existing logic (may already have partial work)
+6. list_sequences -> check which level sequences exist
 ```
 
 ### Step 4: Build Everything the Roadmap Specifies
@@ -162,7 +164,7 @@ You are building **Ordinary Courage VR**. You must not stop, skip, or abbreviate
 **YOUR INFERENCE CONFIDENCE MUST BE 99% BEFORE EXECUTING ANY MUTATION.**
 
 You must implement **EVERYTHING** described in the source truth. This means:
-- **Every single actor** must be spawned and placed accurately.
+- **Every single actor** must be spawned and placed using the SPATIAL POSITIONING WORKFLOW (within 200 units of the reference actor specified in the roadmap).
 - **Every single interaction trigger** (gaze, grab, proximity) must be wired.
 - **Every single audio cue** must be hooked up.
 - **Every single level sequence** must be bound and triggered at the exact right moment.
@@ -245,12 +247,12 @@ ListenForGameplayMessages(GripGrab) -> OnMessage -> CreateLSPlayer(LS_1_2) -> Pl
 
 These scenes require **Heartbeat haptic feedback** at specific moments. Use `PlayHapticEffect` on the VR motion controller. The pattern is a rhythmic double-pulse ("Heartbeat").
 
-| Scene | Moment | Trigger | Controller |
-|-------|--------|---------|------------|
-| 00 Tutorial | Player grips Object of Light | OnInteractionStart on BP_ObjectOfLight | Both hands |
-| 01 Home/Child | Player grips Heather (hug) | OnInteractionStart on BP_HeatherChild | Both hands |
-| 05 Restaurant | Player places hand on Heather's | OnInteractionStart on BP_HandPlacement | Hand that touches |
-| 08 Memory | Circle of unity (both hands placed) | Both BP_HandPlacement OnInteractionStart fired | Both hands |
+| Scene | Moment | Trigger | Controller | Haptic Asset |
+|-------|--------|---------|------------|-------------|
+| 00 Tutorial | Player grips Object of Light | OnInteractionStart on BP_ObjectOfLight | Both hands | /Game/Assets/VRTemplate/Haptics/Heartbeat |
+| 01 Home/Child | Player grips Heather (hug) | OnInteractionStart on BP_HeatherChild | Both hands | /Game/Assets/VRTemplate/Haptics/Heartbeat |
+| 05 Restaurant | Player places hand on Heather's | OnInteractionStart on BP_HandPlacement | Hand that touches | /Game/Assets/VRTemplate/Haptics/Heartbeat |
+| 08 Memory | Circle of unity (both hands placed) | Both BP_HandPlacement OnInteractionStart fired | Both hands | /Game/Assets/VRTemplate/Haptics/Heartbeat |
 
 **If you wire a scene listed above and do NOT add the haptic node, the scene is incomplete.**
 
@@ -332,16 +334,17 @@ These are the exact step values for each scene's MakeStruct nodes. If a step val
 
 Scenes share sublevels. You MUST load the correct sublevel before wiring a scene.
 
-| Scene(s) | Level Name | Type |
-|----------|-----------|------|
-| 00, 08 | ML_Main | Master level |
-| 01, 02, 03, 04 | SL_SusanHome_Logic | Sublevel of ML_Main |
-| 05 | SL_Restaurant_Logic | Sublevel of ML_Main |
-| 06 | ML_DynamicEnvironment | Standalone master level |
-| 07 | ML_Hospital | Standalone master level |
-| 09 | ML_Scene9 | Standalone master level |
+| Scene(s) | Master Level | Logic Sublevel | /Game/ Path (Master) | /Game/ Path (Logic Sublevel) |
+|----------|-------------|----------------|---------------------|-----------------------------|
+| 00 Tutorial | ML_Main | SL_Main_Logic | /Game/Maps/Game/Main/Levels/ML_Main | /Game/Maps/Game/Main/Levels/SLs/SL_Main_Logic |
+| 01-04 Home | ML_Main | SL_Main_Logic | /Game/Maps/Game/Main/Levels/ML_Main | /Game/Maps/Game/Main/Levels/SLs/SL_Main_Logic |
+| 05 Restaurant | ML_Restaurant | SL_Restaurant_Logic | /Game/Maps/Game/Restaurant/Levels/ML_Restaurant | /Game/Maps/Game/Restaurant/Levels/SLs/SL_Restaurant_Logic |
+| 06 Rally | ML_Scene6 | SL_Scene6_Logic | /Game/Maps/Game/Scene6/Levels/ML_Scene6 | /Game/Maps/Game/Scene6/Levels/SLs/SL_Scene6_Logic |
+| 07 Hospital | ML_Hospital | SL_Hospital_Logic | /Game/Maps/Game/Hospital/Levels/ML_Hospital | /Game/Maps/Game/Hospital/Levels/SLs/SL_Hospital_Logic |
+| 08 Memory | ML_Trailer | SL_TrailerScene8_Logic | /Game/Maps/Game/Trailer/Levels/ML_Trailer | /Game/Maps/Game/Scene8/Levels/SLs/SL_TrailerScene8_Logic |
+| 09 Legacy | ML_Scene9 | (none -- logic in master) | /Game/Maps/Game/Scene_9/ML_Scene9 | N/A |
 
-**Scenes 01-04 share the SAME sublevel (SL_SusanHome_Logic).** Actors from all 4 scenes coexist in this level. Use visibility and enable/disable to control what the player sees per scene.
+**Scenes 01-04 share the SAME sublevel (SL_Main_Logic).** Actors from all 4 scenes coexist in this level. Use visibility and enable/disable to control what the player sees per scene.
 
 **Scene 05 (SL_Restaurant_Logic) is CORRUPT.** Use Python-only path for all mutations. Never use C++ handlers.
 
@@ -349,16 +352,140 @@ Scenes share sublevels. You MUST load the correct sublevel before wiring a scene
 
 ## VR PAWN AND CONTROLLER REFERENCE
 
-To wire haptic feedback, you need the VR pawn and motion controller references:
+To wire haptic feedback, you need these EXACT assets and paths:
 
-- **VR Pawn Class:** Look up via `list_actors` -- search for `VRPawn`, `BP_VRPawn`, or `BP_PlayerPawn`
-- **Motion Controllers:** Access via `GetMotionController` on the pawn, or `Get Player Controller` -> `Get HMD Device` path
-- **Haptic Effect:** Use `PlayHapticEffect` node with:
-  - `HapticEffect`: Heartbeat pattern (create or reference existing `HapticFeedback_Heartbeat`)
+- **VR Pawn:** `/Game/Blueprints/Player/BP_PlayerPawn` (Content/Blueprints/Player/BP_PlayerPawn.uasset)
+- **Haptic Effect - Heartbeat:** `/Game/Assets/VRTemplate/Haptics/Heartbeat` (Content/Assets/VRTemplate/Haptics/Heartbeat.uasset)
+- **Haptic Effect - Grab:** `/Game/Assets/VRTemplate/Haptics/GrabHapticEffect` (Content/Assets/VRTemplate/Haptics/GrabHapticEffect.uasset)
+- **Motion Controllers:** Access via `GetMotionController` on BP_PlayerPawn, or `Get Player Controller` -> `Get HMD Device` path
+- **PlayHapticEffect node parameters:**
+  - `HapticEffect`: `/Game/Assets/VRTemplate/Haptics/Heartbeat` (the EXACT path, not a guess)
   - `Hand`: `EControllerHand::Left` or `Right` (or both)
   - `Scale`: 1.0
-- **Alternative:** Use `PlayDynamicForceFeedback` for custom patterns
 - **Look up the exact node class** via `unreal_get_ue_context({ category: "enhanced_input" })` before wiring
+
+---
+
+## PATH CONVERSION RULE (MANDATORY)
+
+The Content Browser shows paths like `Content/X/Y.uasset`. UE5 APIs expect `/Game/X/Y`. The conversion is:
+
+```
+Content Browser path: Content/Sequences/Scene1/LS_1_1.uasset
+UE5 API path:         /Game/Sequences/Scene1/LS_1_1
+
+Rule: Drop "Content/" prefix. Drop ".uasset" or ".umap" suffix. Prepend "/Game/".
+```
+
+**NEVER pass a Content Browser path directly to an API.** Always convert first.
+**NEVER fabricate a /Game/ path.** Always derive it from the Content Browser dump.
+
+Examples:
+| Content Browser | /Game/ Path |
+|----------------|------------|
+| Content/Assets/Characters/Heathers/HeatherChild/BP_HeatherChild.uasset | /Game/Assets/Characters/Heathers/HeatherChild/BP_HeatherChild |
+| Content/Sequences/Scene1/LS_1_1.uasset | /Game/Sequences/Scene1/LS_1_1 |
+| Content/Maps/Game/Main/Levels/ML_Main.umap | /Game/Maps/Game/Main/Levels/ML_Main |
+| Content/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_1.uasset | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_1 |
+| Content/Assets/VRTemplate/Haptics/Heartbeat.uasset | /Game/Assets/VRTemplate/Haptics/Heartbeat |
+| Content/Blueprints/Data/Message/Msg_StoryStep.uasset | /Game/Blueprints/Data/Message/Msg_StoryStep |
+
+---
+
+## SPATIAL POSITIONING WORKFLOW (MANDATORY)
+
+You CANNOT guess world-space coordinates. You MUST derive them from existing actors.
+
+```
+Step 1: Identify the REFERENCE ACTOR from the roadmap.
+        Example: "BP_Illustration spawns near the kitchen table" -> reference = KitchenTable actor
+
+Step 2: Get the reference actor's transform:
+        result = get_actor({ name: "KitchenTable" })
+        -> Returns: { location: { x: 1200, y: -400, z: 80 }, rotation: { ... } }
+
+Step 3: Calculate the offset based on the roadmap description:
+        - "on the table" = same X,Y + Z offset of 5-20 units above surface
+        - "in front of" = reference X + 100-200 units forward
+        - "next to" = reference Y + 50-150 units to the side
+        - "at eye level" = reference Z + 160 units (VR standing height)
+        - "on the floor" = reference X,Y + Z = 0
+
+Step 4: Spawn at calculated position:
+        spawn_actor({ blueprint: "BP_Illustration", location: { x: 1200, y: -400, z: 100 } })
+
+Step 5: Verify placement:
+        result = get_actor({ name: "BP_Illustration" })
+        -> Confirm location is within 200 units of reference
+
+Step 6: If position looks wrong, adjust:
+        set_actor_transform({ name: "BP_Illustration", location: { x: 1250, y: -380, z: 95 } })
+```
+
+**If the roadmap does not specify a reference actor, use `list_actors` to find the nearest relevant actor in the scene and position relative to it.**
+
+**NEVER spawn at (0, 0, 0). That is the world origin and almost certainly wrong.**
+
+---
+
+## MUSIC TRACK TABLE (MANDATORY -- EXACT ASSET PATHS)
+
+Every scene has a music track that MUST loop on BeginPlay. These are the EXACT paths:
+
+| Scene | /Game/ Path |
+|-------|------------|
+| 1 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_1 |
+| 2 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_2 |
+| 3 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_3 |
+| 4 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_4 |
+| 5 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_5 |
+| 6 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_6 |
+| 7 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_7 |
+| 8 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_8 |
+| 9 | /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_9 |
+
+Ambisonic versions also exist at `/Game/Sounds/Test_Music/AMBIX/SceneN_Mix02_MusicPrint_FOA_ambix` for Scenes 1-2.
+
+---
+
+## SFX PATHS PER SCENE (FROM CONTENT BROWSER)
+
+| Scene | SFX Available | /Game/ Path Prefix |
+|-------|--------------|--------------------|
+| 1 | heartbeat, giggle, freezer_loop, static_tv_loop, door_open | /Game/Sounds/SFX/Scene_1/ |
+| 2 | writing_loop, paper_rustle | /Game/Sounds/SFX/Scene_2/ |
+| 3 | fridge_open, glass_clink, pitcher_pickup, door_open/close, waterpour, friends_coming | /Game/Sounds/SFX/Scene_3/ |
+| 4 | phone_ding, door_open | /Game/Sounds/SFX/Scene_4/ |
+| 5-9 | Check Content Browser dump -- search `Content/Sounds/SFX/Scene_N/` | /Game/Sounds/SFX/Scene_N/ |
+
+**VO Tracks:**
+- `/Game/Sounds/VO/MVP_Susan_DCVO_Draft_050725` (master VO)
+- `/Game/Sounds/VO/Scene1_Mix02_VOPrint_` (Scene 1 VO print)
+- `/Game/Sounds/VO/Scene2_Mix02_VOPrint` (Scene 2 VO print)
+
+**Ambient:** `/Game/Sounds/SFX/amb_SOH_S1C1_roomtone_wo-fan_lp_Ambix` (room tone)
+
+---
+
+## PIE TESTING WORKFLOW (MANDATORY AFTER EVERY SCENE)
+
+```
+Step 1: start_pie({ mode: "viewport" })  -- or "VR" if headset is connected
+Step 2: Wait 5 seconds for level to load (use a delay or check output_log)
+Step 3: CHECK: Does the ambient music start playing? (listen for audio)
+Step 4: CHECK: Does the first Level Sequence play on BeginPlay? (for auto-start scenes)
+Step 5: CHECK: Are interaction actors visible at correct positions?
+Step 6: CHECK: Does the Output Log show any errors? Call output_log to read.
+Step 7: stop_pie()
+Step 8: Log results to session_log.md:
+        - PIE test for Scene N: [PASS/FAIL]
+        - Music: [playing/silent]
+        - First LS: [played/did not play]
+        - Errors: [none / list]
+Step 9: If FAIL, diagnose from output_log and fix before moving to next scene.
+```
+
+**Do NOT skip PIE testing. Verification checks the graph structure. PIE tests the runtime behavior. Both must pass.**
 
 ---
 
@@ -406,12 +533,12 @@ unreal.SystemLibrary.execute_console_command(None, 'r.ThumbnailPoolSize 0')
 - Use ONLY the Python fallback for ALL modifications:
 ```python
 import unreal
-bp = unreal.EditorAssetLibrary.load_asset('/Game/Maps/SubLevels/SL_Restaurant_Logic')
+bp = unreal.EditorAssetLibrary.load_asset('/Game/Maps/Game/Restaurant/Levels/SLs/SL_Restaurant_Logic')
 blueprint = unreal.BlueprintEditorLibrary.get_blueprint_asset(bp)
 event_graph = unreal.BlueprintEditorLibrary.find_event_graph(blueprint)
 # ... add nodes and connections via Python API ...
 unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
-unreal.EditorAssetLibrary.save_asset('/Game/Maps/SubLevels/SL_Restaurant_Logic')
+unreal.EditorAssetLibrary.save_asset('/Game/Maps/Game/Restaurant/Levels/SLs/SL_Restaurant_Logic')
 ```
 
 ### 3. Perforce Lock Contention
@@ -485,7 +612,7 @@ You must:
 6. Set the step value to 3 (`set_pin_default`).
 7. `compile_blueprint` -- it MUST compile clean.
 8. `get_blueprint` -- verify the graph is NOT empty.
-9. `spawn_actor` in the level at the correct position.
+9. `spawn_actor` in the level (use SPATIAL POSITIONING WORKFLOW to determine coordinates from reference actors).
 
 **An empty Blueprint is worse than no Blueprint. It means you created a shell and moved on.**
 **A Blueprint with 0 nodes in its EventGraph means you did NOTHING.**
@@ -508,15 +635,15 @@ When assembling a scene:
 **PHASE 2: LOAD AND INSPECT**
 8. `load_level` -> load the master level and its sublevels.
 9. `wait_ready` -> **MANDATORY.** Wait for the level to finish loading before querying anything.
-10. **For Scenes 01-04:** Call `streaming_level_visibility` to hide all other scenes' actors in SL_SusanHome_Logic. Only the current scene's actors should be visible.
+10. **For Scenes 01-04:** Call `streaming_level_visibility` to hide all other scenes' actors in SL_Main_Logic. Only the current scene's actors should be visible.
 11. `scene_snapshot` -> get all actors WITH component details (not just `list_actors`).
 12. `get_level_blueprint` -> inspect existing logic (may have partial work from previous session).
 
 **PHASE 3: BUILD (Inside a Transaction)**
 13. `begin_transaction` -> **MANDATORY.** Start an undo transaction before any mutations.
 14. **Implement EVERY interaction**:
-    a. `spawn_actor` -> place interaction actors (teleport points, triggers) near the target.
-    b. `set_actor_transform` -> position precisely based on spatial context.
+    a. `spawn_actor` -> place interaction actors using SPATIAL POSITIONING WORKFLOW (get reference actor transform, calculate offset, spawn).
+    b. `set_actor_transform` -> adjust position using coordinates from `get_actor` on reference actors. Never guess coordinates.
 15. **Wire the Level Blueprint** (follow the PIN DISCOVERY WORKFLOW below for every node):
     a. `execute_python` -> **Check out the Level Blueprint via Perforce.**
     b. `snapshot_graph` -> **Snapshot the graph BEFORE wiring** (rollback safety).
@@ -588,7 +715,7 @@ Every interaction in this game follows this pattern. If you skip any step, the i
 
 ### Pattern: Trigger Volume -> Story Progression
 ```
-1. spawn_actor(BP_LocationMarker, position)     <- The physical trigger in the world
+1. spawn_actor(BP_LocationMarker, position)     <- Use SPATIAL POSITIONING WORKFLOW below to get coords
 2. add_node(K2Node_AsyncAction_ListenForGameplayMessages)
    -> Channel: Message.Event.TeleportPoint       <- Listens for the trigger event
 3. add_node(CallFunction: GetSubsystem)          <- Gets the message subsystem
@@ -601,7 +728,7 @@ Every interaction in this game follows this pattern. If you skip any step, the i
 
 ### Pattern: Gaze Interaction -> Story Progression
 ```
-1. spawn_actor(BP_GazeText or target, position)  <- The gaze target
+1. spawn_actor(BP_GazeText or target, position)  <- Use SPATIAL POSITIONING WORKFLOW below to get coords
 2. set_actor_property: UObservableComponent.SetInteractable(true)
 3. add_node(K2Node_AsyncAction_ListenForGameplayMessages)
    -> Channel: Message.Event.GazeComplete         <- Listens for gaze completion
@@ -610,7 +737,7 @@ Every interaction in this game follows this pattern. If you skip any step, the i
 
 ### Pattern: Grab Interaction -> Story Progression
 ```
-1. spawn_actor(BP_Interactable, position)         <- The grabbable object
+1. spawn_actor(BP_Interactable, position)         <- Use SPATIAL POSITIONING WORKFLOW below to get coords
 2. set_actor_property: UGrabbableComponent.SetInteractable(true)
 3. add_node(K2Node_AsyncAction_ListenForGameplayMessages)
    -> Channel: Message.Event.GripGrab              <- Listens for grab event
@@ -629,7 +756,7 @@ Every interaction in this game follows this pattern. If you skip any step, the i
 ```
 1. add_node(Event BeginPlay) in level BP
 2. add_node(SpawnSound2D or PlaySound)
-3. set_pin_default: SoundAsset = ambient track
+3. set_pin_default: SoundAsset = /Game/Sounds/Test_Music/Susan_DCVO_BX_Draft_050825__Music__Scene_N (see MUSIC TRACK TABLE)
 4. set_pin_default: bLoop = true
 5. connect_pins: BeginPlay.then -> SpawnSound.execute
 ```
@@ -684,7 +811,7 @@ This is a real end-to-end example. Follow this exact pattern for every interacti
 
 // 1. Add the listener node
 result1 = add_node({
-  blueprint: "SL_SusanHome_Logic",
+  blueprint: "SL_Main_Logic",
   nodeType: "K2Node_AsyncAction_ListenForGameplayMessages",
   pos_x: 200, pos_y: 0
 })
@@ -703,7 +830,7 @@ set_pin_default({ nodeGuid: "GUID_A", pinName: "Channel", value: "Message.Event.
 
 // 4. Add the GetSubsystem node
 result2 = add_node({
-  blueprint: "SL_SusanHome_Logic",
+  blueprint: "SL_Main_Logic",
   nodeType: "CallFunction",
   functionName: "GetGameplayMessageSubsystem",
   pos_x: 600, pos_y: 0
@@ -715,7 +842,7 @@ pins2 = get_pin_info({ nodeGuid: "GUID_B" })
 
 // 6. Add the BroadcastMessage node
 result3 = add_node({
-  blueprint: "SL_SusanHome_Logic",
+  blueprint: "SL_Main_Logic",
   nodeType: "CallFunction",
   functionName: "BroadcastGameplayMessage",
   pos_x: 1000, pos_y: 0
@@ -727,7 +854,7 @@ pins3 = get_pin_info({ nodeGuid: "GUID_C" })
 
 // 8. Add the MakeStruct node for the story step
 result4 = add_node({
-  blueprint: "SL_SusanHome_Logic",
+  blueprint: "SL_Main_Logic",
   nodeType: "MakeStruct",
   structType: "Msg_StoryStep",
   pos_x: 800, pos_y: 200
@@ -751,7 +878,7 @@ connect_pins({ sourceNode: "GUID_A", sourcePin: "OnMessage", targetNode: "GUID_C
 connect_pins({ sourceNode: "GUID_D", sourcePin: "output", targetNode: "GUID_C", targetPin: "Message" })
 
 // 12. Compile
-compile_blueprint({ blueprint: "SL_SusanHome_Logic" })
+compile_blueprint({ blueprint: "SL_Main_Logic" })
 ```
 
 **NOTE:** The GUIDs, pin names, and struct pin names above are EXAMPLES. The real values come from the tool responses. USE THE REAL VALUES.
@@ -857,7 +984,7 @@ When the roadmap specifies `[makeTempBP]`, you MUST create a fully functional Bl
 4. Wire ALL logic from the pseudocode (BeginPlay, event handlers, delegates)
 5. `compile_blueprint` -- it MUST compile clean
 6. `get_blueprint` -- verify the graph has nodes (NOT empty)
-7. `spawn_actor` in the level at the correct position
+7. `spawn_actor` in the level (use SPATIAL POSITIONING WORKFLOW to determine coordinates from reference actors)
 8. Verify with `unreal_verify_scene` that the Blueprint passes all checks
 
 **An empty Blueprint is worse than no Blueprint. It means you created a shell and moved on.**
@@ -965,7 +1092,7 @@ Do NOT skip checkout. Do NOT skip save. The `check_out_file` method accepts: ful
 - `load_level` -- Load a sublevel. **ALWAYS call `wait_ready` after this.**
 - `remove_sublevel` -- Remove a streaming sublevel from the world.
 - `get_level_blueprint` -- Get level blueprint details. **NOTE: POST endpoint. Body param is `level` (not `levelName`).**
-- `streaming_level_visibility` -- **CRITICAL: Set visibility of a streaming sublevel.** Required for Scenes 01-04 which share SL_SusanHome_Logic. Toggle visibility per scene.
+- `streaming_level_visibility` -- **CRITICAL: Set visibility of a streaming sublevel.** Required for Scenes 01-04 which share SL_Main_Logic. Toggle visibility per scene.
 - `focus_actor` -- Focus the viewport camera on a specific actor.
 - `select_actor` -- Select an actor in the editor.
 - `set_viewport` -- Set viewport camera position and orientation.
@@ -1103,9 +1230,9 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 29. **NEVER SKIP THE PRE-FLIGHT.** Every scene gets the full pre-flight sequence. No shortcuts. No "I already read it." Read it again.
 30. **WRAP EVERY MUTATION SEQUENCE IN A TRANSACTION.** Call `begin_transaction` before starting mutations. Call `end_transaction` when done. If something crashes mid-sequence, you can `undo` to recover.
 31. **ALWAYS CALL `wait_ready` AFTER `load_level`.** The editor needs time to load. If you query actors before the level is ready, you get stale or empty data. No exceptions.
-32. **ACTIVATE NIAGARA SYSTEMS EXPLICITLY.** NS_MemoryStream and NS_JoyfulAura in Scene 01 are Niagara particle systems. Use `niagara_activate_system` to turn them on. They do NOT auto-activate.
+32. **NIAGARA SYSTEMS: NS_MemoryStream and NS_JoyfulAura DO NOT EXIST in the Content Browser.** They are referenced in the roadmap for Scene 01 but have NOT been created yet. **FLAG THESE TO THE USER** as missing assets. Do NOT attempt to activate non-existent Niagara systems. If the user creates them, use `niagara_activate_system` to turn them on. The only Niagara systems that exist are VRTemplate ones: NS_MenuLaser, NS_PlayAreaBounds, NS_TeleportRing, NS_TeleportTrace.
 33. **SET MATERIAL PARAMETERS FOR VISUAL EFFECTS.** BP_Glass needs `material_set_param` with `FillLevel` for the pour effect. Highlight materials on interactables need parameter setup. Do not skip visual feedback.
-34. **USE `streaming_level_visibility` FOR SCENES 01-04.** These scenes share SL_SusanHome_Logic. You MUST toggle sublevel visibility so only the correct scene's actors are visible. Otherwise all 4 scenes render simultaneously.
+34. **USE `streaming_level_visibility` FOR SCENES 01-04.** These scenes share SL_Main_Logic. You MUST toggle sublevel visibility so only the correct scene's actors are visible. Otherwise all 4 scenes render simultaneously.
 35. **SNAPSHOT BEFORE RISKY OPERATIONS.** Before any complex mutation sequence (10+ nodes), call `snapshot_graph` first. If the wiring goes wrong, use `restore_graph` to roll back instead of manually deleting nodes.
 36. **TEST WITH PIE AFTER EVERY SCENE.** After verification passes, call `start_pie` to test the scene in Play-In-Editor. Check that the first Level Sequence plays. Call `stop_pie` when done. If PIE crashes, log it and report to user.
 37. **USE `scene_snapshot` FOR VERIFICATION, NOT JUST `list_actors`.** `scene_snapshot` returns component details. `list_actors` only returns names. You need component data to verify makeTempBP components were added correctly.
