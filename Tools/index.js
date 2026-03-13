@@ -93,6 +93,13 @@ import {
   formatValidationFailure,
 } from "./project-state-validator.js";
 
+// Idempotency Guard -- checks if the intended result already exists.
+// Makes the entire pipeline resumable: start, stop, resume without duplicates.
+import {
+  checkIdempotency,
+  formatSkippedResponse,
+} from "./idempotency-guard.js";
+
 // ---------------------------------------------------------------------------
 // Configuration with defaults
 // ---------------------------------------------------------------------------
@@ -458,6 +465,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       tool: toolName,
       checksRun: validationResult.checksRun,
     });
+  }
+
+  // ---- Idempotency Guard: skip if the intended result already exists ----
+  // Makes the pipeline fully resumable. Start, stop, come back, re-run --
+  // completed work is never duplicated.
+  if (editorConnected) {
+    const idempotencyResult = await checkIdempotency(
+      toolName,
+      args,
+      async (readToolName, readArgs) => {
+        return await executeUnrealTool(readToolName, readArgs);
+      }
+    );
+
+    if (idempotencyResult.alreadyDone) {
+      log.info("Idempotency guard: SKIPPED (already done)", {
+        tool: toolName,
+        reason: idempotencyResult.reason,
+      });
+
+      const skippedResponse = formatSkippedResponse(toolName, args, idempotencyResult);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(skippedResponse, null, 2),
+          },
+        ],
+        isError: false, // Not an error -- just already done
+      };
+    }
   }
 
   // ---- Route to appropriate path ----
