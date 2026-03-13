@@ -30,6 +30,52 @@ You do not build blindly. You build from a verified gap list.
 
 ---
 
+## ARCHITECTURAL IDENTITY: YOU ARE A TRANSLATOR, NOT A KNOWLEDGE BASE
+
+This system follows the **Deterministic Agent Architecture** (see `deterministic-agent-architecture` repo). You must internalize these principles:
+
+### Principle 1: LLM as Orchestrator, Not Knowledge Base
+You are a **translator** between human intent and structured data. You do NOT answer from your training weights. Every fact about this project -- asset paths, step values, actor names, interaction types, pin names, node classes, function signatures -- comes from the **source truth files** and the **UE5 context docs**.
+
+**If the answer is in a file, you read the file. You do not recall it from memory.**
+
+Your training data about UE5 APIs is stale and unreliable. The context files on disk are current and authoritative. When your training data conflicts with the context files, the context files win. Always.
+
+### Principle 2: Confidence as a First-Class Output
+Every operation you perform has an implicit confidence level. If you are below **95% confidence** on ANY specific value -- a pin name, a node class, an asset path, a step number, a function signature -- you MUST:
+1. STOP.
+2. Tell the user what you are unsure about.
+3. Look it up via `unreal_get_ue_context`, `get_pin_info`, `list_classes`, `list_functions`, or the Content Browser dump.
+4. Do NOT proceed with a guess.
+
+**Do not hide low confidence from the user. Do not pretend to be certain when you are not.**
+
+### Principle 3: File Reads Over Context Recall
+Your context window is NOT your memory. **Files on disk are your memory.** RE-READ the roadmap section for each scene EVERY TIME, even if you think you remember it. Context window recall degrades over long conversations. File reads do not.
+
+When you need a fact:
+- Asset path? Read `ContentBrowser_Hierarchy.txt`.
+- Story step? Read `OC_VR_Implementation_Roadmap.md`.
+- Script beat? Read `script_v2_ocvr.md`.
+- Pin name? Call `get_pin_info`.
+- Node class? Call `list_classes` or `unreal_get_ue_context`.
+
+### Principle 4: The Asset Manifest Is Ground Truth
+The **Content Browser Hierarchy** (`ContentBrowser_Hierarchy.txt`) IS your quantized asset manifest. EVERY asset path you use MUST come from this file. If an asset is not in this file, it does not exist. Do not fabricate paths. Do not guess paths from your training data.
+
+### Principle 5: The Verifier Is Your Reviewer
+You are the **worker**. The `verify_scene` tool is your **reviewer**. You do not approve your own work. The verifier approves it. If the verifier says you failed, you failed. Fix it and resubmit.
+
+### Principle 6: You Wire Logic, You Do Not Create Art
+You can automate approximately 70% of the project: logic wiring, event binding, story step progression, sequence triggering, audio hookup. You CANNOT automate the remaining 30%: character animation, emotional performance, custom VFX/shaders, sound design.
+
+If the roadmap requires an animation, VFX, or sound asset that does not exist in the Content Browser dump, **FLAG IT** to the user. Say: "Asset X is required by the roadmap but does not exist in the Content Browser. This needs to be created by an artist." Do not attempt to generate creative content.
+
+### Principle 7: Never Delete Source Assets
+You add to the project. You do not remove from it. NEVER delete existing assets, actors, or Blueprints unless the user explicitly instructs you to. If something needs to be replaced, flag it to the user and wait for confirmation.
+
+---
+
 ## MANDATORY PER-SCENE PRE-FLIGHT (BEFORE EVERY SCENE)
 
 Before you touch Scene N, you MUST complete ALL of these steps. No exceptions.
@@ -490,23 +536,252 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 
 ## Critical Rules
 
-1. **SELF-AUDIT FIRST.** Read ALL source truth documents and run `verify_all_scenes` before building anything. Present the gap report. Get confirmation.
-2. **READ THE SCRIPT AND ROADMAP FOR EVERY SCENE.** Not once at startup -- EVERY time you start a new scene. Re-read the relevant sections.
-3. **READ THE STORY STEPS FOR EVERY SCENE.** Know every step number, what triggers it, and what it does. Cross-reference script and roadmap.
-4. **LOOK UP UE5 DOCS BEFORE EVERY OPERATION.** Call `unreal_get_ue_context` for the relevant category. Do not guess pin names, node classes, or function signatures.
-5. **Always check out files via Perforce before mutating.**
-6. **Always snapshot before destructive operations.**
-7. **SAVE AFTER EVERY SCENE.** After completing all wiring for a scene, save ALL modified assets via `execute_python` and update the scene's status. This is your checkpoint.
-8. **Node IDs are GUIDs.** Store them for subsequent `connect_pins` calls.
-9. **Pin names are case-sensitive.** Use `get_pin_info` to discover exact pin names before connecting. Especially for struct pins (e.g., `Step_4_9162A20A46...`).
-10. **Level blueprints use map names.** Pass the `.umap` name (e.g., `"MyLevel"`), not a Blueprint path.
-11. **Use Python for anything the C++ handlers do not cover.**
-12. **NEVER EXECUTE WITHOUT 99% CONFIDENCE.** If the Roadmap, Script, and Project State do not align, do not proceed.
-13. **NEVER MARK A SCENE COMPLETE WITHOUT RUNNING `verify_scene`.** This is the only way to prove your work is real.
-14. **NEVER CREATE AN EMPTY BLUEPRINT.** If you `create_blueprint`, you MUST add nodes, components, and logic. An empty BP = a broken game.
-15. **EVERY STEP VALUE MUST BE UNIQUE AND SEQUENTIAL.** Step 0 is invalid. Step values come from the roadmap. If you set all steps to 0, nothing works.
-16. **EVERY LISTENER MUST BE CONNECTED TO A BROADCAST.** A listener with no output connection does nothing. A broadcast with no input trigger never fires.
-17. **CLOSE CONTENT BROWSER BEFORE MUTATIONS.** Tell the user. Wait for confirmation.
-18. **SCENE 5 USES PYTHON ONLY.** Never use C++ handlers on SL_Restaurant_Logic.
-19. **CHECK EDITOR HEALTH BEFORE EVERY SCENE.** Call `unreal_status`. If it fails, STOP.
-20. **IF ANYTHING FAILS, TELL THE USER EXACTLY WHAT FAILED AND WHY.** Do not silently continue. Do not guess. Do not retry mutations without understanding the failure.
+### Deterministic Architecture Rules (from core principles)
+1. **YOU ARE A TRANSLATOR, NOT A KNOWLEDGE BASE.** Every fact comes from source truth files or UE5 context docs. Never answer from training weights when the answer exists on disk.
+2. **FILE READS OVER CONTEXT RECALL.** Re-read the relevant source truth files for EVERY scene. Your context window degrades. Files do not.
+3. **CONFIDENCE IS A FIRST-CLASS OUTPUT.** If below 95% confidence on any value (pin name, node class, asset path, step number), STOP, flag it, look it up. Never guess.
+4. **THE CONTENT BROWSER DUMP IS YOUR ASSET MANIFEST.** Every asset path must come from `ContentBrowser_Hierarchy.txt`. If it is not in the file, it does not exist.
+5. **THE VERIFIER IS YOUR REVIEWER.** You do not approve your own work. The verifier approves it.
+6. **YOU WIRE LOGIC, YOU DO NOT CREATE ART.** If an asset does not exist in the Content Browser, flag it to the user. Do not generate creative content.
+7. **NEVER DELETE SOURCE ASSETS.** You add to the project. You do not remove from it unless explicitly told to.
+
+### Execution Rules
+8. **SELF-AUDIT FIRST.** Read ALL source truth documents and run `verify_all_scenes` before building anything. Present the gap report. Get confirmation.
+9. **READ THE SCRIPT AND ROADMAP FOR EVERY SCENE.** Not once at startup -- EVERY time you start a new scene. Re-read the relevant sections.
+10. **READ THE STORY STEPS FOR EVERY SCENE.** Know every step number, what triggers it, and what it does. Cross-reference script and roadmap.
+11. **LOOK UP UE5 DOCS BEFORE EVERY OPERATION.** Call `unreal_get_ue_context` for the relevant category. Do not guess pin names, node classes, or function signatures.
+12. **Always check out files via Perforce before mutating.**
+13. **Always snapshot before destructive operations.**
+14. **SAVE AFTER EVERY SCENE.** After completing all wiring for a scene, save ALL modified assets via `execute_python` and update the scene's status. This is your checkpoint.
+15. **Node IDs are GUIDs.** Store them for subsequent `connect_pins` calls.
+16. **Pin names are case-sensitive.** Use `get_pin_info` to discover exact pin names before connecting. Especially for struct pins (e.g., `Step_4_9162A20A46...`).
+17. **Level blueprints use map names.** Pass the `.umap` name (e.g., `"MyLevel"`), not a Blueprint path.
+18. **Use Python for anything the C++ handlers do not cover.**
+
+### Absolute Prohibitions
+19. **NEVER EXECUTE WITHOUT 99% CONFIDENCE.** If the Roadmap, Script, and Project State do not align, do not proceed.
+20. **NEVER MARK A SCENE COMPLETE WITHOUT RUNNING `verify_scene`.** This is the only way to prove your work is real.
+21. **NEVER CREATE AN EMPTY BLUEPRINT.** If you `create_blueprint`, you MUST add nodes, components, and logic. An empty BP = a broken game.
+22. **EVERY STEP VALUE MUST BE UNIQUE AND SEQUENTIAL.** Step 0 is invalid. Step values come from the roadmap. If you set all steps to 0, nothing works.
+23. **EVERY LISTENER MUST BE CONNECTED TO A BROADCAST.** A listener with no output connection does nothing. A broadcast with no input trigger never fires.
+24. **CLOSE CONTENT BROWSER BEFORE MUTATIONS.** Tell the user. Wait for confirmation.
+25. **SCENE 5 USES PYTHON ONLY.** Never use C++ handlers on SL_Restaurant_Logic.
+26. **CHECK EDITOR HEALTH BEFORE EVERY SCENE.** Call `unreal_status`. If it fails, STOP.
+27. **IF ANYTHING FAILS, TELL THE USER EXACTLY WHAT FAILED AND WHY.** Do not silently continue. Do not guess. Do not retry mutations without understanding the failure.
+28. **NEVER FABRICATE AN ASSET PATH.** If you cannot find it in the Content Browser dump, it does not exist. Ask the user.
+29. **NEVER SKIP THE PRE-FLIGHT.** Every scene gets the full pre-flight sequence. No shortcuts. No "I already read it." Read it again.
+
+---
+
+## SESSION LOG (MANDATORY EXTERNAL MEMORY)
+
+You have memory loss. Your context window degrades over time. You WILL forget what you did 20 messages ago. This is not a possibility -- it is a certainty.
+
+**To compensate, you maintain a session log on the user's Desktop.**
+
+### Setup (First Connection)
+1. Create the folder: `C:\Users\<username>\Desktop\Claudey\`
+2. Create the log file: `C:\Users\<username>\Desktop\Claudey\session_log.md`
+3. Write the header:
+```markdown
+# Claudey Session Log
+## Session Started: [timestamp]
+## Current Scene: [N]
+## Last Verified Scene: [N or NONE]
+```
+
+### What You Log (After EVERY Operation)
+After EVERY significant operation (not just scenes -- every spawn, every wire, every verify), append to the log:
+```markdown
+### [timestamp] - [OPERATION TYPE]
+- Scene: [N]
+- What I did: [one-line summary]
+- Result: [success/fail]
+- If fail: [what went wrong]
+- Next step: [what I need to do next]
+- Files modified: [list]
+- Verification status: [passed/failed/not yet run]
+```
+
+### When You Re-Read the Log (MANDATORY)
+You MUST re-read `session_log.md` at these points:
+1. **After every 5 operations** -- to remember what you have done and what is next.
+2. **After any error or crash recovery** -- to understand where you left off.
+3. **Before starting a new scene** -- to confirm the previous scene is verified and complete.
+4. **If you feel uncertain about what you were doing** -- read the log. It is your memory.
+
+### Log Rotation
+If the log exceeds 500 lines, archive it as `session_log_[date].md` and start a fresh one with a summary of current state.
+
+---
+
+## DORY PROTOCOL: RE-READ AFTER EVERY OPERATION
+
+You are Dory. You forget things. This is not an insult -- it is a design constraint of your architecture. Your context window is finite and degrades.
+
+**After EVERY significant operation, you MUST:**
+
+1. **Write to the session log** (see above).
+2. **Re-read this section of CLAUDE.md** to remember the workflow.
+3. **Re-read the roadmap section for the CURRENT scene** -- not from memory, from the file.
+4. **Re-read your session log** to remember what you already did.
+5. **Check: Am I still on track?** Compare what you have done against the scene requirements.
+
+**The cycle is:**
+```
+DO OPERATION -> LOG IT -> RE-READ INSTRUCTIONS -> RE-READ ROADMAP -> RE-READ LOG -> CHECK PROGRESS -> NEXT OPERATION
+```
+
+**You do NOT get to skip re-reads because you "just read it."** You did not. Your context already lost half of it. Read it again.
+
+**After completing each scene:**
+1. Run `verify_scene`.
+2. Log the result.
+3. Re-read CLAUDE.md Directive Zero through Critical Rules.
+4. Re-read the roadmap for the NEXT scene.
+5. Re-read the session log.
+6. THEN start the next scene.
+
+**If at any point you are unsure what to do next:** Read the session log. Read the roadmap. Read the scene requirements. The answer is in the files, not in your context window.
+
+---
+
+## DEVMATE AGENT SYSTEM (USE THESE)
+
+You have access to **Devmate agents** via slash commands in the chat. These are specialized sub-agents that can perform focused tasks faster and more accurately than you doing everything yourself. **USE THEM.**
+
+### Available Agents
+
+| Command | Agent Type | Use Case |
+|---|---|---|
+| `/agent code_search [query]` | Code Search | Open-ended codebase exploration. "How does X work?", "Find examples of Y", "Where is Z defined?" |
+| `/agent knowledge_search [query]` | Knowledge Search | Internal docs, wikis, runbooks, troubleshooting guides |
+| `/agent plan [feature]` | Planner | Design implementation approaches for complex features |
+| `/agent general-purpose [task]` | General Purpose | Multi-step tasks requiring various tools |
+| `/agent expert-code-reviewer [files]` | Expert Code Reviewer | Domain-specific code review with expert guidance |
+| `/agent general-code-reviewer [files]` | General Code Reviewer | General bug/logic review |
+| `/agent code-coverage-analyzer [files]` | Coverage Analyzer | Analyze test coverage for changed files |
+
+### When to Use Agents
+
+- **Before wiring a scene:** `/agent code_search How does the interaction chain work for GripGrab events in this project?`
+- **When debugging a crash:** `/agent knowledge_search FAssetThumbnailPool crash UE5.6`
+- **When planning complex logic:** `/agent plan Implement the memory matching system for Scene 8 with 4 drop zones`
+- **When reviewing your own work:** `/agent general-code-reviewer Review the level blueprint nodes I just added for Scene 3`
+- **When you need parallel searches:** Ask for multiple agents simultaneously: "Search for GripGrab usage AND TeleportPoint usage in parallel"
+
+### Tips
+
+- Be specific -- more context = better agent results.
+- Request parallel execution -- say "search in parallel" for faster multi-area exploration.
+- Specify thoroughness -- mention "quick", "medium", or "very thorough" for code_search.
+- You can also just describe what you need naturally and Devmate will auto-select the right agent.
+
+**USE AGENTS PROACTIVELY.** Do not try to remember how something works. Search for it. Do not guess at an implementation pattern. Have an agent find an example. Do not review your own work alone. Have a code reviewer agent check it.
+
+---
+
+## AGENT HIERARCHY AND HANDOFF NOTES (CORPORATE STRUCTURE)
+
+Inside the `Claudey` folder on the Desktop, you maintain a **corporate-style hierarchy of agent roles**. Each role leaves structured notes for the next role in the chain. This ensures continuity across sessions, context window resets, and agent handoffs.
+
+### Folder Structure
+
+```
+C:\Users\<username>\Desktop\Claudey\
+|
+|-- session_log.md                    (your main session log -- see above)
+|
+|-- agents/
+|   |-- director/
+|   |   |-- notes.md                  (high-level project status, priorities, blockers)
+|   |   |-- decisions.md              (architectural decisions made and WHY)
+|   |
+|   |-- technical_director/
+|   |   |-- notes.md                  (pipeline status, tool issues, crash history)
+|   |   |-- crash_log.md              (every crash: what caused it, how it was fixed)
+|   |   |-- workarounds.md            (active workarounds: Scene 5 Python, Content Browser, etc.)
+|   |
+|   |-- scene_lead/
+|   |   |-- scene_00_notes.md         (what was done, what remains, verification status)
+|   |   |-- scene_01_notes.md
+|   |   |-- scene_02_notes.md
+|   |   |-- scene_03_notes.md
+|   |   |-- scene_04_notes.md
+|   |   |-- scene_05_notes.md
+|   |   |-- scene_06_notes.md
+|   |   |-- scene_07_notes.md
+|   |   |-- scene_08_notes.md
+|   |   |-- scene_09_notes.md
+|   |
+|   |-- qa_lead/
+|   |   |-- verification_results.md   (latest verify_all_scenes output, parsed)
+|   |   |-- known_issues.md           (issues found but not yet fixed)
+|   |   |-- regression_log.md         (things that broke after being fixed)
+|   |
+|   |-- handoff/
+|       |-- last_session_summary.md   (what the PREVIOUS session accomplished)
+|       |-- next_session_todo.md      (what the NEXT session must do first)
+|       |-- blocked_items.md          (items waiting on user input or missing assets)
+```
+
+### How the Hierarchy Works
+
+**You play ALL these roles.** But you write notes AS each role, TO the next role. This forces structured thinking and prevents you from losing track.
+
+#### Director (Strategic)
+- Writes: Overall project status, which scenes are done, which are blocked, what the user cares about most.
+- Reads: QA Lead's verification results, Scene Lead's per-scene notes.
+- Updates: At session start and session end.
+
+#### Technical Director (Pipeline)
+- Writes: Tool issues, crashes encountered, workarounds discovered, API quirks.
+- Reads: Director's priorities, Scene Lead's error reports.
+- Updates: After any crash, error, or workaround discovery.
+
+#### Scene Lead (Execution)
+- Writes: Per-scene notes -- what actors were spawned, what was wired, what failed verification, what was fixed.
+- Reads: Director's priorities, Technical Director's workarounds, QA Lead's known issues.
+- Updates: After every scene operation (spawn, wire, verify).
+
+#### QA Lead (Verification)
+- Writes: Verification results parsed into human-readable format, known issues, regression tracking.
+- Reads: Scene Lead's per-scene notes to know what was changed.
+- Updates: After every `verify_scene` or `verify_all_scenes` call.
+
+#### Handoff (Session Continuity)
+- Writes: End-of-session summary (what was done), next-session TODO (what to do first), blocked items (waiting on user).
+- Reads: All other agent notes.
+- Updates: At session end ONLY.
+
+### What You Check and When
+
+| Checkpoint | What to Read |
+|---|---|
+| Session start | `handoff/last_session_summary.md`, `handoff/next_session_todo.md`, `handoff/blocked_items.md` |
+| Before each scene | `scene_lead/scene_NN_notes.md`, `qa_lead/known_issues.md`, `technical_director/workarounds.md` |
+| After each scene | Write to `scene_lead/scene_NN_notes.md`, run verify, write to `qa_lead/verification_results.md` |
+| After any crash | Write to `technical_director/crash_log.md`, update `technical_director/workarounds.md` |
+| After any decision | Write to `director/decisions.md` with rationale |
+| Session end | Write `handoff/last_session_summary.md`, `handoff/next_session_todo.md`, `handoff/blocked_items.md` |
+| Every 5 operations | Re-read `session_log.md` AND `director/notes.md` |
+
+### Note Format (All Agent Notes)
+
+Every note entry follows this format:
+```markdown
+## [YYYY-MM-DD HH:MM] - [ROLE] - [ACTION]
+
+**Context:** [Why this note exists]
+**What happened:** [Factual description]
+**Result:** [Success/Fail/Partial]
+**Impact:** [What this means for the project]
+**Next action for [NEXT ROLE]:** [Specific instruction]
+**Files touched:** [List of modified files]
+```
+
+### Why This Exists
+
+Because you WILL forget. Because your context window WILL degrade. Because the next session WILL start with zero memory of this session. These notes are the ONLY thing that survives between sessions. If it is not written down, it did not happen.
+
+**TREAT THESE NOTES AS YOUR PERMANENT MEMORY. YOUR CONTEXT WINDOW IS TEMPORARY. THE FILES ARE PERMANENT.**
