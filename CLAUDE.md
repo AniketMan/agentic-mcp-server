@@ -496,35 +496,53 @@ You must:
 
 When assembling a scene:
 
+**PHASE 1: PREPARATION (Read Everything First)**
 1. **Read the Roadmap** (`OC_VR_Implementation_Roadmap.md`) for the target scene.
 2. **Read the Script** (`script_v2_ocvr.md`) for narrative context.
 3. **Read the Story Steps** for this scene from the roadmap -- know every step number and what triggers it.
-4. **Check the Content Browser Dump** (`ContentBrowser_Hierarchy.txt`) to find the exact asset paths.
-5. **Look up UE5 docs** via `unreal_get_ue_context` for every operation type you will perform.
-6. `load_level` -> load the master level and its sublevels.
-7. `list_actors` -> get all actors with world positions.
-8. **Implement EVERY interaction**:
-   a. `spawn_actor` -> place interaction actors (teleport points, triggers) near the target.
-   b. `set_actor_transform` -> position precisely based on spatial context.
-9. **Wire the Level Blueprint**:
-   a. `execute_python` -> **Check out the Level Blueprint via Perforce.**
-   b. `get_level_blueprint` -> inspect existing logic.
-   c. `add_node` -> add listeners (gaze, grab, proximity).
-   d. `add_node` -> add story step broadcasting.
-   e. `connect_pins` -> wire the COMPLETE interaction chain (Input -> Listener -> Broadcast).
-   f. `set_pin_default` -> set the EXACT step value required by the script. Use `get_pin_info` to get the exact struct pin name (e.g., `Step_4_9162A20A46...`).
-   g. **Wire the Ambient Music Loop** to start on BeginPlay and loop.
-   h. `compile_blueprint` -> compile the level blueprint.
-   i. `execute_python` -> **Save the Level Blueprint via Perforce.**
-10. **Configure Sequences**:
+4. **Read the LS Master Reference** (`LevelSequence_Master_Reference.md`) for this scene -- every LS, actors, triggers, on-complete.
+5. **Check the Content Browser Dump** (`ContentBrowser_Hierarchy.txt`) to find the exact asset paths.
+6. **Look up UE5 docs** via `unreal_get_ue_context` for every operation type you will perform.
+7. **Get scene requirements** via `unreal_get_scene_requirements({ sceneId: N })` -- this is your build checklist.
+
+**PHASE 2: LOAD AND INSPECT**
+8. `load_level` -> load the master level and its sublevels.
+9. `wait_ready` -> **MANDATORY.** Wait for the level to finish loading before querying anything.
+10. **For Scenes 01-04:** Call `streaming_level_visibility` to hide all other scenes' actors in SL_SusanHome_Logic. Only the current scene's actors should be visible.
+11. `scene_snapshot` -> get all actors WITH component details (not just `list_actors`).
+12. `get_level_blueprint` -> inspect existing logic (may have partial work from previous session).
+
+**PHASE 3: BUILD (Inside a Transaction)**
+13. `begin_transaction` -> **MANDATORY.** Start an undo transaction before any mutations.
+14. **Implement EVERY interaction**:
+    a. `spawn_actor` -> place interaction actors (teleport points, triggers) near the target.
+    b. `set_actor_transform` -> position precisely based on spatial context.
+15. **Wire the Level Blueprint** (follow the PIN DISCOVERY WORKFLOW below for every node):
+    a. `execute_python` -> **Check out the Level Blueprint via Perforce.**
+    b. `snapshot_graph` -> **Snapshot the graph BEFORE wiring** (rollback safety).
+    c. `add_node` -> add listeners (gaze, grab, proximity). **Store the returned nodeGuid.**
+    d. `get_pin_info(nodeGuid)` -> **Read the EXACT pin names from the response.** Do not guess.
+    e. `add_node` -> add story step broadcasting. **Store the returned nodeGuid.**
+    f. `get_pin_info(nodeGuid)` -> **Read the EXACT pin names.**
+    g. `connect_pins` -> wire using the EXACT pin names from `get_pin_info`. Not from memory. Not from training data.
+    h. `set_pin_default` -> set the EXACT step value from the Story Step Quick Reference.
+    i. **Wire the Ambient Music Loop** to start on BeginPlay and loop.
+    j. `compile_blueprint` -> compile the level blueprint. **If compile fails, read the error, fix it, recompile.**
+    k. `execute_python` -> **Save the Level Blueprint via Perforce.**
+16. **Configure Sequences**:
     a. `execute_python` -> **Check out the Level Sequence via Perforce.**
     b. Verify sequence exists in Content Browser dump.
     c. `ls_open` -> open the scene's level sequence.
     d. `ls_bind_actor` -> bind characters and cameras.
     e. `ls_add_track` / `ls_add_section` -> set timing for audio and animations.
     f. `execute_python` -> **Save the Level Sequence via Perforce.**
-11. **VERIFY**: Call `unreal_verify_scene({ sceneId: N })`. Fix all failures. Re-verify until `passed: true`.
-12. **SAVE CHECKPOINT**: Save all dirty packages. Update project state.
+17. `end_transaction` -> **Close the undo transaction.**
+
+**PHASE 4: VERIFY AND SAVE**
+18. **VERIFY**: Call `unreal_verify_scene({ sceneId: N })`. Fix all failures. Re-verify until `passed: true`.
+19. **PIE TEST**: Call `start_pie` to test the scene. Verify the first LS plays. Call `stop_pie`.
+20. **SAVE CHECKPOINT**: Save all dirty packages. Update project state.
+21. **WRITE NOTES**: Update `Claudey/agents/scene_lead/scene_NN_notes.md` and `Claudey/agents/qa_lead/verification_results.md`.
 
 ---
 
@@ -617,6 +635,215 @@ Every interaction in this game follows this pattern. If you skip any step, the i
 ```
 
 **EVERY SCENE MUST HAVE ALL APPLICABLE PATTERNS WIRED. NO EXCEPTIONS.**
+
+---
+
+## PIN DISCOVERY WORKFLOW (MANDATORY FOR EVERY NODE)
+
+This is the #1 source of wiring failures. You MUST follow this workflow for EVERY node you add:
+
+```
+Step 1: add_node(blueprint, nodeType, ...)
+        -> Returns: { nodeGuid: "abc123-def456", pins: [...] }
+        -> STORE the nodeGuid. You need it for everything.
+
+Step 2: get_pin_info({ nodeGuid: "abc123-def456" })
+        -> Returns: { pins: [
+             { name: "execute", direction: "input", type: "exec" },
+             { name: "then", direction: "output", type: "exec" },
+             { name: "Message", direction: "input", type: "struct" },
+             { name: "Step_4_9162A20A46B2C3...", direction: "input", type: "int" }
+           ]}
+        -> READ the exact pin names. They are case-sensitive. They may contain GUIDs.
+        -> DO NOT use pin names from your training data. USE THESE.
+
+Step 3: connect_pins({
+          sourceNode: "abc123-def456",
+          sourcePin: "then",          <- EXACT name from get_pin_info
+          targetNode: "ghi789-jkl012",
+          targetPin: "execute"         <- EXACT name from get_pin_info
+        })
+
+Step 4: set_pin_default({
+          nodeGuid: "abc123-def456",
+          pinName: "Step_4_9162A20A46B2C3...",  <- EXACT name from get_pin_info
+          value: "3"                              <- From Story Step Quick Reference
+        })
+```
+
+**NEVER skip Step 2.** If you guess a pin name and it is wrong, the connection silently fails and the interaction is broken.
+
+---
+
+## COMPLETE WORKED EXAMPLE: Wiring a Gaze Interaction (Scene 01, Step 1)
+
+This is a real end-to-end example. Follow this exact pattern for every interaction.
+
+```
+// GOAL: Player gazes at Heather -> Story Step 1 broadcasts
+
+// 1. Add the listener node
+result1 = add_node({
+  blueprint: "SL_SusanHome_Logic",
+  nodeType: "K2Node_AsyncAction_ListenForGameplayMessages",
+  pos_x: 200, pos_y: 0
+})
+// result1 = { nodeGuid: "GUID_A", pins: [...] }
+
+// 2. Get pin info for the listener
+pins1 = get_pin_info({ nodeGuid: "GUID_A" })
+// pins1 = { pins: [
+//   { name: "Channel", direction: "input", type: "gameplay_tag" },
+//   { name: "OnMessage", direction: "output", type: "delegate" },
+//   { name: "then", direction: "output", type: "exec" }
+// ]}
+
+// 3. Set the channel to GazeComplete
+set_pin_default({ nodeGuid: "GUID_A", pinName: "Channel", value: "Message.Event.GazeComplete" })
+
+// 4. Add the GetSubsystem node
+result2 = add_node({
+  blueprint: "SL_SusanHome_Logic",
+  nodeType: "CallFunction",
+  functionName: "GetGameplayMessageSubsystem",
+  pos_x: 600, pos_y: 0
+})
+// result2 = { nodeGuid: "GUID_B", pins: [...] }
+
+// 5. Get pin info
+pins2 = get_pin_info({ nodeGuid: "GUID_B" })
+
+// 6. Add the BroadcastMessage node
+result3 = add_node({
+  blueprint: "SL_SusanHome_Logic",
+  nodeType: "CallFunction",
+  functionName: "BroadcastGameplayMessage",
+  pos_x: 1000, pos_y: 0
+})
+// result3 = { nodeGuid: "GUID_C", pins: [...] }
+
+// 7. Get pin info
+pins3 = get_pin_info({ nodeGuid: "GUID_C" })
+
+// 8. Add the MakeStruct node for the story step
+result4 = add_node({
+  blueprint: "SL_SusanHome_Logic",
+  nodeType: "MakeStruct",
+  structType: "Msg_StoryStep",
+  pos_x: 800, pos_y: 200
+})
+// result4 = { nodeGuid: "GUID_D", pins: [...] }
+
+// 9. Get pin info -- THIS IS WHERE THE STEP PIN NAME LIVES
+pins4 = get_pin_info({ nodeGuid: "GUID_D" })
+// pins4 = { pins: [
+//   { name: "Step_4_9162A20A46B2C3...", direction: "input", type: "int" },
+//   { name: "output", direction: "output", type: "struct" }
+// ]}
+
+// 10. Set the step value to 1 (Scene 01, Step 1 = Gaze at Heather)
+set_pin_default({ nodeGuid: "GUID_D", pinName: "Step_4_9162A20A46B2C3...", value: "1" })
+
+// 11. Connect everything using EXACT pin names from get_pin_info
+connect_pins({ sourceNode: "GUID_A", sourcePin: "then", targetNode: "GUID_B", targetPin: "execute" })
+connect_pins({ sourceNode: "GUID_B", sourcePin: "ReturnValue", targetNode: "GUID_C", targetPin: "Target" })
+connect_pins({ sourceNode: "GUID_A", sourcePin: "OnMessage", targetNode: "GUID_C", targetPin: "execute" })
+connect_pins({ sourceNode: "GUID_D", sourcePin: "output", targetNode: "GUID_C", targetPin: "Message" })
+
+// 12. Compile
+compile_blueprint({ blueprint: "SL_SusanHome_Logic" })
+```
+
+**NOTE:** The GUIDs, pin names, and struct pin names above are EXAMPLES. The real values come from the tool responses. USE THE REAL VALUES.
+
+---
+
+## ERROR RECOVERY FLOWCHART
+
+When any MCP tool returns an error, follow this flowchart:
+
+```
+ERROR RECEIVED
+  |
+  v
+Is it a connection timeout / null response?
+  YES -> Call unreal_status. If editor is dead, STOP. Tell user.
+  NO  -> Continue below.
+  |
+  v
+Is it "asset not found" / "blueprint not found"?
+  YES -> Check ContentBrowser_Hierarchy.txt for the correct path.
+         If path is wrong, fix it and retry.
+         If asset truly doesn't exist, FLAG to user.
+  NO  -> Continue below.
+  |
+  v
+Is it "pin not found" / "pin name mismatch"?
+  YES -> Call get_pin_info(nodeGuid) to get the REAL pin names.
+         Use the real names and retry.
+         DO NOT guess a different pin name.
+  NO  -> Continue below.
+  |
+  v
+Is it "compile error"?
+  YES -> Read the compile error message.
+         Common fixes:
+         - Missing connection: find the unconnected pin and wire it.
+         - Type mismatch: check pin types via get_pin_info.
+         - Missing variable: add the variable via add_variable.
+         Fix the issue and recompile.
+  NO  -> Continue below.
+  |
+  v
+Is it "node already exists" / idempotency skip?
+  YES -> This is FINE. The idempotency guard caught a duplicate. Move on.
+  NO  -> Continue below.
+  |
+  v
+Is it "checkout failed" / Perforce error?
+  YES -> Tell user: "File [path] is locked. Check Perforce."
+         Wait for user to resolve.
+  NO  -> Continue below.
+  |
+  v
+UNKNOWN ERROR:
+  1. Log the full error to session_log.md and technical_director/crash_log.md.
+  2. Call restore_graph to roll back to the last snapshot.
+  3. Tell the user the exact error message.
+  4. DO NOT retry blindly. Wait for guidance.
+```
+
+---
+
+## CONFIDENCE LEVELS CLARIFICATION
+
+Three different confidence thresholds exist. They are NOT the same thing:
+
+| Threshold | What It Applies To | Meaning |
+|-----------|-------------------|----------|
+| **70% (0.7)** | MCP Server Confidence Gate | The MCP server automatically rejects mutation calls below 0.7. This is a hard technical gate in the quantized inference layer. You cannot override it. |
+| **95%** | Your self-assessed confidence on specific VALUES | If you are below 95% sure about a specific pin name, node class, asset path, or step number, you MUST look it up before using it. This prevents silent failures from wrong values. |
+| **99%** | Your self-assessed confidence on EXECUTING A MUTATION | Before calling any mutation tool (add_node, connect_pins, spawn_actor, etc.), your overall confidence that the operation is correct must be 99%. This means: you have read the source truth, looked up the API, verified the asset path, and confirmed the pin names. |
+
+**In practice:** Look everything up (95% rule) -> Verify everything is correct (99% rule) -> MCP server double-checks (70% gate).
+
+---
+
+## VERIFIER FALLBACK (If verify_scene Itself Fails)
+
+If `unreal_verify_scene` returns an error instead of a pass/fail report:
+
+1. **Check editor connection:** Call `unreal_status`. If dead, STOP.
+2. **Check the error message:** If it says "could not query [endpoint]", that specific check failed but others may have passed. Log which check failed.
+3. **Manual verification fallback:**
+   a. `list_actors` -> verify all required actors exist
+   b. `get_level_blueprint` -> verify nodes exist (not empty)
+   c. `list_sequences` -> verify all required LS exist
+   d. `compile_blueprint` -> verify it compiles clean
+   e. `scene_snapshot` -> verify components on makeTempBP actors
+4. **Log the verifier failure** to `technical_director/crash_log.md`.
+5. **Tell the user:** "The automated verifier failed with [error]. I ran manual checks instead. Results: [list]."
+6. **DO NOT skip verification entirely.** If the verifier fails, you do manual checks. There is no path that skips verification.
 
 ---
 
