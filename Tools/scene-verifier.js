@@ -148,6 +148,7 @@ const SCENE_REQUIREMENTS = {
       { name: "LS_3_3_v2", desc: "Cheers animation", bound: [] },
       { name: "LS_3_5", desc: "Heather retrieves glasses", bound: ["BP_Heather_Teen"] },
       { name: "LS_3_6", desc: "Pour interaction sequence", bound: [] },
+      { name: "LS_3_7", desc: "Cheers complete, friends leave, transition to Scene 04", bound: ["BP_Heather_Teen", "BP_FriendMale", "BP_FriendFemale"] },
     ],
     interactions: [
       { type: "GRAB", desc: "Fridge door grab opens fridge", actor: "BP_Fridge", event: "OnInteractionStart" },
@@ -170,6 +171,9 @@ const SCENE_REQUIREMENTS = {
     blueprints: [],
     levelSequences: [
       { name: "LS_4_1", desc: "Phone notification setup", bound: [] },
+      { name: "LS_4_2", desc: "Text message sequence plays", bound: [] },
+      { name: "LS_4_3", desc: "Susan reacts to messages, emotional shift", bound: [] },
+      { name: "LS_4_4", desc: "Phone drop, transition to restaurant", bound: [] },
     ],
     interactions: [
       { type: "GRAB", desc: "Phone grab shows text messages", actor: "BP_PhoneInteraction", event: "OnInteractionStart" },
@@ -198,7 +202,8 @@ const SCENE_REQUIREMENTS = {
       { name: "LS_5_1", desc: "Establish scene, Heather waiting", bound: ["BP_Heather_Adult"] },
       { name: "LS_5_2", desc: "Heather talking energetically", bound: ["BP_Heather_Adult"] },
       { name: "LS_5_3", desc: "Heather sips, reaches out", bound: ["BP_Heather_Adult"] },
-      { name: "LS_5_4", desc: "Intimate moment, fade", bound: ["BP_Heather_Adult"] },
+      { name: "LS_5_3_grip", desc: "Hand-hold grip variant with heartbeat haptic", bound: ["BP_Heather_Adult", "BP_HandPlacement"] },
+      { name: "LS_5_4", desc: "Intimate moment, fade to rally", bound: ["BP_Heather_Adult"] },
     ],
     interactions: [
       { type: "TRIGGER", desc: "Chair marker overlap sits Susan down, disables teleport", actor: "BP_LocationMarker", event: "OnComponentBeginOverlap" },

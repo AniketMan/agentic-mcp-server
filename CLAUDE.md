@@ -241,6 +241,144 @@ ListenForGameplayMessages(GripGrab) -> OnMessage -> CreateLSPlayer(LS_1_2) -> Pl
 
 ---
 
+## HAPTIC FEEDBACK TABLE (MANDATORY)
+
+These scenes require **Heartbeat haptic feedback** at specific moments. Use `PlayHapticEffect` on the VR motion controller. The pattern is a rhythmic double-pulse ("Heartbeat").
+
+| Scene | Moment | Trigger | Controller |
+|-------|--------|---------|------------|
+| 00 Tutorial | Player grips Object of Light | OnInteractionStart on BP_ObjectOfLight | Both hands |
+| 01 Home/Child | Player grips Heather (hug) | OnInteractionStart on BP_HeatherChild | Both hands |
+| 05 Restaurant | Player places hand on Heather's | OnInteractionStart on BP_HandPlacement | Hand that touches |
+| 08 Memory | Circle of unity (both hands placed) | Both BP_HandPlacement OnInteractionStart fired | Both hands |
+
+**If you wire a scene listed above and do NOT add the haptic node, the scene is incomplete.**
+
+---
+
+## SCENE TRANSITION TABLE (MANDATORY)
+
+Every scene must transition to the next. If the transition is not wired, the player is stuck.
+
+| From | To | Mechanism | Trigger |
+|------|----|-----------|---------|
+| 00 Tutorial | 01 Home/Child | Door threshold trigger | Player walks through BP_Door_Tutorial threshold |
+| 01 Home/Child | 02 Home/PreTeen | Cross-fade (LS_1_4) | Automatic after LS_1_3 completes |
+| 02 Home/PreTeen | 03 Home/Teen | Door grab | Player grabs BP_Door |
+| 03 Home/Teen | 04 Home/Adult | Auto after cheers | LS_3_7 completes -> fade |
+| 04 Home/Adult | 05 Restaurant | Door grab | Player grabs BP_Door (front door) |
+| 05 Restaurant | 06 Rally | Fade (LS_5_4) | After hand-hold sequence completes |
+| 06 Rally | 07 Hospital | Door threshold | Player walks through BP_Door_Hospital |
+| 07 Hospital | 08 Memory | Auto after detective | LS_7_6 completes -> fade to black |
+| 08 Memory | 09 Legacy | Circle of unity | LS_8_Final completes -> transition |
+| 09 Legacy | End/Credits | Sunrise fade to white | LS_9_6 completes -> fade to white |
+
+**Every transition MUST have an OnFinished delegate or threshold trigger wired. A missing transition = player stuck forever.**
+
+---
+
+## STORY STEP QUICK REFERENCE (MANDATORY)
+
+These are the exact step values for each scene's MakeStruct nodes. If a step value is wrong, the story progression breaks.
+
+| Scene | Step | Triggered By |
+|-------|------|--------------|
+| 01 | 1 | Gaze at Heather complete |
+| 01 | 2 | Hug interaction (grip) |
+| 01 | 3 | Cross-fade complete (LS_1_4 OnFinished) |
+| 02 | 1 | Walk to table marker |
+| 02 | 2 | Grab illustration |
+| 02 | 3 | Door grab (exit to Scene 03) |
+| 03 | 1 | Door opens, friends enter |
+| 03 | 2 | Fridge grab |
+| 03 | 3 | Pitcher grab |
+| 03 | 4 | Pour complete (3 glasses filled) |
+| 03 | 5 | Cheers complete (LS_3_7 OnFinished) |
+| 04 | 1 | Phone grab |
+| 04 | 2 | All 7 text messages read |
+| 04 | 3 | Phone drop / door grab |
+| 05 | 1 | Sit at table (marker overlap) |
+| 05 | 2 | Gaze at Heather |
+| 05 | 3 | Hand-hold grip |
+| 05 | 4 | Fade complete (LS_5_4 OnFinished) |
+| 06 | 1 | Shape selection (triangle or square) |
+| 06 | 2 | Weight placed on scale |
+| 06 | 3 | First cradle pull |
+| 06 | 4 | Second cradle pull (chaos) |
+| 06 | 5 | Sign grab (car falls) |
+| 06 | 6 | Phone grab (hospital call) |
+| 07 | 1 | Lobby establish (BeginPlay) |
+| 07 | 2 | Reception desk marker overlap |
+| 07 | 3 | Number card grab |
+| 07 | 4 | Hallway walk complete |
+| 07 | 5 | Enter meeting room |
+| 07 | 6 | Detective delivers news |
+| 08 | 1 | Teapot matched to childhood photo |
+| 08 | 2 | Illustration matched to preteen photo |
+| 08 | 3 | Pitcher matched to teen photo |
+| 08 | 4 | Phone matched to adult photo + circle of unity |
+| 09 | 1 | Flowers begin (BeginPlay) |
+| 09 | 2 | Scholarship recipients shown |
+| 09 | 3 | Youth programs shown |
+| 09 | 4 | NO HATE Act shown |
+| 09 | 5 | Media appearances shown |
+| 09 | 6 | Sunrise finale complete |
+
+**Every step value in this table MUST have a corresponding MakeStruct node with that exact value. Zero is NEVER valid.**
+
+---
+
+## SUBLEVEL LOADING ORDER (MANDATORY)
+
+Scenes share sublevels. You MUST load the correct sublevel before wiring a scene.
+
+| Scene(s) | Level Name | Type |
+|----------|-----------|------|
+| 00, 08 | ML_Main | Master level |
+| 01, 02, 03, 04 | SL_SusanHome_Logic | Sublevel of ML_Main |
+| 05 | SL_Restaurant_Logic | Sublevel of ML_Main |
+| 06 | ML_DynamicEnvironment | Standalone master level |
+| 07 | ML_Hospital | Standalone master level |
+| 09 | ML_Scene9 | Standalone master level |
+
+**Scenes 01-04 share the SAME sublevel (SL_SusanHome_Logic).** Actors from all 4 scenes coexist in this level. Use visibility and enable/disable to control what the player sees per scene.
+
+**Scene 05 (SL_Restaurant_Logic) is CORRUPT.** Use Python-only path for all mutations. Never use C++ handlers.
+
+---
+
+## VR PAWN AND CONTROLLER REFERENCE
+
+To wire haptic feedback, you need the VR pawn and motion controller references:
+
+- **VR Pawn Class:** Look up via `list_actors` -- search for `VRPawn`, `BP_VRPawn`, or `BP_PlayerPawn`
+- **Motion Controllers:** Access via `GetMotionController` on the pawn, or `Get Player Controller` -> `Get HMD Device` path
+- **Haptic Effect:** Use `PlayHapticEffect` node with:
+  - `HapticEffect`: Heartbeat pattern (create or reference existing `HapticFeedback_Heartbeat`)
+  - `Hand`: `EControllerHand::Left` or `Right` (or both)
+  - `Scale`: 1.0
+- **Alternative:** Use `PlayDynamicForceFeedback` for custom patterns
+- **Look up the exact node class** via `unreal_get_ue_context({ category: "enhanced_input" })` before wiring
+
+---
+
+## BLUEPRINT SCRIPTS FALLBACK (EMERGENCY USE)
+
+If MCP wiring fails repeatedly, pasteable Python scripts exist in the repo:
+
+```
+BlueprintScripts/
+  bp_helpers.py                    -- HTTP API wrapper (paste first)
+  cinematic/
+    all_scenes_cinematic.py        -- Auto-play all 10 scenes as movie
+  interactive/
+    all_scenes_interactive.py      -- Full interactive build, all 10 scenes
+```
+
+These scripts call the same MCP HTTP endpoints. Paste `bp_helpers.py` into the UE5 Python console first, then paste the scene script. Use ONLY as a last resort if MCP tools are failing.
+
+---
+
 ## CRASH PREVENTION PROTOCOL (MANDATORY)
 
 These are not warnings. These are procedures you MUST follow to prevent editor crashes.
