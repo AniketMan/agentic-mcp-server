@@ -1505,23 +1505,29 @@ The ambient music/audio track for each scene **MUST** start playing on `BeginPla
 
 ---
 
-## NODE WEIGHT REINFORCEMENT LEARNING (MANDATORY)
+## NODE WEIGHT REINFORCEMENT LEARNING (MANDATORY HARD GATE)
 
-To achieve deterministic execution, you MUST maintain a **Node Weight Ledger**. This system tracks the success/failure of your pin connection patterns and node configurations, allowing you to learn exponentially across runs until every operation hits 95%+ confidence.
+To achieve deterministic execution, you MUST maintain a **Node Weight Ledger**. This system tracks the success/failure of your pin connection patterns and node configurations. 
+
+**CRITICAL RULE:** You CANNOT move forward if a node operation fails. A failure requires an immediate rollback, ledger update, and retry. You only advance when the node operation hits 100% verification success.
 
 ### The Ledger File
 The ledger is stored at `reference/source_truth/node_weight_ledger.json`. 
 You MUST read this file before wiring any Blueprint.
 
-### How It Works (The Backprop Loop)
-1. **First Run (Exploration):** You infer a pin connection (e.g., `OutputPin[0]` of `GetSubsystem` to `InputPin[2]` of `BroadcastMessage`). You log this attempt in your session log.
-2. **Verification (Feedback):** You run `unreal_verify_scene`. 
-    - If it PASSES: The pattern was correct.
-    - If it FAILS: The pattern was incorrect.
-3. **Weight Update (Backprop):** You open `node_weight_ledger.json` and update the weight for that specific pattern:
-    - **Success:** `weight = min(weight + 0.2, 1.0)` (Exponential confidence increase)
-    - **Failure:** `weight = max(weight - 0.5, 0.0)` (Harsh penalty for failure)
-4. **Subsequent Runs (Exploitation):** Before connecting pins, you check the ledger. If a pattern has a weight of `0.95` or higher, you use it IMMEDIATELY without inference. It is now a deterministic rule.
+### The Hard Gate Backprop Loop
+1. **Snapshot:** Call `snapshot_graph` before making a new connection.
+2. **Attempt:** Infer a pin connection and execute it.
+3. **Verify:** Immediately run `unreal_verify_scene` or query the graph to verify the connection.
+4. **If PASS (100% Success):**
+   - Update `node_weight_ledger.json`: `weight = 1.0` (Verified Deterministic)
+   - Increment `successCount`.
+   - **Proceed to the next node.**
+5. **If FAIL:**
+   - **STOP.** Do not proceed to the next node.
+   - Update `node_weight_ledger.json`: `weight = 0.0`, increment `failureCount`, log the error reason.
+   - Call `restore_graph` to roll back the failed attempt.
+   - **Retry** with a different pin configuration. Repeat until PASS.
 
 ### Ledger Schema Example
 ```json
@@ -1532,24 +1538,27 @@ You MUST read this file before wiring any Blueprint.
       "targetNode": "CallFunction:BroadcastMessage",
       "sourcePin": "ReturnValue",
       "targetPin": "Target",
-      "weight": 0.95,
-      "successCount": 4,
-      "failureCount": 0
+      "weight": 1.0,
+      "successCount": 1,
+      "failureCount": 0,
+      "status": "VERIFIED_DETERMINISTIC"
     },
     "MakeStruct_to_Broadcast": {
       "sourceNode": "MakeStruct:Msg_StoryStep",
       "targetNode": "CallFunction:BroadcastMessage",
       "sourcePin": "Msg_StoryStep",
       "targetPin": "Message",
-      "weight": 0.3,
-      "successCount": 1,
-      "failureCount": 2
+      "weight": 0.0,
+      "successCount": 0,
+      "failureCount": 1,
+      "status": "FAILED_NEEDS_RETRY",
+      "lastError": "Pin 'Message' does not accept type 'Msg_StoryStep'"
     }
   }
 }
 ```
 
-**CRITICAL RULE:** You are the author of this ledger. If a pattern fails, you MUST update the ledger immediately to prevent repeating the mistake. If it succeeds, you MUST update the ledger to solidify the deterministic path.
+**EXPLOITATION:** On subsequent runs or scenes, before connecting pins, check the ledger. If a pattern has `weight: 1.0`, use it IMMEDIATELY without inference. It is a hard rule.
 
 ---
 
@@ -1571,13 +1580,17 @@ You have memory loss. Your context window degrades over time. You WILL forget wh
 ```
 
 ### What You Log (After EVERY Operation)
-After EVERY significant operation (not just scenes -- every spawn, every wire, every verify), append to the log:
+After EVERY significant operation (not just scenes -- every spawn, every wire, every verify), append to the log. 
+**For node wiring operations, you MUST explicitly log the path and weight so you can read it on the next run.**
+
 ```markdown
 ### [timestamp] - [OPERATION TYPE]
 - Scene: [N]
 - What I did: [one-line summary]
+- Path Attempted: [e.g., NodeA(PinX) -> NodeB(PinY)]
+- Ledger Weight Used: [0.0 to 1.0]
 - Result: [success/fail]
-- If fail: [what went wrong]
+- If fail: [what went wrong, what I updated the weight to]
 - Next step: [what I need to do next]
 - Files modified: [list]
 - Verification status: [passed/failed/not yet run]
