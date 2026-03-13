@@ -37,13 +37,20 @@ This project uses **Perforce** for source control. UE5 locks files by default. B
 1. **Check out the file first** via `execute_python`:
 ```python
 import unreal
-unreal.SourceControl.check_out(unreal.EditorAssetLibrary.load_asset('/Game/Path/To/Asset'))
+# check_out_file takes a STRING path, NOT an asset object
+unreal.SourceControl.check_out_file('/Game/Path/To/Asset')
+# For multiple files at once:
+# unreal.SourceControl.check_out_files(['/Game/Path/To/Asset1', '/Game/Path/To/Asset2'])
 ```
 2. **Save the file after modification** via `execute_python`:
 ```python
 unreal.EditorAssetLibrary.save_asset('/Game/Path/To/Asset')
 ```
-Do NOT skip checkout. Do NOT skip save.
+3. **Check in when done** (optional, after all scene work is complete):
+```python
+unreal.SourceControl.check_in_file('/Game/Path/To/Asset', 'MCP: Scene wiring complete')
+```
+Do NOT skip checkout. Do NOT skip save. The `check_out_file` method accepts: fully qualified path, relative path, long package name, asset path, or export text path.
 
 ### CRASH PREVENTION: THE CONTENT BROWSER BUG
 **WARNING:** UE5.6 has a bug where the `FAssetThumbnailPool` crashes the editor during MCP operations if the Content Browser is trying to render thumbnails.
@@ -51,6 +58,19 @@ Do NOT skip checkout. Do NOT skip save.
 
 ### SCENE 5 CORRUPTION WARNING
 `SL_Restaurant_Logic` (Scene 5) level blueprint is known to be corrupt and crashes the C++ compiler. If you must modify it, use the Python fallback (`execute_python`) with `unreal.BlueprintEditorLibrary` instead of the C++ handlers.
+
+**Scene 5 Python Fallback Pattern:**
+```python
+import unreal
+# Load the level blueprint as an asset
+bp = unreal.EditorAssetLibrary.load_asset('/Game/Maps/SubLevels/SL_Restaurant_Logic')
+blueprint = unreal.BlueprintEditorLibrary.get_blueprint_asset(bp)
+event_graph = unreal.BlueprintEditorLibrary.find_event_graph(blueprint)
+# ... add nodes and connections via Python ...
+# compile_blueprint takes a Blueprint OBJECT, not a string path
+unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
+unreal.EditorAssetLibrary.save_asset('/Game/Maps/SubLevels/SL_Restaurant_Logic')
+```
 
 ---
 
@@ -186,8 +206,9 @@ After passing the confidence gate, every mutation goes through two checks:
 1. **Always read project state on connection.**
 2. **Always check out files via Perforce before mutating.**
 3. **Always snapshot before destructive operations.**
-4. **Node IDs are GUIDs.** Store them for subsequent `connect_pins` calls.
-5. **Pin names are case-sensitive.** Use `get_pin_info` to discover exact pin names before connecting. Especially for struct pins (e.g., `Step_4_9162A20A46...`).
-6. **Level blueprints use map names.** Pass the `.umap` name (e.g., `"MyLevel"`), not a Blueprint path.
-7. **Use Python for anything the C++ handlers do not cover.**
-8. **NEVER EXECUTE WITHOUT 99% CONFIDENCE.** If the Roadmap, Script, and Project State don't align, do not proceed.
+4. **SAVE AFTER EVERY SCENE.** After completing all wiring for a scene, save ALL modified assets via `execute_python` and update the scene's `STATUS.json` to `completed`. This is your checkpoint. If you crash or restart, you resume from the next scene.
+5. **Node IDs are GUIDs.** Store them for subsequent `connect_pins` calls.
+6. **Pin names are case-sensitive.** Use `get_pin_info` to discover exact pin names before connecting. Especially for struct pins (e.g., `Step_4_9162A20A46...`).
+7. **Level blueprints use map names.** Pass the `.umap` name (e.g., `"MyLevel"`), not a Blueprint path.
+8. **Use Python for anything the C++ handlers do not cover.**
+9. **NEVER EXECUTE WITHOUT 99% CONFIDENCE.** If the Roadmap, Script, and Project State don't align, do not proceed.
