@@ -64,34 +64,44 @@ The Gatekeeper sits in the JS bridge layer and intercepts the Planner's JSON pla
 If the Gatekeeper rejects a step, the plan is bounced back to the Planner with a specific error. If approved, the Gatekeeper dispatches the steps to the Workers.
 
 ### Layer 3: The Workers (Local Executors)
-The Workers are the only entities that actually execute tool calls against the Unreal Engine C++ plugin. They operate purely on inference, not generation.
+The Workers are the **experts on the project**. They are the only entities with direct access to the live Unreal Engine instance. They can query the Content Browser, inspect actors, read Blueprint graphs, and verify every action in real time. The Planner has documents; the Workers have reality.
 
-When a Worker receives an approved step, it loads a specific context window containing:
+When a Worker receives a step, it loads a context window containing:
+- **The live engine state** (highest priority -- the Worker can query anything)
+- The user's `user_context/` files (user's word is law)
 - The exact tool registry schema for the required tool
 - The relevant Unreal Engine API documentation (from the `contexts/` folder)
-- The user's `source_truth/` override files
-- The step instructions from the Gatekeeper
+- The step instructions from the Planner's plan (lowest priority -- a guide, not gospel)
 
-The Worker runs inference to determine the exact JSON payload to send to the C++ plugin. It then checks the confidence score (logits) of its output. 
+**The Execute-Verify-Fix Loop:**
+Workers do not fire-and-forget. Every action is verified against the live engine state. If a tool call fails, the Worker self-corrects: it queries the engine for more context, adjusts its approach, and retries. Workers track whether each retry is improving the situation. They only escalate to the Planner when 3+ consecutive attempts show no improvement.
+
+**Workers correct the Planner's mistakes autonomously.** If the plan says an asset doesn't exist but the Worker can find it in the Content Browser, the Worker uses it. If the plan has the wrong pin name, the Worker calls `get_pins` and uses the real name. The Worker logs all corrections so the Planner knows what changed.
 
 **The 95% Confidence Gate:**
 - If confidence is **>= 95%**, the Worker executes the call.
-- If confidence is **< 95%**, the Worker retries with a slightly adjusted context window (up to 3 attempts).
-- If confidence remains **< 95%**, the Worker halts execution, marks the step as blocked, and escalates back to the Gatekeeper (and ultimately the Planner) with a detailed error report.
+- If confidence is **< 95%**, the Worker queries the engine for more data (which typically raises confidence to 97%+).
+- If confidence remains **< 95%** after 5 retries with no improvement, the Worker escalates with a detailed report of everything it tried.
 
-Workers have no internet access, no creativity, and no ability to hallucinate. They either know exactly what to do based on the provided documentation, or they do nothing.
+Workers have no internet access. They do not generate creative content. But within their domain -- the live engine and the project docs -- they are fully autonomous.
 
 ## Documentation Hierarchy
 
 The documentation that drives this system is structured to prioritize user control and deterministic execution.
 
-### 1. `source_truth/` (User Overrides)
-This folder contains project-specific files provided by the user, such as the screenplay, asset naming conventions, or specific architectural rules. **This is the highest authority.** If a Worker detects a conflict between the Planner's instructions and a file in `source_truth/`, the `source_truth/` file always wins. 
+### 1. The Live Engine (Ground Truth)
+The live Unreal Engine instance is the ultimate source of truth. If a Worker can query the Content Browser, inspect an actor, or read a Blueprint graph, that data supersedes everything else. The engine is real; documents are approximations.
 
-### 2. `contexts/` (Domain Knowledge)
+### 2. `user_context/` (User Files -- Read Only)
+This folder contains project-specific files provided by the user, such as the screenplay, roadmap, asset dumps, or specific rules. **The user's files are never modified by Claude or the Workers.** They are read-only law. If a Worker detects a conflict between the Planner's instructions and a file in `user_context/`, the user's file always wins.
+
+### 3. `plan/` (Planner Output)
+This folder contains the Planner's JSON execution plan and any project config it generated. Workers treat this as a guide, not an authority. If the plan contradicts the engine state or the user's files, the Workers correct it autonomously. 
+
+### 4. `contexts/` (Domain Knowledge)
 This folder contains detailed technical documentation for specific Unreal Engine subsystems (e.g., Blueprints, PCG, Animation, Sequencer). Workers load these files on-demand based on the tool they are about to execute. This ensures the Worker's context window is filled only with highly relevant, accurate API information.
 
-### 3. `SYSTEM.md` & `WORKER_INSTRUCTIONS.md`
+### 5. `SYSTEM.md` & `WORKER_INSTRUCTIONS.md`
 These files define the operational rules for the system. `SYSTEM.md` defines the overall architecture and plan formatting for the Planner. `WORKER_INSTRUCTIONS.md` defines the strict execution loop, confidence gating, and escalation protocols for the local models.
 
 ## Engine Integration: Headless Agent Mode

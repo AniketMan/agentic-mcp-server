@@ -69,6 +69,12 @@ import {
   executeVisualAgentCommand,
 } from "./visual-agent.js";
 
+// Async Runner for Claude Planner
+import { launchPlan, checkJobStatus } from "./async-runner.js";
+
+// Escalation feedback for Claude Planner
+import { getPendingEscalations, resolveEscalation } from "./gatekeeper/escalation.js";
+
 // Quantized Inference Layer -- deterministic scene wiring via cached manifests
 import {
   QUANTIZED_TOOLS,
@@ -238,6 +244,50 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     }
   }
 
+  // Planner Tools (Claude only)
+  mcpTools.push({
+    name: "launch_plan",
+    description: "[PLANNER ONLY] Launch a JSON execution plan in the background. The local workers will execute it. Returns a job_id to poll.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        planPath: { type: "string", description: "Absolute path to the plan JSON file" }
+      },
+      required: ["planPath"]
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
+  });
+
+  mcpTools.push({
+    name: "check_job_status",
+    description: "[PLANNER ONLY] Check the status of a background plan execution job. Also returns any pending escalations that need your attention.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobId: { type: "string", description: "The job_id returned by launch_plan" }
+      },
+      required: ["jobId"]
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+  });
+
+  mcpTools.push({
+    name: "resolve_escalation",
+    description: "[PLANNER ONLY] Respond to an escalation from the workers. Provide a revised step or direct tool call to resolve the issue.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobId: { type: "string", description: "The job_id of the running plan" },
+        stepIndex: { type: "number", description: "The step index that was escalated" },
+        action: { type: "string", description: "One of: revise_step, provide_direct_call, break_into_substeps, skip_step" },
+        revised_step: { type: "object", description: "The revised step object (tool, parameters, description)" },
+        message: { type: "string", description: "Explanation for the workers about what to do differently" }
+      },
+      required: ["jobId", "stepIndex", "action"]
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
+  });
+
   // UE context documentation tool is always available
   mcpTools.push({
     name: "unreal_get_ue_context",
@@ -327,6 +377,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // ---- Status check ----
   if (name === "unreal_status") {
     return handleStatusRequest();
+  }
+
+  // ---- Planner Async Tools ----
+  if (name === "launch_plan") {
+    return {
+      content: [{ type: "text", text: JSON.stringify(launchPlan(args.planPath), null, 2) }]
+    };
+  }
+  if (name === "check_job_status") {
+    const status = checkJobStatus(args.jobId);
+    // Attach any pending escalations so Claude sees them
+    if (status.status === 'running' || status.status === 'failed') {
+      try {
+        status.pending_escalations = getPendingEscalations(args.jobId);
+      } catch { status.pending_escalations = []; }
+    }
+    return {
+      content: [{ type: "text", text: JSON.stringify(status, null, 2) }]
+    };
+  }
+  if (name === "resolve_escalation") {
+    const result = resolveEscalation(args.jobId, args.stepIndex, {
+      action: args.action,
+      revised_step: args.revised_step || null,
+      message: args.message || '',
+    });
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
+    };
   }
 
   // ---- Validate tool name prefix ----
