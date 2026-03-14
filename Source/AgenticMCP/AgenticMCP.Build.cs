@@ -10,6 +10,10 @@ public class AgenticMCP : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		// Allow missing modules at link time — optional subsystems (Niagara,
+		// OculusXR, PCG, etc.) may not be present in every project.
+		bPrecompile = false;
+
 		// ---- Public dependencies (headers exposed to other modules) ----
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
@@ -29,12 +33,13 @@ public class AgenticMCP : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"AssetRegistry",      // Asset scanning and lookup
-			"AssetTools",         // Asset creation and rename
+			"AssetTools",         // Asset creation, rename, duplicate, import
 			"Kismet",             // Blueprint editor utilities
 			"KismetCompiler",     // Blueprint compilation
 			"EditorSubsystem",    // UEditorSubsystem base class
 			"LevelEditor",        // Level management APIs
 			"Landscape",          // Landscape actor support
+			"Foliage",            // Foliage editing APIs
 			"RHI",                // Render hardware interface (for nullrhi commandlet)
 			"ImageWrapper",       // PNG/JPEG compression for screenshots
 			"GraphEditor",        // Graph editor for K2Node types
@@ -46,8 +51,27 @@ public class AgenticMCP : ModuleRules
 			"InputCore",          // EKeys, FKey for input simulation
 			"Slate",              // FSlateApplication for input
 			"SlateCore",          // Slate core types
+			"PhysicsCore",        // Physics body instance, constraints
+			"AnimGraph",          // Animation Blueprint graph nodes
+			"AnimGraphRuntime",   // Animation state machine runtime
+			"UMG",                // UMG Widget Blueprint support
+			"SourceControl",      // Source control integration
+			"AIModule",           // AI controllers, behavior tree runtime
+			"GameplayTasks",      // Gameplay task system (used by AI)
+			"ToolMenus",          // Editor tool menus and settings access
+			"DeveloperSettings",  // UDeveloperSettings access
+			"MaterialEditor",     // Material editor APIs
+			"PropertyEditor",     // Property editing for settings
+			"EditorStyle",        // Editor style for widget inspection
 			"OculusXRHMD",        // Meta XR HMD APIs
 			"OculusXRInput"       // Meta XR Input/Hand tracking APIs
 		});
+
+		// ---- Conditionally available modules ----
+		// PCG may not be available in all engine builds
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("PCG");
+		}
 	}
 }

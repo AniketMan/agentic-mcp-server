@@ -306,6 +306,99 @@ private:
 	// ---- RenderDoc Handlers (Handlers_RenderDoc.cpp) ----
 	FString HandleRenderDocCapture(const TMap<FString, FString>& Params, const FString& Body);
 
+	// ---- PCG Handlers (Handlers_PCG.cpp) ----
+	FString HandlePCGListGraphs(const FString& Body);
+	FString HandlePCGGetGraphInfo(const FString& Body);
+	FString HandlePCGExecuteGraph(const FString& Body);
+	FString HandlePCGGetNodeSettings(const FString& Body);
+	FString HandlePCGSetNodeSettings(const FString& Body);
+	FString HandlePCGListComponents(const FString& Body);
+
+	// ---- Animation Blueprint Handlers (Handlers_AnimBlueprint.cpp) ----
+	FString HandleAnimBPList(const FString& Body);
+	FString HandleAnimBPGetGraph(const FString& Body);
+	FString HandleAnimBPGetStates(const FString& Body);
+	FString HandleAnimBPGetTransitions(const FString& Body);
+	FString HandleAnimBPGetSlotGroups(const FString& Body);
+	FString HandleAnimBPGetMontages(const FString& Body);
+
+	// ---- Scene Hierarchy Handlers (Handlers_SceneHierarchy.cpp) ----
+	FString HandleSceneGetHierarchy(const FString& Body);
+	FString HandleSceneSetActorFolder(const FString& Body);
+	FString HandleSceneAttachActor(const FString& Body);
+	FString HandleSceneDetachActor(const FString& Body);
+	FString HandleSceneRenameActor(const FString& Body);
+
+	// ---- Sequencer Editing Handlers (Handlers_SequencerEdit.cpp) ----
+	FString HandleSequencerCreate(const FString& Body);
+	FString HandleSequencerAddTrack(const FString& Body);
+	FString HandleSequencerGetTracks(const FString& Body);
+	FString HandleSequencerSetPlayRange(const FString& Body);
+
+	// ---- Landscape / Foliage Handlers (Handlers_Landscape.cpp) ----
+	FString HandleLandscapeList(const FString& Body);
+	FString HandleLandscapeGetInfo(const FString& Body);
+	FString HandleLandscapeGetLayers(const FString& Body);
+	FString HandleFoliageList(const FString& Body);
+	FString HandleFoliageGetStats(const FString& Body);
+
+	// ---- Physics Handlers (Handlers_Physics.cpp) ----
+	FString HandlePhysicsGetBodyInfo(const FString& Body);
+	FString HandlePhysicsSetSimulate(const FString& Body);
+	FString HandlePhysicsApplyForce(const FString& Body);
+	FString HandlePhysicsListConstraints(const FString& Body);
+	FString HandlePhysicsGetOverlaps(const FString& Body);
+
+	// ---- AI / Behavior Tree Handlers (Handlers_AI.cpp) ----
+	FString HandleAIListBehaviorTrees(const FString& Body);
+	FString HandleAIGetBehaviorTree(const FString& Body);
+	FString HandleAIListBlackboards(const FString& Body);
+	FString HandleAIGetBlackboard(const FString& Body);
+	FString HandleAIListControllers(const FString& Body);
+	FString HandleAIGetEQSQueries(const FString& Body);
+
+	// ---- Material Editing Handlers (Handlers_MaterialEdit.cpp) ----
+	FString HandleMaterialList(const FString& Body);
+	FString HandleMaterialGetInfo(const FString& Body);
+	FString HandleMaterialCreate(const FString& Body);
+	FString HandleMaterialListInstances(const FString& Body);
+
+	// ---- Asset Import / Management Handlers (Handlers_AssetImport.cpp) ----
+	FString HandleAssetImport(const FString& Body);
+	FString HandleAssetGetInfo(const FString& Body);
+	FString HandleAssetDuplicate(const FString& Body);
+	FString HandleAssetRename(const FString& Body);
+	FString HandleAssetDelete(const FString& Body);
+	FString HandleAssetListByType(const FString& Body);
+
+	// ---- Editor Settings Handlers (Handlers_EditorSettings.cpp) ----
+	FString HandleSettingsGetProject(const FString& Body);
+	FString HandleSettingsGetEditor(const FString& Body);
+	FString HandleSettingsGetRendering(const FString& Body);
+	FString HandleSettingsGetPlugins(const FString& Body);
+
+	// ---- UMG / Widget Handlers (Handlers_UMG.cpp) ----
+	FString HandleUMGListWidgets(const FString& Body);
+	FString HandleUMGGetWidgetTree(const FString& Body);
+	FString HandleUMGGetWidgetProperties(const FString& Body);
+	FString HandleUMGListHUDs(const FString& Body);
+
+	// ---- Skeletal Mesh Handlers (Handlers_SkeletalMesh.cpp) ----
+	FString HandleSkelMeshList(const FString& Body);
+	FString HandleSkelMeshGetInfo(const FString& Body);
+	FString HandleSkelMeshGetBones(const FString& Body);
+	FString HandleSkelMeshGetMorphTargets(const FString& Body);
+	FString HandleSkelMeshGetSockets(const FString& Body);
+
+	// ---- Build / Packaging Handlers (Handlers_Packaging.cpp) ----
+	FString HandleBuildGetStatus(const FString& Body);
+	FString HandleBuildLighting(const FString& Body);
+	FString HandleSourceControlGetStatus(const FString& Body);
+	FString HandleSourceControlCheckout(const FString& Body);
+
+	// ---- Python Execution with Output Capture (Handlers_PythonFix.cpp) ----
+	FString HandleExecutePythonCapture(const FString& Body);
+
 	// ============================================================
 	// Serialization helpers
 	// ============================================================

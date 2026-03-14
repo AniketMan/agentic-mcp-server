@@ -147,7 +147,7 @@
         },
         {
           "name": "duration",
-          "type": "number",
+          "type": "string",
           "description": "Duration value for timeline or delay nodes",
           "required": false
         }
@@ -180,6 +180,81 @@
         }
       ],
       "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "aiGetBehaviorTree",
+      "description": "AIGetBehaviorTree",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "aiGetBlackboard",
+      "description": "AIGetBlackboard",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "aiGetEQSQueries",
+      "description": "AIGetEQSQueries",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "aiListBehaviorTrees",
+      "description": "AIListBehaviorTrees",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "aiListBlackboards",
+      "description": "AIListBlackboards",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "aiListControllers",
+      "description": "AIListControllers",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
         "destructiveHint": true
       }
     },
@@ -240,6 +315,212 @@
         }
       ],
       "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPGetGraph",
+      "description": "AnimBPGetGraph",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPGetMontages",
+      "description": "AnimBPGetMontages",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPGetSlotGroups",
+      "description": "AnimBPGetSlotGroups",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPGetStates",
+      "description": "AnimBPGetStates",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPGetTransitions",
+      "description": "AnimBPGetTransitions",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPList",
+      "description": "AnimBPList",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "assetDelete",
+      "description": "AssetDelete",
+      "parameters": [
+        {
+          "name": "assetPath",
+          "type": "string",
+          "description": "assetPath parameter",
+          "required": true
+        },
+        {
+          "name": "confirm",
+          "type": "string",
+          "description": "confirm parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "assetDuplicate",
+      "description": "AssetDuplicate",
+      "parameters": [
+        {
+          "name": "sourcePath",
+          "type": "string",
+          "description": "sourcePath parameter",
+          "required": true
+        },
+        {
+          "name": "newName",
+          "type": "string",
+          "description": "newName parameter",
+          "required": true
+        },
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "description": "destinationPath parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "assetGetInfo",
+      "description": "AssetGetInfo",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "assetImport",
+      "description": "AssetImport",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "filePath parameter",
+          "required": true
+        },
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "description": "destinationPath parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "assetListByType",
+      "description": "AssetListByType",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type filter (e.g. 'blueprint', 'map', 'all')",
+          "required": true
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "path parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "assetRename",
+      "description": "AssetRename",
+      "parameters": [
+        {
+          "name": "assetPath",
+          "type": "string",
+          "description": "assetPath parameter",
+          "required": true
+        },
+        {
+          "name": "newName",
+          "type": "string",
+          "description": "newName parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
         "destructiveHint": true
       }
     },
@@ -449,6 +730,31 @@
       ],
       "annotations": {
         "readOnlyHint": true
+      }
+    },
+    {
+      "name": "buildGetStatus",
+      "description": "BuildGetStatus",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "buildLighting",
+      "description": "BuildLighting",
+      "parameters": [
+        {
+          "name": "quality",
+          "type": "string",
+          "description": "Image quality (1-100)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
       }
     },
     {
@@ -958,7 +1264,7 @@
           "name": "script",
           "type": "string",
           "description": "Inline Python code to execute",
-          "required": false
+          "required": true
         },
         {
           "name": "file",
@@ -968,6 +1274,28 @@
         }
       ],
       "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "executePythonCapture",
+      "description": "ExecutePythonCapture",
+      "parameters": [
+        {
+          "name": "script",
+          "type": "string",
+          "description": "Python script code to execute",
+          "required": false
+        },
+        {
+          "name": "file",
+          "type": "string",
+          "description": "Path to a Python file to execute",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
         "destructiveHint": true
       }
     },
@@ -990,6 +1318,24 @@
       ],
       "annotations": {
         "readOnlyHint": true
+      }
+    },
+    {
+      "name": "foliageGetStats",
+      "description": "FoliageGetStats",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "foliageList",
+      "description": "FoliageList",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
       }
     },
     {
@@ -1107,6 +1453,47 @@
       ],
       "annotations": {
         "readOnlyHint": true
+      }
+    },
+    {
+      "name": "landscapeGetInfo",
+      "description": "LandscapeGetInfo",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "landscapeGetLayers",
+      "description": "LandscapeGetLayers",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "landscapeList",
+      "description": "LandscapeList",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
       }
     },
     {
@@ -1291,6 +1678,88 @@
         }
       ],
       "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "materialCreate",
+      "description": "MaterialCreate",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        },
+        {
+          "name": "parentMaterial",
+          "type": "string",
+          "description": "parentMaterial parameter",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "path parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "materialGetInfo",
+      "description": "MaterialGetInfo",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "materialList",
+      "description": "MaterialList",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        },
+        {
+          "name": "instancesOnly",
+          "type": "string",
+          "description": "instancesOnly parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "materialListInstances",
+      "description": "MaterialListInstances",
+      "parameters": [
+        {
+          "name": "parentMaterial",
+          "type": "string",
+          "description": "parentMaterial parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
         "destructiveHint": true
       }
     },
@@ -1697,6 +2166,163 @@
       }
     },
     {
+      "name": "pcgExecuteGraph",
+      "description": "PCGExecuteGraph",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pcgGetGraphInfo",
+      "description": "PCGGetGraphInfo",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pcgGetNodeSettings",
+      "description": "PCGGetNodeSettings",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pcgListComponents",
+      "description": "PCGListComponents",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pcgListGraphs",
+      "description": "PCGListGraphs",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pcgSetNodeSettings",
+      "description": "PCGSetNodeSettings",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "physicsApplyForce",
+      "description": "PhysicsApplyForce",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "mode parameter",
+          "required": false
+        },
+        {
+          "name": "forceX",
+          "type": "string",
+          "description": "forceX parameter",
+          "required": false
+        },
+        {
+          "name": "forceY",
+          "type": "string",
+          "description": "forceY parameter",
+          "required": false
+        },
+        {
+          "name": "forceZ",
+          "type": "string",
+          "description": "forceZ parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "physicsGetBodyInfo",
+      "description": "PhysicsGetBodyInfo",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "physicsGetOverlaps",
+      "description": "PhysicsGetOverlaps",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "physicsListConstraints",
+      "description": "PhysicsListConstraints",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "physicsSetSimulate",
+      "description": "PhysicsSetSimulate",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        },
+        {
+          "name": "simulate",
+          "type": "string",
+          "description": "simulate parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
       "name": "pixelStreamingGetCodec",
       "description": "Get the current video codec settings",
       "parameters": [],
@@ -1979,6 +2605,104 @@
       }
     },
     {
+      "name": "sceneAttachActor",
+      "description": "SceneAttachActor",
+      "parameters": [
+        {
+          "name": "childActor",
+          "type": "string",
+          "description": "childActor parameter",
+          "required": true
+        },
+        {
+          "name": "parentActor",
+          "type": "string",
+          "description": "parentActor parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sceneDetachActor",
+      "description": "SceneDetachActor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sceneGetHierarchy",
+      "description": "SceneGetHierarchy",
+      "parameters": [
+        {
+          "name": "folder",
+          "type": "string",
+          "description": "folder parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sceneRenameActor",
+      "description": "SceneRenameActor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        },
+        {
+          "name": "newLabel",
+          "type": "string",
+          "description": "newLabel parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sceneSetActorFolder",
+      "description": "SceneSetActorFolder",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        },
+        {
+          "name": "folder",
+          "type": "string",
+          "description": "folder parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
       "name": "sceneSnapshot",
       "description": "Get a structured snapshot of all actors in the scene",
       "parameters": [
@@ -2078,6 +2802,100 @@
       ],
       "annotations": {
         "readOnlyHint": true
+      }
+    },
+    {
+      "name": "sequencerAddTrack",
+      "description": "SequencerAddTrack",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": true
+        },
+        {
+          "name": "trackType",
+          "type": "string",
+          "description": "trackType parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerCreate",
+      "description": "SequencerCreate",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "path parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerGetTracks",
+      "description": "SequencerGetTracks",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerSetPlayRange",
+      "description": "SequencerSetPlayRange",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "startFrame",
+          "type": "string",
+          "description": "startFrame parameter",
+          "required": true
+        },
+        {
+          "name": "endFrame",
+          "type": "string",
+          "description": "endFrame parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
       }
     },
     {
@@ -2264,6 +3082,55 @@
       }
     },
     {
+      "name": "settingsGetEditor",
+      "description": "SettingsGetEditor",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "settingsGetPlugins",
+      "description": "SettingsGetPlugins",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        },
+        {
+          "name": "enabledOnly",
+          "type": "string",
+          "description": "enabledOnly parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "settingsGetProject",
+      "description": "SettingsGetProject",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "settingsGetRendering",
+      "description": "SettingsGetRendering",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
       "name": "setViewport",
       "description": "Set the viewport camera position and orientation",
       "parameters": [
@@ -2354,6 +3221,86 @@
       }
     },
     {
+      "name": "skelMeshGetBones",
+      "description": "SkelMeshGetBones",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "skelMeshGetInfo",
+      "description": "SkelMeshGetInfo",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "skelMeshGetMorphTargets",
+      "description": "SkelMeshGetMorphTargets",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "skelMeshGetSockets",
+      "description": "SkelMeshGetSockets",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "skelMeshList",
+      "description": "SkelMeshList",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
       "name": "snapshotGraph",
       "description": "Take a snapshot of a Blueprint graph for later rollback",
       "parameters": [
@@ -2372,6 +3319,38 @@
       ],
       "annotations": {
         "readOnlyHint": true
+      }
+    },
+    {
+      "name": "sourceControlCheckout",
+      "description": "SourceControlCheckout",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "filePath parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sourceControlGetStatus",
+      "description": "SourceControlGetStatus",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "filePath parameter",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
       }
     },
     {
@@ -2543,6 +3522,69 @@
         }
       ],
       "annotations": {
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "umgGetWidgetProperties",
+      "description": "UMGGetWidgetProperties",
+      "parameters": [
+        {
+          "name": "blueprintName",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": true
+        },
+        {
+          "name": "widgetName",
+          "type": "string",
+          "description": "widgetName parameter",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "umgGetWidgetTree",
+      "description": "UMGGetWidgetTree",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "umgListHUDs",
+      "description": "UMGListHUDs",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "umgListWidgets",
+      "description": "UMGListWidgets",
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter string to narrow results",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
         "destructiveHint": true
       }
     },

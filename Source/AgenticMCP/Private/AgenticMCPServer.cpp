@@ -1349,6 +1349,294 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandlePixelStreamingListPlayers(Params, Body);
 	});
+
+	// ---- PCG Handlers ----
+	HandlerMap.Add(TEXT("pcgListGraphs"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGListGraphs(Body);
+	});
+	HandlerMap.Add(TEXT("pcgGetGraphInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGGetGraphInfo(Body);
+	});
+	HandlerMap.Add(TEXT("pcgExecuteGraph"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGExecuteGraph(Body);
+	});
+	HandlerMap.Add(TEXT("pcgGetNodeSettings"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGGetNodeSettings(Body);
+	});
+	HandlerMap.Add(TEXT("pcgSetNodeSettings"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGSetNodeSettings(Body);
+	});
+	HandlerMap.Add(TEXT("pcgListComponents"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGListComponents(Body);
+	});
+
+	// ---- Animation Blueprint Handlers ----
+	HandlerMap.Add(TEXT("animBPList"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPList(Body);
+	});
+	HandlerMap.Add(TEXT("animBPGetGraph"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetGraph(Body);
+	});
+	HandlerMap.Add(TEXT("animBPGetStates"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetStates(Body);
+	});
+	HandlerMap.Add(TEXT("animBPGetTransitions"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetTransitions(Body);
+	});
+	HandlerMap.Add(TEXT("animBPGetSlotGroups"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetSlotGroups(Body);
+	});
+	HandlerMap.Add(TEXT("animBPGetMontages"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetMontages(Body);
+	});
+
+	// ---- Scene Hierarchy Handlers ----
+	HandlerMap.Add(TEXT("sceneGetHierarchy"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSceneGetHierarchy(Body);
+	});
+	HandlerMap.Add(TEXT("sceneSetActorFolder"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSceneSetActorFolder(Body);
+	});
+	HandlerMap.Add(TEXT("sceneAttachActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSceneAttachActor(Body);
+	});
+	HandlerMap.Add(TEXT("sceneDetachActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSceneDetachActor(Body);
+	});
+	HandlerMap.Add(TEXT("sceneRenameActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSceneRenameActor(Body);
+	});
+
+	// ---- Sequencer Editing Handlers ----
+	HandlerMap.Add(TEXT("sequencerCreate"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerCreate(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerAddTrack"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerAddTrack(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerGetTracks"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerGetTracks(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerSetPlayRange"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerSetPlayRange(Body);
+	});
+
+	// ---- Landscape / Foliage Handlers ----
+	HandlerMap.Add(TEXT("landscapeList"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleLandscapeList(Body);
+	});
+	HandlerMap.Add(TEXT("landscapeGetInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleLandscapeGetInfo(Body);
+	});
+	HandlerMap.Add(TEXT("landscapeGetLayers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleLandscapeGetLayers(Body);
+	});
+	HandlerMap.Add(TEXT("foliageList"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleFoliageList(Body);
+	});
+	HandlerMap.Add(TEXT("foliageGetStats"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleFoliageGetStats(Body);
+	});
+
+	// ---- Physics Handlers ----
+	HandlerMap.Add(TEXT("physicsGetBodyInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePhysicsGetBodyInfo(Body);
+	});
+	HandlerMap.Add(TEXT("physicsSetSimulate"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePhysicsSetSimulate(Body);
+	});
+	HandlerMap.Add(TEXT("physicsApplyForce"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePhysicsApplyForce(Body);
+	});
+	HandlerMap.Add(TEXT("physicsListConstraints"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePhysicsListConstraints(Body);
+	});
+	HandlerMap.Add(TEXT("physicsGetOverlaps"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePhysicsGetOverlaps(Body);
+	});
+
+	// ---- AI / Behavior Tree Handlers ----
+	HandlerMap.Add(TEXT("aiListBehaviorTrees"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAIListBehaviorTrees(Body);
+	});
+	HandlerMap.Add(TEXT("aiGetBehaviorTree"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAIGetBehaviorTree(Body);
+	});
+	HandlerMap.Add(TEXT("aiListBlackboards"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAIListBlackboards(Body);
+	});
+	HandlerMap.Add(TEXT("aiGetBlackboard"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAIGetBlackboard(Body);
+	});
+	HandlerMap.Add(TEXT("aiListControllers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAIListControllers(Body);
+	});
+	HandlerMap.Add(TEXT("aiGetEQSQueries"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAIGetEQSQueries(Body);
+	});
+
+	// ---- Material Editing Handlers ----
+	HandlerMap.Add(TEXT("materialList"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialList(Body);
+	});
+	HandlerMap.Add(TEXT("materialGetInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialGetInfo(Body);
+	});
+	HandlerMap.Add(TEXT("materialCreate"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialCreate(Body);
+	});
+	HandlerMap.Add(TEXT("materialListInstances"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialListInstances(Body);
+	});
+
+	// ---- Asset Import / Management Handlers ----
+	HandlerMap.Add(TEXT("assetImport"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAssetImport(Body);
+	});
+	HandlerMap.Add(TEXT("assetGetInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAssetGetInfo(Body);
+	});
+	HandlerMap.Add(TEXT("assetDuplicate"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAssetDuplicate(Body);
+	});
+	HandlerMap.Add(TEXT("assetRename"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAssetRename(Body);
+	});
+	HandlerMap.Add(TEXT("assetDelete"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAssetDelete(Body);
+	});
+	HandlerMap.Add(TEXT("assetListByType"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAssetListByType(Body);
+	});
+
+	// ---- Editor Settings Handlers ----
+	HandlerMap.Add(TEXT("settingsGetProject"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSettingsGetProject(Body);
+	});
+	HandlerMap.Add(TEXT("settingsGetEditor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSettingsGetEditor(Body);
+	});
+	HandlerMap.Add(TEXT("settingsGetRendering"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSettingsGetRendering(Body);
+	});
+	HandlerMap.Add(TEXT("settingsGetPlugins"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSettingsGetPlugins(Body);
+	});
+
+	// ---- UMG / Widget Handlers ----
+	HandlerMap.Add(TEXT("umgListWidgets"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGListWidgets(Body);
+	});
+	HandlerMap.Add(TEXT("umgGetWidgetTree"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGGetWidgetTree(Body);
+	});
+	HandlerMap.Add(TEXT("umgGetWidgetProperties"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGGetWidgetProperties(Body);
+	});
+	HandlerMap.Add(TEXT("umgListHUDs"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGListHUDs(Body);
+	});
+
+	// ---- Skeletal Mesh Handlers ----
+	HandlerMap.Add(TEXT("skelMeshList"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSkelMeshList(Body);
+	});
+	HandlerMap.Add(TEXT("skelMeshGetInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSkelMeshGetInfo(Body);
+	});
+	HandlerMap.Add(TEXT("skelMeshGetBones"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSkelMeshGetBones(Body);
+	});
+	HandlerMap.Add(TEXT("skelMeshGetMorphTargets"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSkelMeshGetMorphTargets(Body);
+	});
+	HandlerMap.Add(TEXT("skelMeshGetSockets"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSkelMeshGetSockets(Body);
+	});
+
+	// ---- Build / Packaging Handlers ----
+	HandlerMap.Add(TEXT("buildGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBuildGetStatus(Body);
+	});
+	HandlerMap.Add(TEXT("buildLighting"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBuildLighting(Body);
+	});
+	HandlerMap.Add(TEXT("sourceControlGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSourceControlGetStatus(Body);
+	});
+	HandlerMap.Add(TEXT("sourceControlCheckout"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSourceControlCheckout(Body);
+	});
+
+	// ---- Python Execution with Output Capture ----
+	HandlerMap.Add(TEXT("executePythonCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleExecutePythonCapture(Body);
+	});
 }
 
 // ============================================================
