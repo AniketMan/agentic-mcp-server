@@ -132,6 +132,24 @@
           "type": "string",
           "description": "macroSource parameter",
           "required": false
+        },
+        {
+          "name": "delegateName",
+          "type": "string",
+          "description": "Name of the delegate to bind",
+          "required": false
+        },
+        {
+          "name": "ownerClass",
+          "type": "string",
+          "description": "Owner class for the node",
+          "required": false
+        },
+        {
+          "name": "duration",
+          "type": "number",
+          "description": "Duration value for timeline or delay nodes",
+          "required": false
         }
       ],
       "annotations": {
