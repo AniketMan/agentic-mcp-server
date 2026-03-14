@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Asset Loading Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing assets tools -->
+# Unreal Engine 5.6 Asset Loading Context
 
 This context is automatically loaded when working with asset loading and streaming.
 

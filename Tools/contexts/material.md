@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Material System Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing material tools -->
+# Unreal Engine 5.6 Material System Context
 
 This context is automatically loaded when working with Material MCP tools.
 

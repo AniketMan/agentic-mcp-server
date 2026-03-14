@@ -1,3 +1,4 @@
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing scene awareness tools -->
 # Scene Awareness Guide
 
 This document describes how the AI agent should maintain awareness of the UE5 project state, infer scene mappings, and make contextual placement decisions.

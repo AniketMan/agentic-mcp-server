@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Slate UI Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing slate tools -->
+# Unreal Engine 5.6 Slate UI Context
 
 This context is automatically loaded when working with Slate widget or Editor UI tasks.
 

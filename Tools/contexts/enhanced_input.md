@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Enhanced Input Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing enhanced input tools -->
+# Unreal Engine 5.6 Enhanced Input Context
 
 This context is automatically loaded when working with Enhanced Input tools.
 

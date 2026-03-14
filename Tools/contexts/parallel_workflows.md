@@ -1,3 +1,4 @@
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing parallel workflows tools -->
 # Parallel Tool Execution & Subagent Workflow Patterns
 
 Guidance for decomposing complex Unreal tasks into parallel MCP tool calls and Claude Code subagents.

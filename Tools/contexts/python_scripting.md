@@ -1,3 +1,4 @@
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing python scripting tools -->
 # UE5 Python Editor Scripting Reference
 
 This document covers the Python APIs available inside the UE5 editor for asset management, actor manipulation, level operations, and editor utilities.

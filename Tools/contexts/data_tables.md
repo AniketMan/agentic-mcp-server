@@ -1,3 +1,4 @@
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing data tables tools -->
 # Data Table and Data Asset Operations
 
 This document covers reading and writing UE5 Data Tables and Data Assets via Python.

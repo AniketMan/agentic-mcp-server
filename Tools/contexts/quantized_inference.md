@@ -1,3 +1,4 @@
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing quantized inference tools -->
 # Quantized Inference Context
 
 ## Architecture Overview

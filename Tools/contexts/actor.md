@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Actor & Component Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing actor tools -->
+# Unreal Engine 5.6 Actor & Component Context
 
 This context is automatically loaded when working with Actor and Component manipulation.
 
@@ -273,7 +274,7 @@ Available via `spawn_actor`, `move_actor`, `delete_actors`, `get_level_actors`:
 
 ## Level Management
 
-### Loading Levels in Editor (UE 5.7)
+### Loading Levels in Editor (UE 5.6)
 
 The `open_level` MCP tool provides level management without console commands.
 
@@ -297,7 +298,7 @@ UWorld* NewWorld = UEditorLoadingAndSavingUtils::NewBlankMap(/*bSaveCurrent=*/tr
 bool bExists = FPackageName::DoesPackageExist(TEXT("/Game/Maps/MyLevel"));
 ```
 
-### Map Templates (UE 5.7)
+### Map Templates (UE 5.6)
 
 ```cpp
 // Access available map templates via GUnrealEd

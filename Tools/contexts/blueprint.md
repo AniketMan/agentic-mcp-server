@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Blueprint Graph Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing blueprint tools -->
+# Unreal Engine 5.6 Blueprint Graph Context
 
 This context is automatically loaded when working with Blueprint manipulation tools.
 

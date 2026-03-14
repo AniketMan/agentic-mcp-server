@@ -1,4 +1,5 @@
-# Unreal Engine 5.7 Character System Context
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing character tools -->
+# Unreal Engine 5.6 Character System Context
 
 This context is automatically loaded when working with Character MCP tools.
 

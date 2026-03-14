@@ -1,3 +1,4 @@
+<- Added audit scripts: audit-handlers.mjs, audit-test.mjs, WORKER REFERENCE: Load this file when executing level sequence tools -->
 # Level Sequence Python API Reference
 
 This document covers the complete Python API for creating and editing Level Sequences in UE5 via the `unreal` module. All operations require the Editor Python plugin to be enabled.
