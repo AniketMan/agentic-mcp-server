@@ -79,7 +79,8 @@ FString FAgenticMCPServer::HandleMetaHumanSpawn(const FString& Body)
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AActor* Actor = World->SpawnActor<AActor>(BP->GeneratedClass, &Location, &Rotation, SpawnParams);
+	FTransform SpawnTransform(Rotation, Location);
+	AActor* Actor = World->SpawnActor<AActor>(BP->GeneratedClass, &SpawnTransform, SpawnParams);
 	if (!Actor)
 		return MakeErrorJson(TEXT("Failed to spawn MetaHuman"));
 

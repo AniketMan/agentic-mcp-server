@@ -100,7 +100,8 @@ FString FAgenticMCPServer::HandleVCamCreate(const FString& Body)
     // Spawn a CameraActor first
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    ACameraActor* Cam = World->SpawnActor<ACameraActor>(Location, Rotation, Params);
+    FTransform SpawnTransform(Rotation, Location);
+    ACameraActor* Cam = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), &SpawnTransform, Params);
     if (!Cam)
     {
         return MakeErrorJson(TEXT("Failed to spawn camera actor"));
@@ -171,8 +172,8 @@ FString FAgenticMCPServer::HandleVCamAddModifier(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             FString Result;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);

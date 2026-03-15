@@ -323,10 +323,9 @@ FString FAgenticMCPServer::HandlePhysicsAddConstraint(const FString& Body)
 	// Spawn a PhysicsConstraintActor
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	FTransform ConstraintTransform(FRotator::ZeroRotator, (Actor1->GetActorLocation() + Actor2->GetActorLocation()) / 2.0f);
 	APhysicsConstraintActor* ConstraintActor = World->SpawnActor<APhysicsConstraintActor>(
-		(Actor1->GetActorLocation() + Actor2->GetActorLocation()) / 2.0f,
-		FRotator::ZeroRotator,
-		SpawnParams
+		APhysicsConstraintActor::StaticClass(), &ConstraintTransform, SpawnParams
 	);
 	if (!ConstraintActor)
 	{

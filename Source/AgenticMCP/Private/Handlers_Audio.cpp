@@ -567,7 +567,8 @@ FString FAgenticMCPServer::HandleAudioCreateAmbientSound(const FString& Body)
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AAmbientSound* AmbientActor = World->SpawnActor<AAmbientSound>(Location, FRotator::ZeroRotator, SpawnParams);
+	FTransform SpawnTransform(FRotator::ZeroRotator, Location);
+	AAmbientSound* AmbientActor = World->SpawnActor<AAmbientSound>(AAmbientSound::StaticClass(), &SpawnTransform, SpawnParams);
 	if (!AmbientActor)
 		return MakeErrorJson(TEXT("Failed to spawn AmbientSound actor"));
 
@@ -612,7 +613,8 @@ FString FAgenticMCPServer::HandleAudioCreateAudioVolume(const FString& Body)
 		return MakeErrorJson(TEXT("No editor world"));
 
 	FActorSpawnParameters SpawnParams;
-	AAudioVolume* Volume = World->SpawnActor<AAudioVolume>(Location, FRotator::ZeroRotator, SpawnParams);
+	FTransform VolumeTransform(FRotator::ZeroRotator, Location);
+	AAudioVolume* Volume = World->SpawnActor<AAudioVolume>(AAudioVolume::StaticClass(), &VolumeTransform, SpawnParams);
 	if (!Volume)
 		return MakeErrorJson(TEXT("Failed to spawn AudioVolume"));
 

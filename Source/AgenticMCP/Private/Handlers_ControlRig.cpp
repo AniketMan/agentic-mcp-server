@@ -211,14 +211,11 @@ FString FAgenticMCPServer::HandleControlRigAddControl(const FString& Body)
              "lib.add_control(rig, '%s', unreal.RigControlType.%s)"),
         *AssetPath, *ControlName, *ControlType);
 
-    // Use IPythonScriptPlugin if available
+    // Execute Python command via GEditor->Exec()
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python)
-        {
-            TArray<FString> Output;
-            bool bSuccess = Python->ExecPythonCommand(*PythonCmd);
+            FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+            bool bSuccess = GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
             if (bSuccess)
             {
                 Asset->MarkPackageDirty();
@@ -288,8 +285,8 @@ FString FAgenticMCPServer::HandleControlRigAddBone(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             Asset->MarkPackageDirty();
             FString Result;
@@ -350,8 +347,8 @@ FString FAgenticMCPServer::HandleControlRigSetupIK(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             Asset->MarkPackageDirty();
             FString Result;

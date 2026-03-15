@@ -104,7 +104,8 @@ FString FAgenticMCPServer::HandleWaterCreate(const FString& Body)
 
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-    AActor* NewActor = World->SpawnActor<AActor>(WaterClass, &Location, nullptr, Params);
+    FTransform SpawnTransform(FRotator::ZeroRotator, Location);
+    AActor* NewActor = World->SpawnActor<AActor>(WaterClass, &SpawnTransform, Params);
     if (!NewActor)
     {
         return MakeErrorJson(TEXT("Failed to spawn water body"));
@@ -169,8 +170,8 @@ FString FAgenticMCPServer::HandleWaterSetProperties(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             FString Result;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);

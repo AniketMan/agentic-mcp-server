@@ -1176,6 +1176,32 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleXRRecenter(Params, Body);
 	});
 
+	// ---- MetaXR Audio/Haptics Handlers ----
+	HandlerMap.Add(TEXT("xrPlayHapticEffect"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRPlayHapticEffect(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrStopHapticEffect"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRStopHapticEffect(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrGetHapticCapabilities"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRGetHapticCapabilities(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrSetSpatialAudioEnabled"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetSpatialAudioEnabled(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrGetSpatialAudioStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRGetSpatialAudioStatus(Params, Body);
+	});
+	HandlerMap.Add(TEXT("xrConfigureAudioAttenuation"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRConfigureAudioAttenuation(Params, Body);
+	});
+
 	// ---- Story/Game Handlers ----
 	HandlerMap.Add(TEXT("storyState"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
@@ -2556,6 +2582,20 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("xrSetPerformanceLevels")));
 	Router->BindRoute(FHttpPath(TEXT("/api/xr/recenter")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("xrRecenter")));
+
+	// MetaXR Audio/Haptics Endpoints
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/haptics/play")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrPlayHapticEffect")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/haptics/stop")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrStopHapticEffect")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/haptics/capabilities")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrGetHapticCapabilities")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/audio/spatial/set")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrSetSpatialAudioEnabled")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/audio/spatial/status")), EHttpServerRequestVerbs::VERB_GET,
+		QueuedHandler(TEXT("xrGetSpatialAudioStatus")));
+	Router->BindRoute(FHttpPath(TEXT("/api/xr/audio/attenuation")), EHttpServerRequestVerbs::VERB_POST,
+		QueuedHandler(TEXT("xrConfigureAudioAttenuation")));
 
 	// Story/Game Endpoints
 	Router->BindRoute(FHttpPath(TEXT("/api/story/state")), EHttpServerRequestVerbs::VERB_GET,

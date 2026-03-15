@@ -71,13 +71,12 @@ FString FAgenticMCPServer::HandleLiveLinkListSources(const FString& Body)
         return MakeErrorJson(TEXT("PythonScriptPlugin not loaded."));
     }
 
-    IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
+    FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+    GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
     if (!Python)
-    {
         return MakeErrorJson(TEXT("Failed to get PythonScriptPlugin"));
     }
 
-    Python->ExecPythonCommand(*PythonCmd);
 
     FString Result;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -121,8 +120,8 @@ FString FAgenticMCPServer::HandleLiveLinkAddSource(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             FString Result;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -166,8 +165,8 @@ FString FAgenticMCPServer::HandleLiveLinkRemoveSource(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             FString Result;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);

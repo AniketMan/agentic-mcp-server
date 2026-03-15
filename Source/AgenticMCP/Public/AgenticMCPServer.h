@@ -249,6 +249,14 @@ private:
 	FString HandleXRSetPerformanceLevels(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body);
 
+	// ---- MetaXR Audio/Haptics Handlers (Handlers_MetaXRAudioHaptics.cpp) ----
+	FString HandleXRPlayHapticEffect(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRStopHapticEffect(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRGetHapticCapabilities(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRSetSpatialAudioEnabled(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRGetSpatialAudioStatus(const TMap<FString, FString>& Params, const FString& Body);
+	FString HandleXRConfigureAudioAttenuation(const TMap<FString, FString>& Params, const FString& Body);
+
 	// ---- Story Handlers (Handlers_Story.cpp) ----
 	FString HandleStoryState(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleStoryAdvance(const TMap<FString, FString>& Params, const FString& Body);

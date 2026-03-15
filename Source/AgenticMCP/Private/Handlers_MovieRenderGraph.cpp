@@ -73,8 +73,8 @@ FString FAgenticMCPServer::HandleMRGCreateConfig(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             FString Result;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -137,8 +137,8 @@ FString FAgenticMCPServer::HandleMRGRender(const FString& Body)
 
     if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
     {
-        IPythonScriptPlugin* Python = FModuleManager::Get().GetModulePtr<IPythonScriptPlugin>(TEXT("PythonScriptPlugin"));
-        if (Python && Python->ExecPythonCommand(*PythonCmd))
+        FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
+        GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
         {
             FString Result;
             TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
