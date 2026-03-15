@@ -12,4 +12,5 @@
 
 export { validateStep, validatePlan, WorkflowState, loadRegistry } from './rule-engine.js';
 export { isLLMAvailable, executeWithConfidenceGate, CONFIDENCE_THRESHOLD, MAX_RETRIES } from './llm-validator.js';
-export { executePlan, sendToPlugin } from './dispatcher.js';
+export { executePlan, sendToPlugin, buildWaves } from './dispatcher.js';
+export { selectTechnique, recordOutcome, getTechniqueStats, TECHNIQUES } from './technique-selector.js';
