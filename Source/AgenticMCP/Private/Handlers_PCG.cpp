@@ -395,3 +395,277 @@ FString FAgenticMCPServer::HandlePCGSetSeed(const FString& Body)
 	return JsonToString(Result);
 #endif
 }
+
+// ============================================================
+// pcgExecuteGraph - Execute a PCG graph by name (standalone, not on a component)
+// ============================================================
+FString FAgenticMCPServer::HandlePCGExecuteGraph(const FString& Body)
+{
+#if !HAS_PCG_PLUGIN
+	return MakeErrorJson(TEXT("PCG plugin is not available in this build"));
+#else
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	if (ActorName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: actorName"));
+
+	FString GraphName = Json->GetStringField(TEXT("graphName"));
+
+	UWorld* World = nullptr;
+	if (GEditor)
+		World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world available"));
+
+	// Find actor with PCG component
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if ((*It)->GetActorLabel() == ActorName || (*It)->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+
+	// If a graph name is specified, find and assign it first
+	if (!GraphName.IsEmpty())
+	{
+		FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+		TArray<FAssetData> PCGAssets;
+		ARM.Get().GetAssetsByClass(UPCGGraphInterface::StaticClass()->GetClassPathName(), PCGAssets, true);
+
+		UPCGGraph* NewGraph = nullptr;
+		for (const FAssetData& Asset : PCGAssets)
+		{
+			if (Asset.AssetName.ToString() == GraphName || Asset.GetObjectPathString().Contains(GraphName))
+			{
+				NewGraph = Cast<UPCGGraph>(Asset.GetAsset());
+				break;
+			}
+		}
+
+		if (NewGraph)
+		{
+			UPCGComponent* PCGComp = FoundActor->FindComponentByClass<UPCGComponent>();
+			if (PCGComp)
+			{
+				PCGComp->SetGraph(NewGraph);
+			}
+		}
+	}
+
+	UPCGComponent* PCGComp = FoundActor->FindComponentByClass<UPCGComponent>();
+	if (!PCGComp)
+		return MakeErrorJson(FString::Printf(TEXT("Actor '%s' has no PCG component"), *ActorName));
+
+	PCGComp->Generate();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
+	Result->SetStringField(TEXT("action"), TEXT("executeGraph"));
+	if (PCGComp->GetGraph())
+		Result->SetStringField(TEXT("graphName"), PCGComp->GetGraph()->GetName());
+	return JsonToString(Result);
+#endif
+}
+
+// ============================================================
+// pcgGetNodeSettings - Get settings/properties of a specific PCG node
+// ============================================================
+FString FAgenticMCPServer::HandlePCGGetNodeSettings(const FString& Body)
+{
+#if !HAS_PCG_PLUGIN
+	return MakeErrorJson(TEXT("PCG plugin is not available in this build"));
+#else
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString GraphName = Json->GetStringField(TEXT("graphName"));
+	if (GraphName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: graphName"));
+
+	FString NodeName = Json->GetStringField(TEXT("nodeName"));
+	int32 NodeIndex = Json->HasField(TEXT("nodeIndex")) ? Json->GetIntegerField(TEXT("nodeIndex")) : -1;
+
+	if (NodeName.IsEmpty() && NodeIndex < 0)
+		return MakeErrorJson(TEXT("Must provide either nodeName or nodeIndex"));
+
+	// Find graph
+	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> PCGAssets;
+	ARM.Get().GetAssetsByClass(UPCGGraphInterface::StaticClass()->GetClassPathName(), PCGAssets, true);
+
+	UPCGGraph* FoundGraph = nullptr;
+	for (const FAssetData& Asset : PCGAssets)
+	{
+		if (Asset.AssetName.ToString() == GraphName || Asset.GetObjectPathString().Contains(GraphName))
+		{
+			FoundGraph = Cast<UPCGGraph>(Asset.GetAsset());
+			break;
+		}
+	}
+	if (!FoundGraph)
+		return MakeErrorJson(FString::Printf(TEXT("PCG graph not found: %s"), *GraphName));
+
+	// Find node
+	const TArray<UPCGNode*>& Nodes = FoundGraph->GetNodes();
+	UPCGNode* TargetNode = nullptr;
+
+	for (int32 i = 0; i < Nodes.Num(); i++)
+	{
+		if (!Nodes[i]) continue;
+		if (!NodeName.IsEmpty() && (Nodes[i]->GetName() == NodeName || Nodes[i]->GetNodeTitle().ToString() == NodeName))
+		{
+			TargetNode = Nodes[i];
+			break;
+		}
+		else if (i == NodeIndex)
+		{
+			TargetNode = Nodes[i];
+			break;
+		}
+	}
+
+	if (!TargetNode)
+		return MakeErrorJson(TEXT("PCG node not found"));
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("nodeName"), TargetNode->GetName());
+	Result->SetStringField(TEXT("nodeTitle"), TargetNode->GetNodeTitle().ToString());
+	Result->SetNumberField(TEXT("posX"), TargetNode->PositionX);
+	Result->SetNumberField(TEXT("posY"), TargetNode->PositionY);
+
+	const UPCGSettings* Settings = TargetNode->GetSettings();
+	if (Settings)
+	{
+		Result->SetStringField(TEXT("settingsClass"), Settings->GetClass()->GetName());
+		Result->SetNumberField(TEXT("seed"), Settings->GetSeed());
+
+		// Serialize all UPROPERTY fields via reflection
+		TArray<TSharedPtr<FJsonValue>> PropsArray;
+		for (TFieldIterator<FProperty> PropIt(Settings->GetClass()); PropIt; ++PropIt)
+		{
+			FProperty* Prop = *PropIt;
+			if (!Prop || !Prop->HasAnyPropertyFlags(CPF_Edit)) continue;
+
+			TSharedRef<FJsonObject> PropJson = MakeShared<FJsonObject>();
+			PropJson->SetStringField(TEXT("name"), Prop->GetName());
+			PropJson->SetStringField(TEXT("type"), Prop->GetCPPType());
+
+			FString ValueStr;
+			const void* ValuePtr = Prop->ContainerPtrToValuePtr<void>(Settings);
+			Prop->ExportTextItem_Direct(ValueStr, ValuePtr, nullptr, nullptr, PPF_None);
+			PropJson->SetStringField(TEXT("value"), ValueStr);
+
+			PropsArray.Add(MakeShared<FJsonValueObject>(PropJson));
+		}
+		Result->SetArrayField(TEXT("properties"), PropsArray);
+	}
+
+	return JsonToString(Result);
+#endif
+}
+
+// ============================================================
+// pcgSetNodeSettings - Set a property on a PCG node's settings
+// ============================================================
+FString FAgenticMCPServer::HandlePCGSetNodeSettings(const FString& Body)
+{
+#if !HAS_PCG_PLUGIN
+	return MakeErrorJson(TEXT("PCG plugin is not available in this build"));
+#else
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString GraphName = Json->GetStringField(TEXT("graphName"));
+	if (GraphName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: graphName"));
+
+	FString NodeName = Json->GetStringField(TEXT("nodeName"));
+	int32 NodeIndex = Json->HasField(TEXT("nodeIndex")) ? Json->GetIntegerField(TEXT("nodeIndex")) : -1;
+
+	FString PropertyName = Json->GetStringField(TEXT("propertyName"));
+	if (PropertyName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: propertyName"));
+
+	FString PropertyValue = Json->GetStringField(TEXT("propertyValue"));
+
+	// Find graph
+	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> PCGAssets;
+	ARM.Get().GetAssetsByClass(UPCGGraphInterface::StaticClass()->GetClassPathName(), PCGAssets, true);
+
+	UPCGGraph* FoundGraph = nullptr;
+	for (const FAssetData& Asset : PCGAssets)
+	{
+		if (Asset.AssetName.ToString() == GraphName || Asset.GetObjectPathString().Contains(GraphName))
+		{
+			FoundGraph = Cast<UPCGGraph>(Asset.GetAsset());
+			break;
+		}
+	}
+	if (!FoundGraph)
+		return MakeErrorJson(FString::Printf(TEXT("PCG graph not found: %s"), *GraphName));
+
+	// Find node
+	const TArray<UPCGNode*>& Nodes = FoundGraph->GetNodes();
+	UPCGNode* TargetNode = nullptr;
+
+	for (int32 i = 0; i < Nodes.Num(); i++)
+	{
+		if (!Nodes[i]) continue;
+		if (!NodeName.IsEmpty() && (Nodes[i]->GetName() == NodeName || Nodes[i]->GetNodeTitle().ToString() == NodeName))
+		{
+			TargetNode = Nodes[i];
+			break;
+		}
+		else if (i == NodeIndex)
+		{
+			TargetNode = Nodes[i];
+			break;
+		}
+	}
+
+	if (!TargetNode)
+		return MakeErrorJson(TEXT("PCG node not found"));
+
+	UPCGSettings* Settings = TargetNode->GetSettings();
+	if (!Settings)
+		return MakeErrorJson(TEXT("Node has no settings object"));
+
+	// Find and set the property
+	FProperty* TargetProp = nullptr;
+	for (TFieldIterator<FProperty> PropIt(Settings->GetClass()); PropIt; ++PropIt)
+	{
+		if ((*PropIt)->GetName() == PropertyName)
+		{
+			TargetProp = *PropIt;
+			break;
+		}
+	}
+
+	if (!TargetProp)
+		return MakeErrorJson(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
+
+	void* ValuePtr = TargetProp->ContainerPtrToValuePtr<void>(Settings);
+	if (!TargetProp->ImportText_Direct(*PropertyValue, ValuePtr, Settings, PPF_None))
+		return MakeErrorJson(FString::Printf(TEXT("Failed to set property '%s' to '%s'"), *PropertyName, *PropertyValue));
+
+	Settings->PostEditChange();
+	FoundGraph->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("graphName"), FoundGraph->GetName());
+	Result->SetStringField(TEXT("nodeName"), TargetNode->GetName());
+	Result->SetStringField(TEXT("propertyName"), PropertyName);
+	Result->SetStringField(TEXT("propertyValue"), PropertyValue);
+	return JsonToString(Result);
+#endif
+}

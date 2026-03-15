@@ -744,3 +744,152 @@ FString FAgenticMCPServer::HandleMaterialGetGraph(const FString& Body)
 	Result->SetObjectField(TEXT("materialOutputConnections"), OutputsJson);
 	return JsonToString(Result);
 }
+
+// ============================================================
+// materialCreateInstance - Create a material instance from a parent material
+// ============================================================
+FString FAgenticMCPServer::HandleMaterialCreateInstance(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString ParentName = Json->GetStringField(TEXT("parentMaterial"));
+	if (ParentName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: parentMaterial"));
+
+	FString InstanceName = Json->GetStringField(TEXT("instanceName"));
+	if (InstanceName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: instanceName"));
+
+	FString InstancePath = Json->GetStringField(TEXT("path"));
+	if (InstancePath.IsEmpty())
+		InstancePath = TEXT("/Game/Materials/");
+
+	// Find parent material
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+	TArray<FAssetData> MatAssets;
+	AssetRegistry.GetAssetsByClass(UMaterialInterface::StaticClass()->GetClassPathName(), MatAssets, true);
+
+	UMaterialInterface* ParentMat = nullptr;
+	for (const FAssetData& Asset : MatAssets)
+	{
+		if (Asset.AssetName.ToString() == ParentName || Asset.GetObjectPathString().Contains(ParentName))
+		{
+			ParentMat = Cast<UMaterialInterface>(Asset.GetAsset());
+			break;
+		}
+	}
+
+	if (!ParentMat)
+		return MakeErrorJson(FString::Printf(TEXT("Parent material not found: %s"), *ParentName));
+
+	// Create the material instance constant
+	FString PackagePath = InstancePath / InstanceName;
+	UPackage* Package = CreatePackage(*PackagePath);
+	if (!Package)
+		return MakeErrorJson(TEXT("Failed to create package for material instance"));
+
+	UMaterialInstanceConstant* MIC = NewObject<UMaterialInstanceConstant>(
+		Package, *InstanceName, RF_Public | RF_Standalone);
+
+	if (!MIC)
+		return MakeErrorJson(TEXT("Failed to create material instance"));
+
+	MIC->SetParentEditorOnly(ParentMat);
+	MIC->PostEditChange();
+	MIC->MarkPackageDirty();
+
+	// Notify asset registry
+	FAssetRegistryModule::AssetCreated(MIC);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("instanceName"), MIC->GetName());
+	Result->SetStringField(TEXT("instancePath"), MIC->GetPathName());
+	Result->SetStringField(TEXT("parentMaterial"), ParentMat->GetName());
+	return JsonToString(Result);
+}
+
+// ============================================================
+// materialDeleteNode - Delete a material expression node from a material
+// ============================================================
+FString FAgenticMCPServer::HandleMaterialDeleteNode(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString MaterialName = Json->GetStringField(TEXT("materialName"));
+	if (MaterialName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: materialName"));
+
+	FString NodeName = Json->GetStringField(TEXT("nodeName"));
+	int32 NodeIndex = Json->GetIntegerField(TEXT("nodeIndex"));
+
+	if (NodeName.IsEmpty() && NodeIndex < 0)
+		return MakeErrorJson(TEXT("Must provide either nodeName or nodeIndex"));
+
+	// Find the material
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+	TArray<FAssetData> MatAssets;
+	AssetRegistry.GetAssetsByClass(UMaterial::StaticClass()->GetClassPathName(), MatAssets, true);
+
+	UMaterial* Material = nullptr;
+	for (const FAssetData& Asset : MatAssets)
+	{
+		if (Asset.AssetName.ToString() == MaterialName || Asset.GetObjectPathString().Contains(MaterialName))
+		{
+			Material = Cast<UMaterial>(Asset.GetAsset());
+			break;
+		}
+	}
+
+	if (!Material)
+		return MakeErrorJson(FString::Printf(TEXT("Material not found: %s"), *MaterialName));
+
+	// Find the expression to remove
+	UMaterialExpression* TargetExpr = nullptr;
+	int32 FoundIndex = -1;
+
+	for (int32 i = 0; i < Material->GetExpressions().Num(); i++)
+	{
+		UMaterialExpression* Expr = Material->GetExpressions()[i];
+		if (!Expr) continue;
+
+		if (!NodeName.IsEmpty() && Expr->GetName() == NodeName)
+		{
+			TargetExpr = Expr;
+			FoundIndex = i;
+			break;
+		}
+		else if (i == NodeIndex)
+		{
+			TargetExpr = Expr;
+			FoundIndex = i;
+			break;
+		}
+	}
+
+	if (!TargetExpr)
+		return MakeErrorJson(TEXT("Material expression node not found"));
+
+	FString RemovedName = TargetExpr->GetName();
+	FString RemovedClass = TargetExpr->GetClass()->GetName();
+
+	// Remove the expression
+	Material->GetExpressionCollection().RemoveExpression(TargetExpr);
+	Material->PostEditChange();
+	Material->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("materialName"), Material->GetName());
+	Result->SetStringField(TEXT("removedNode"), RemovedName);
+	Result->SetStringField(TEXT("removedClass"), RemovedClass);
+	Result->SetNumberField(TEXT("removedIndex"), FoundIndex);
+	Result->SetNumberField(TEXT("remainingExpressions"), Material->GetExpressions().Num());
+	return JsonToString(Result);
+}

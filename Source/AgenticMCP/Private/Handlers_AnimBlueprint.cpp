@@ -396,3 +396,148 @@ FString FAgenticMCPServer::HandleAnimBPGetBlendSpace(const FString& Body)
 
 	return JsonToString(Result);
 }
+
+// ============================================================
+// animBPGetSlotGroups - List all anim slot groups in an AnimBP
+// ============================================================
+FString FAgenticMCPServer::HandleAnimBPGetSlotGroups(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BPName = Json->GetStringField(TEXT("name"));
+	if (BPName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: name"));
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+	TArray<FAssetData> AnimBPAssets;
+	AssetRegistry.GetAssetsByClass(UAnimBlueprint::StaticClass()->GetClassPathName(), AnimBPAssets, true);
+
+	UAnimBlueprint* AnimBP = nullptr;
+	for (const FAssetData& Asset : AnimBPAssets)
+	{
+		if (Asset.AssetName.ToString() == BPName || Asset.GetObjectPathString().Contains(BPName))
+		{
+			AnimBP = Cast<UAnimBlueprint>(Asset.GetAsset());
+			break;
+		}
+	}
+
+	if (!AnimBP)
+		return MakeErrorJson(FString::Printf(TEXT("Animation Blueprint not found: %s"), *BPName));
+
+	// Get the skeleton to access slot groups
+	USkeleton* Skeleton = AnimBP->TargetSkeleton;
+	if (!Skeleton)
+		return MakeErrorJson(TEXT("AnimBP has no target skeleton"));
+
+	TArray<TSharedPtr<FJsonValue>> GroupArray;
+	const TArray<FAnimSlotGroup>& SlotGroups = Skeleton->GetSlotGroups();
+	for (const FAnimSlotGroup& Group : SlotGroups)
+	{
+		TSharedRef<FJsonObject> GroupJson = MakeShared<FJsonObject>();
+		GroupJson->SetStringField(TEXT("groupName"), Group.GroupName.ToString());
+
+		TArray<TSharedPtr<FJsonValue>> SlotArray;
+		for (const FName& SlotName : Group.SlotNames)
+		{
+			SlotArray.Add(MakeShared<FJsonValueString>(SlotName.ToString()));
+		}
+		GroupJson->SetArrayField(TEXT("slots"), SlotArray);
+		GroupArray.Add(MakeShared<FJsonValueObject>(GroupJson));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("animBlueprint"), BPName);
+	Result->SetStringField(TEXT("skeleton"), Skeleton->GetName());
+	Result->SetNumberField(TEXT("groupCount"), GroupArray.Num());
+	Result->SetArrayField(TEXT("slotGroups"), GroupArray);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// animBPGetTransitions - Get transition rules for a state machine
+// ============================================================
+FString FAgenticMCPServer::HandleAnimBPGetTransitions(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BPName = Json->GetStringField(TEXT("name"));
+	if (BPName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: name"));
+
+	FString StateMachineName = Json->GetStringField(TEXT("stateMachine"));
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+	TArray<FAssetData> AnimBPAssets;
+	AssetRegistry.GetAssetsByClass(UAnimBlueprint::StaticClass()->GetClassPathName(), AnimBPAssets, true);
+
+	UAnimBlueprint* AnimBP = nullptr;
+	for (const FAssetData& Asset : AnimBPAssets)
+	{
+		if (Asset.AssetName.ToString() == BPName || Asset.GetObjectPathString().Contains(BPName))
+		{
+			AnimBP = Cast<UAnimBlueprint>(Asset.GetAsset());
+			break;
+		}
+	}
+
+	if (!AnimBP)
+		return MakeErrorJson(FString::Printf(TEXT("Animation Blueprint not found: %s"), *BPName));
+
+	TArray<TSharedPtr<FJsonValue>> TransitionArray;
+
+	for (UEdGraph* Graph : AnimBP->FunctionGraphs)
+	{
+		if (!Graph) continue;
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			UAnimGraphNode_StateMachineBase* SMNode = Cast<UAnimGraphNode_StateMachineBase>(Node);
+			if (!SMNode) continue;
+
+			if (!StateMachineName.IsEmpty() &&
+				!Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString().Contains(StateMachineName))
+				continue;
+
+			UAnimationStateMachineGraph* SMGraph = SMNode->GetStateMachineGraph();
+			if (!SMGraph) continue;
+
+			for (UEdGraphNode* SMChild : SMGraph->Nodes)
+			{
+				UAnimStateTransitionNode* TransNode = Cast<UAnimStateTransitionNode>(SMChild);
+				if (!TransNode) continue;
+
+				TSharedRef<FJsonObject> TransJson = MakeShared<FJsonObject>();
+				TransJson->SetStringField(TEXT("guid"), TransNode->NodeGuid.ToString());
+
+				if (UAnimStateNodeBase* Prev = TransNode->GetPreviousState())
+					TransJson->SetStringField(TEXT("fromState"), Prev->GetStateName());
+				if (UAnimStateNodeBase* Next = TransNode->GetNextState())
+					TransJson->SetStringField(TEXT("toState"), Next->GetStateName());
+
+				// Transition rule info
+				TransJson->SetBoolField(TEXT("bidirectional"), TransNode->Bidirectional);
+
+				// Get the transition graph for rule details
+				if (UEdGraph* TransGraph = TransNode->GetBoundGraph())
+				{
+					TransJson->SetStringField(TEXT("ruleGraph"), TransGraph->GetName());
+					TransJson->SetNumberField(TEXT("ruleNodeCount"), TransGraph->Nodes.Num());
+				}
+
+				TransitionArray.Add(MakeShared<FJsonValueObject>(TransJson));
+			}
+		}
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("animBlueprint"), BPName);
+	Result->SetNumberField(TEXT("transitionCount"), TransitionArray.Num());
+	Result->SetArrayField(TEXT("transitions"), TransitionArray);
+	return JsonToString(Result);
+}
