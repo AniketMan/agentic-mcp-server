@@ -9,7 +9,9 @@
  *   - Worker:     port 8081  (Llama 3.1 8B Instruct Q4_K_M)
  *   - QA Auditor: port 8082  (Llama 3.2 3B Instruct Q4_K_M)
  *
- * System prompts are injected at server startup from models/instructions/*.md
+ * System prompts are loaded from models/instructions/*.md and injected
+ * per-request via the /v1/chat/completions endpoint (system role message).
+ * The --system-prompt-file flag was removed from llama-server in PR #9857.
  */
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
@@ -26,6 +28,19 @@ const QA_AUDITOR_URL = process.env.LLAMA_QA_AUDITOR_URL || 'http://localhost:808
 const LLAMA_CPP_URL = process.env.LLAMA_CPP_URL || null;
 const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD || '0.95');
 const MAX_RETRIES = parseInt(process.env.MAX_WORKER_RETRIES || '3', 10);
+
+// Load instruction MDs for each role (injected as system prompt per-request)
+const INSTRUCTIONS_DIR = join(__dirname, '..', '..', 'models', 'instructions');
+const ROLE_INSTRUCTIONS = {};
+for (const [role, file] of [['validator', 'validator.md'], ['worker', 'worker.md'], ['qa', 'qa-auditor.md']]) {
+  const path = join(INSTRUCTIONS_DIR, file);
+  if (existsSync(path)) {
+    ROLE_INSTRUCTIONS[role] = readFileSync(path, 'utf-8');
+  } else {
+    ROLE_INSTRUCTIONS[role] = '';
+    console.warn(`[LLM-VALIDATOR] Warning: ${path} not found. ${role} will run without system prompt.`);
+  }
+}
 
 // Map tool names to context file categories
 const TOOL_CONTEXT_MAP = {
@@ -121,14 +136,16 @@ async function isLLMAvailable() {
  * Run inference on the local LLM to validate a plan step.
  * Returns { confidence, payload, raw_response }
  */
-async function runWorkerInference(step, toolDef, context, attempt = 1) {
-  const prompt = `You are a deterministic Unreal Engine tool executor. You produce exact JSON payloads for MCP tool calls.
+async function runWorkerInference(step, toolDef, context, attempt = 1, role = 'worker') {
+  // Build the system prompt: role instructions + context
+  const systemPrompt = [
+    ROLE_INSTRUCTIONS[role] || '',
+    '',
+    'CONTEXT (check these before producing output):',
+    context,
+  ].join('\n');
 
-CONTEXT (check these before producing output):
-${context}
-
-TASK:
-Execute this plan step by producing the exact JSON payload for the tool call.
+  const userPrompt = `Execute this plan step by producing the exact JSON payload for the tool call.
 
 Step: ${JSON.stringify(step, null, 2)}
 
@@ -142,18 +159,23 @@ Respond with ONLY valid JSON. No explanation. No markdown.
 Format: {"toolName": "${step.tool}", "payload": {...}}`;
 
   try {
-    const url = getUrlForRole('worker');
-    const resp = await fetch(`${url}/completion`, {
+    const url = getUrlForRole(role);
+    // Use /v1/chat/completions endpoint with system role for prompt injection
+    const resp = await fetch(`${url}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt,
-        n_predict: 512,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: 512,
         temperature: 0.1,  // near-deterministic
         top_p: 0.9,
         stop: ['\n\n'],
         // Request logprobs for confidence scoring
-        n_probs: 1,
+        logprobs: true,
+        top_logprobs: 1,
       }),
       signal: AbortSignal.timeout(30000),
     });
@@ -163,20 +185,19 @@ Format: {"toolName": "${step.tool}", "payload": {...}}`;
     }
 
     const result = await resp.json();
-    const content = result.content?.trim();
+    const choice = result.choices?.[0];
+    const content = choice?.message?.content?.trim();
 
-    // Extract confidence from completion_probabilities if available
-    // Otherwise estimate from the model's perplexity
+    // Extract confidence from logprobs if available
     let confidence = 0;
-    if (result.completion_probabilities) {
-      // Average token probability across the output
-      const probs = result.completion_probabilities.map(t => t.probs?.[0]?.prob || 0);
-      confidence = probs.length > 0 ? probs.reduce((a, b) => a + b, 0) / probs.length : 0;
-    } else if (result.timings?.predicted_per_token_ms) {
-      // Heuristic: faster generation = higher confidence (model is more certain)
-      // This is a rough proxy when logprobs aren't available
-      const msPerToken = result.timings.predicted_per_token_ms;
-      confidence = msPerToken < 10 ? 0.95 : msPerToken < 20 ? 0.85 : 0.70;
+    const logprobsData = choice?.logprobs?.content;
+    if (logprobsData && logprobsData.length > 0) {
+      // Average token probability across the output (exp of logprob)
+      const probs = logprobsData.map(t => Math.exp(t.logprob || -10));
+      confidence = probs.reduce((a, b) => a + b, 0) / probs.length;
+    } else if (result.usage?.completion_tokens) {
+      // Heuristic fallback: if we got tokens but no logprobs, assume moderate confidence
+      confidence = 0.80;
     }
 
     // Try to parse the JSON output
@@ -275,6 +296,7 @@ export {
   executeWithConfidenceGate,
   loadContextForTool,
   getUrlForRole,
+  ROLE_INSTRUCTIONS,
   CONFIDENCE_THRESHOLD,
   MAX_RETRIES,
   VALIDATOR_URL,

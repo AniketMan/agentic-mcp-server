@@ -1,7 +1,8 @@
 @echo off
 REM ============================================================================
 REM  Start Planner/Worker inference server (Llama 3.1 8B) on port 8081
-REM  System prompt injected from instructions/worker.md
+REM  System prompt is injected per-request by the gatekeeper (llm-validator.js)
+REM  from instructions/worker.md
 REM ============================================================================
 setlocal enabledelayedexpansion
 
@@ -26,15 +27,6 @@ if not exist "%MODEL%" (
     exit /b 1
 )
 
-REM Load system prompt from instruction MD
-set "SYSTEM_PROMPT_FILE=instructions\worker.md"
-if not exist "%SYSTEM_PROMPT_FILE%" (
-    echo [WARNING] %SYSTEM_PROMPT_FILE% not found. Starting without system prompt.
-    set "SYSTEM_PROMPT_ARG="
-) else (
-    set "SYSTEM_PROMPT_ARG=--system-prompt-file "%SYSTEM_PROMPT_FILE%""
-)
-
 echo ============================================================================
 echo  Starting Planner/Worker (Llama 3.1 8B) on port %PORT%
 echo  GPU layers: %GPU_LAYERS%  Context: %CTX_SIZE%  Threads: %THREADS%
@@ -47,7 +39,6 @@ bin\llama-server.exe ^
     --n-gpu-layers %GPU_LAYERS% ^
     --ctx-size %CTX_SIZE% ^
     --threads %THREADS% ^
-    %SYSTEM_PROMPT_ARG% ^
     --log-disable
 
 echo.

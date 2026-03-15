@@ -1,7 +1,8 @@
 @echo off
 REM ============================================================================
 REM  Start QA Auditor inference server (Llama 3.2 3B) on port 8082
-REM  System prompt injected from instructions/qa-auditor.md
+REM  System prompt is injected per-request by the gatekeeper (llm-validator.js)
+REM  from instructions/qa-auditor.md
 REM ============================================================================
 setlocal enabledelayedexpansion
 
@@ -26,15 +27,6 @@ if not exist "%MODEL%" (
     exit /b 1
 )
 
-REM Load system prompt from instruction MD
-set "SYSTEM_PROMPT_FILE=instructions\qa-auditor.md"
-if not exist "%SYSTEM_PROMPT_FILE%" (
-    echo [WARNING] %SYSTEM_PROMPT_FILE% not found. Starting without system prompt.
-    set "SYSTEM_PROMPT_ARG="
-) else (
-    set "SYSTEM_PROMPT_ARG=--system-prompt-file "%SYSTEM_PROMPT_FILE%""
-)
-
 echo ============================================================================
 echo  Starting QA Auditor (Llama 3.2 3B) on port %PORT%
 echo  GPU layers: %GPU_LAYERS%  Context: %CTX_SIZE%  Threads: %THREADS%
@@ -47,7 +39,6 @@ bin\llama-server.exe ^
     --n-gpu-layers %GPU_LAYERS% ^
     --ctx-size %CTX_SIZE% ^
     --threads %THREADS% ^
-    %SYSTEM_PROMPT_ARG% ^
     --log-disable
 
 echo.

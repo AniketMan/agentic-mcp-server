@@ -52,7 +52,9 @@ Each server loads its system prompt from `instructions/` at startup:
 | Worker | `instructions/worker.md` |
 | QA Auditor | `instructions/qa-auditor.md` |
 
-The system prompt is injected via llama.cpp's `--system-prompt-file` flag. When Claude dispatches a plan step through the gatekeeper, the Worker server already has its role instructions loaded. The gatekeeper sends only the step context and task as the user prompt. The model runs inference against both the system prompt (its role) and the user prompt (the task) to produce the exact JSON payload.
+The system prompt is injected per-request by the gatekeeper (`Tools/gatekeeper/llm-validator.js`). At startup, the gatekeeper reads all three instruction MDs into memory. When a plan step is dispatched, the gatekeeper sends a `/v1/chat/completions` request with the instruction MD as the `system` role message and the step context + task as the `user` role message. The model runs inference against both to produce the exact JSON payload.
+
+Note: The `--system-prompt-file` flag was removed from llama-server in PR #9857. System prompts must be sent per-request.
 
 ## How It Connects
 
