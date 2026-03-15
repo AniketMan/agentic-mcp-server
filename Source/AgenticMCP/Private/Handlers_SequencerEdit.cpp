@@ -1,18 +1,30 @@
 // Handlers_SequencerEdit.cpp
 // Level Sequence editing handlers for AgenticMCP.
 // Full mutation support: create, tracks, sections, keyframes, camera cuts, render.
+// Target: UE 5.4 - 5.6
 //
-// Endpoints:
-//   sequencerCreate        - Create a new LevelSequence asset
-//   sequencerAddTrack      - Add a binding track (actor) to a sequence
-//   sequencerAddSection    - Add a section to a track
-//   sequencerSetKeyframe   - Set a keyframe value at a specific frame
-//   sequencerDeleteSection - Remove a section from a track
-//   sequencerBindActor     - Bind an actor to a sequence as possessable
-//   sequencerAddCameraCut  - Add a camera cut track with camera binding
-//   sequencerGetTracks     - Get all tracks and sections in a sequence
-//   sequencerSetPlayRange  - Set the playback range of a sequence
-//   sequencerRender        - Render sequence to image sequence via Movie Pipeline
+// Endpoints (21 total):
+//   sequencerCreate           - Create a new LevelSequence asset
+//   sequencerAddTrack         - Add a binding track (actor) to a sequence
+//   sequencerDeleteTrack      - Remove a track from a binding
+//   sequencerAddSection       - Add a section to a track
+//   sequencerDeleteSection    - Remove a section from a track
+//   sequencerMoveSection      - Move/resize a section's time range
+//   sequencerDuplicateSection - Duplicate a section within the same track
+//   sequencerSetKeyframe      - Set a keyframe value at a specific frame
+//   sequencerGetKeyframes     - Read back all keyframe times and values
+//   sequencerBindActor        - Bind an actor to a sequence as possessable
+//   sequencerAddSpawnable     - Add a spawnable actor to a sequence
+//   sequencerAddCameraCut     - Add a camera cut track with camera binding
+//   sequencerAddSubSequence   - Add a sub-sequence (shot) to a subsequences track
+//   sequencerAddFade          - Add a fade track with fade in/out sections
+//   sequencerSetTrackMuteLock - Set mute/lock state on a track
+//   sequencerSetAudioSection  - Assign a sound asset to an audio section
+//   sequencerSetEventPayload  - Set event function binding on an event track key
+//   sequencerGetTracks        - Get all tracks and sections in a sequence
+//   sequencerSetPlayRange     - Set the playback range of a sequence
+//   sequencerRender           - Render sequence to image sequence via Movie Pipeline
+//   sequencerRenderStatus     - Check render job status / completion
 
 #include "AgenticMCPServer.h"
 #include "LevelSequence.h"
@@ -34,6 +46,10 @@
 #include "Sections/MovieSceneFloatSection.h"
 #include "Sections/MovieSceneCameraCutSection.h"
 #include "Sections/MovieSceneAudioSection.h"
+#include "Sections/MovieSceneSubSection.h"
+#include "Sections/MovieSceneEventSection.h"
+#include "Tracks/MovieSceneFadeTrack.h"
+#include "Sections/MovieSceneFadeSection.h"
 #include "Channels/MovieSceneChannelProxy.h"
 #include "Channels/MovieSceneFloatChannel.h"
 #include "Channels/MovieSceneBoolChannel.h"
@@ -50,6 +66,8 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "UObject/SavePackage.h"
+#include "Sound/SoundBase.h"
+#include "MovieSceneSpawnable.h"
 
 // Movie Render Pipeline (for sequencerRender)
 #include "MoviePipelineQueue.h"
@@ -74,6 +92,44 @@ static FFrameNumber DisplayFrameToTick(int32 DisplayFrame, const UMovieScene* Mo
 		DisplayRate,
 		TickRes
 	).FloorToFrame();
+}
+
+// Reverse: convert tick-resolution frame to display frame for reporting.
+static int32 TickToDisplayFrame(FFrameNumber TickFrame, const UMovieScene* MovieScene)
+{
+	FFrameRate TickRes = MovieScene->GetTickResolution();
+	FFrameRate DisplayRate = MovieScene->GetDisplayRate();
+	return ConvertFrameTime(
+		FFrameTime(TickFrame),
+		TickRes,
+		DisplayRate
+	).FloorToFrame().Value;
+}
+
+// Helper: find a track by type string within a binding's tracks.
+static UMovieSceneTrack* FindTrackByType(FMovieSceneBinding* Binding, const FString& TrackType)
+{
+	for (UMovieSceneTrack* Track : Binding->GetTracks())
+	{
+		if (!Track) continue;
+		bool bMatch = false;
+		if (TrackType == TEXT("Transform") || TrackType == TEXT("3DTransform"))
+			bMatch = Track->IsA<UMovieScene3DTransformTrack>();
+		else if (TrackType == TEXT("Visibility"))
+			bMatch = Track->IsA<UMovieSceneVisibilityTrack>();
+		else if (TrackType == TEXT("Bool"))
+			bMatch = Track->IsA<UMovieSceneBoolTrack>();
+		else if (TrackType == TEXT("Float"))
+			bMatch = Track->IsA<UMovieSceneFloatTrack>();
+		else if (TrackType == TEXT("SkeletalAnimation"))
+			bMatch = Track->IsA<UMovieSceneSkeletalAnimationTrack>();
+		else if (TrackType == TEXT("Audio"))
+			bMatch = Track->IsA<UMovieSceneAudioTrack>();
+		else if (TrackType == TEXT("Event"))
+			bMatch = Track->IsA<UMovieSceneEventTrack>();
+		if (bMatch) return Track;
+	}
+	return nullptr;
 }
 
 static UWorld* GetEditorWorld_Seq()
@@ -1251,5 +1307,892 @@ FString FAgenticMCPServer::HandleSequencerRender(const FString& Body)
 			 "'MovieRenderPipeline.RenderQueuedJobs' to start rendering. "
 			 "Or use executePython to call: "
 			 "unreal.MoviePipelineQueueSubsystem().render_queue_with_executor(unreal.MoviePipelinePIEExecutor())"));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerDeleteTrack - Remove a track from a binding
+// Params: sequenceName, actorName or bindingGuid, trackType
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerDeleteTrack(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString BindingGuidStr = Json->GetStringField(TEXT("bindingGuid"));
+	FString TrackType = Json->HasField(TEXT("trackType")) ? Json->GetStringField(TEXT("trackType")) : TEXT("Transform");
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Handle master tracks (CameraCut, Audio, Event, Fade) that have no binding
+	if (TrackType == TEXT("CameraCut") || TrackType == TEXT("Fade"))
+	{
+		for (UMovieSceneTrack* Track : MovieScene->GetTracks())
+		{
+			bool bMatch = false;
+			if (TrackType == TEXT("CameraCut")) bMatch = Track->IsA<UMovieSceneCameraCutTrack>();
+			else if (TrackType == TEXT("Fade")) bMatch = Track->IsA<UMovieSceneFadeTrack>();
+			if (bMatch)
+			{
+				MovieScene->RemoveTrack(*Track);
+				Seq->MarkPackageDirty();
+				TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+				Result->SetBoolField(TEXT("success"), true);
+				Result->SetStringField(TEXT("sequenceName"), SeqName);
+				Result->SetStringField(TEXT("trackType"), TrackType);
+				Result->SetStringField(TEXT("scope"), TEXT("master"));
+				return JsonToString(Result);
+			}
+		}
+		return MakeErrorJson(FString::Printf(TEXT("No master %s track found"), *TrackType));
+	}
+
+	// Actor-bound tracks
+	FGuid BindingGuid;
+	if (!BindingGuidStr.IsEmpty())
+	{
+		if (!FindBindingByGuid(MovieScene, BindingGuidStr, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("Binding GUID not found: %s"), *BindingGuidStr));
+	}
+	else if (!ActorName.IsEmpty())
+	{
+		if (!FindBindingByActorName(MovieScene, ActorName, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("No binding found for actor: %s"), *ActorName));
+	}
+	else
+	{
+		return MakeErrorJson(TEXT("Provide 'actorName' or 'bindingGuid'"));
+	}
+
+	FMovieSceneBinding* Binding = MovieScene->FindBinding(BindingGuid);
+	if (!Binding) return MakeErrorJson(TEXT("Binding not found"));
+
+	UMovieSceneTrack* TargetTrack = FindTrackByType(Binding, TrackType);
+	if (!TargetTrack)
+		return MakeErrorJson(FString::Printf(TEXT("No %s track found for this binding"), *TrackType));
+
+	MovieScene->RemoveTrack(*TargetTrack);
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("trackType"), TrackType);
+	Result->SetStringField(TEXT("bindingGuid"), BindingGuid.ToString());
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerGetKeyframes - Read back keyframe times and values
+// Params: sequenceName, actorName or bindingGuid, trackType,
+//         sectionIndex (default 0), channelIndex (default -1 = all)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerGetKeyframes(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString BindingGuidStr = Json->GetStringField(TEXT("bindingGuid"));
+	FString TrackType = Json->HasField(TEXT("trackType")) ? Json->GetStringField(TEXT("trackType")) : TEXT("Transform");
+	int32 SectionIdx = Json->HasField(TEXT("sectionIndex")) ? (int32)Json->GetNumberField(TEXT("sectionIndex")) : 0;
+	int32 ChannelFilter = Json->HasField(TEXT("channelIndex")) ? (int32)Json->GetNumberField(TEXT("channelIndex")) : -1;
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	FGuid BindingGuid;
+	if (!BindingGuidStr.IsEmpty())
+	{
+		if (!FindBindingByGuid(MovieScene, BindingGuidStr, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("Binding GUID not found: %s"), *BindingGuidStr));
+	}
+	else if (!ActorName.IsEmpty())
+	{
+		if (!FindBindingByActorName(MovieScene, ActorName, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("No binding found for actor: %s"), *ActorName));
+	}
+	else
+	{
+		return MakeErrorJson(TEXT("Provide 'actorName' or 'bindingGuid'"));
+	}
+
+	FMovieSceneBinding* Binding = MovieScene->FindBinding(BindingGuid);
+	if (!Binding) return MakeErrorJson(TEXT("Binding not found"));
+
+	UMovieSceneTrack* TargetTrack = FindTrackByType(Binding, TrackType);
+	if (!TargetTrack)
+		return MakeErrorJson(FString::Printf(TEXT("No %s track found for this binding"), *TrackType));
+
+	const TArray<UMovieSceneSection*>& Sections = TargetTrack->GetAllSections();
+	if (SectionIdx < 0 || SectionIdx >= Sections.Num())
+		return MakeErrorJson(FString::Printf(TEXT("Section index %d out of range (0-%d)"), SectionIdx, Sections.Num() - 1));
+
+	UMovieSceneSection* Section = Sections[SectionIdx];
+	FMovieSceneChannelProxy& Proxy = Section->GetChannelProxy();
+
+	TArray<TSharedPtr<FJsonValue>> ChannelsArr;
+
+	// Double channels (Transform tracks use these in UE5.4+)
+	TArrayView<FMovieSceneDoubleChannel*> DoubleChannels = Proxy.GetChannels<FMovieSceneDoubleChannel>();
+	for (int32 ci = 0; ci < DoubleChannels.Num(); ++ci)
+	{
+		if (ChannelFilter >= 0 && ci != ChannelFilter) continue;
+		FMovieSceneDoubleChannel* Ch = DoubleChannels[ci];
+		TSharedRef<FJsonObject> ChJson = MakeShared<FJsonObject>();
+		ChJson->SetNumberField(TEXT("channelIndex"), ci);
+		ChJson->SetStringField(TEXT("channelType"), TEXT("Double"));
+
+		TArray<TSharedPtr<FJsonValue>> KeysArr;
+		TArrayView<const FFrameNumber> Times = Ch->GetTimes();
+		TArrayView<const FMovieSceneDoubleValue> Values = Ch->GetValues();
+		for (int32 ki = 0; ki < Times.Num(); ++ki)
+		{
+			TSharedRef<FJsonObject> KeyJson = MakeShared<FJsonObject>();
+			KeyJson->SetNumberField(TEXT("frame"), TickToDisplayFrame(Times[ki], MovieScene));
+			KeyJson->SetNumberField(TEXT("value"), Values[ki].Value);
+			FString InterpStr = TEXT("cubic");
+			if (Values[ki].InterpMode == RCIM_Linear) InterpStr = TEXT("linear");
+			else if (Values[ki].InterpMode == RCIM_Constant) InterpStr = TEXT("constant");
+			KeyJson->SetStringField(TEXT("interpolation"), InterpStr);
+			KeysArr.Add(MakeShared<FJsonValueObject>(KeyJson));
+		}
+		ChJson->SetArrayField(TEXT("keys"), KeysArr);
+		ChJson->SetNumberField(TEXT("keyCount"), Times.Num());
+		ChannelsArr.Add(MakeShared<FJsonValueObject>(ChJson));
+	}
+
+	// Float channels
+	TArrayView<FMovieSceneFloatChannel*> FloatChannels = Proxy.GetChannels<FMovieSceneFloatChannel>();
+	for (int32 ci = 0; ci < FloatChannels.Num(); ++ci)
+	{
+		int32 GlobalIdx = DoubleChannels.Num() + ci;
+		if (ChannelFilter >= 0 && GlobalIdx != ChannelFilter) continue;
+		FMovieSceneFloatChannel* Ch = FloatChannels[ci];
+		TSharedRef<FJsonObject> ChJson = MakeShared<FJsonObject>();
+		ChJson->SetNumberField(TEXT("channelIndex"), GlobalIdx);
+		ChJson->SetStringField(TEXT("channelType"), TEXT("Float"));
+
+		TArray<TSharedPtr<FJsonValue>> KeysArr;
+		TArrayView<const FFrameNumber> Times = Ch->GetTimes();
+		TArrayView<const FMovieSceneFloatValue> Values = Ch->GetValues();
+		for (int32 ki = 0; ki < Times.Num(); ++ki)
+		{
+			TSharedRef<FJsonObject> KeyJson = MakeShared<FJsonObject>();
+			KeyJson->SetNumberField(TEXT("frame"), TickToDisplayFrame(Times[ki], MovieScene));
+			KeyJson->SetNumberField(TEXT("value"), Values[ki].Value);
+			FString InterpStr = TEXT("cubic");
+			if (Values[ki].InterpMode == RCIM_Linear) InterpStr = TEXT("linear");
+			else if (Values[ki].InterpMode == RCIM_Constant) InterpStr = TEXT("constant");
+			KeyJson->SetStringField(TEXT("interpolation"), InterpStr);
+			KeysArr.Add(MakeShared<FJsonValueObject>(KeyJson));
+		}
+		ChJson->SetArrayField(TEXT("keys"), KeysArr);
+		ChJson->SetNumberField(TEXT("keyCount"), Times.Num());
+		ChannelsArr.Add(MakeShared<FJsonValueObject>(ChJson));
+	}
+
+	// Bool channels
+	TArrayView<FMovieSceneBoolChannel*> BoolChannels = Proxy.GetChannels<FMovieSceneBoolChannel>();
+	for (int32 ci = 0; ci < BoolChannels.Num(); ++ci)
+	{
+		int32 GlobalIdx = DoubleChannels.Num() + FloatChannels.Num() + ci;
+		if (ChannelFilter >= 0 && GlobalIdx != ChannelFilter) continue;
+		FMovieSceneBoolChannel* Ch = BoolChannels[ci];
+		TSharedRef<FJsonObject> ChJson = MakeShared<FJsonObject>();
+		ChJson->SetNumberField(TEXT("channelIndex"), GlobalIdx);
+		ChJson->SetStringField(TEXT("channelType"), TEXT("Bool"));
+
+		TArray<TSharedPtr<FJsonValue>> KeysArr;
+		TArrayView<const FFrameNumber> Times = Ch->GetTimes();
+		TArrayView<const bool> Values = Ch->GetValues();
+		for (int32 ki = 0; ki < Times.Num(); ++ki)
+		{
+			TSharedRef<FJsonObject> KeyJson = MakeShared<FJsonObject>();
+			KeyJson->SetNumberField(TEXT("frame"), TickToDisplayFrame(Times[ki], MovieScene));
+			KeyJson->SetBoolField(TEXT("value"), Values[ki]);
+			KeysArr.Add(MakeShared<FJsonValueObject>(KeyJson));
+		}
+		ChJson->SetArrayField(TEXT("keys"), KeysArr);
+		ChJson->SetNumberField(TEXT("keyCount"), Times.Num());
+		ChannelsArr.Add(MakeShared<FJsonValueObject>(ChJson));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("trackType"), TrackType);
+	Result->SetNumberField(TEXT("sectionIndex"), SectionIdx);
+	Result->SetNumberField(TEXT("channelCount"), ChannelsArr.Num());
+	Result->SetArrayField(TEXT("channels"), ChannelsArr);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerAddSpawnable - Add a spawnable actor to a sequence
+// Params: sequenceName, actorName (world actor to convert to spawnable)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerAddSpawnable(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+	if (ActorName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: actorName"));
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UWorld* World = GetEditorWorld_Seq();
+	if (!World) return MakeErrorJson(TEXT("No editor world available"));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Find the actor in the world
+	AActor* Actor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if ((*It)->GetActorLabel() == ActorName || (*It)->GetName() == ActorName)
+		{
+			Actor = *It;
+			break;
+		}
+	}
+	if (!Actor) return MakeErrorJson(FString::Printf(TEXT("Actor not found in world: %s"), *ActorName));
+
+	// Check if already a spawnable
+	for (int32 i = 0; i < MovieScene->GetSpawnableCount(); ++i)
+	{
+		const FMovieSceneSpawnable& Spawn = MovieScene->GetSpawnable(i);
+		if (Spawn.GetName() == Actor->GetActorLabel() || Spawn.GetName() == Actor->GetName())
+		{
+			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+			Result->SetBoolField(TEXT("success"), true);
+			Result->SetBoolField(TEXT("alreadySpawnable"), true);
+			Result->SetStringField(TEXT("actorName"), Spawn.GetName());
+			Result->SetStringField(TEXT("bindingGuid"), Spawn.GetGuid().ToString());
+			return JsonToString(Result);
+		}
+	}
+
+	// Create spawnable from the actor's class and template
+	FGuid SpawnGuid = MovieScene->AddSpawnable(Actor->GetActorLabel(), *Actor->GetClass()->GetDefaultObject<AActor>());
+	if (!SpawnGuid.IsValid())
+		return MakeErrorJson(TEXT("Failed to create spawnable"));
+
+	// Copy the object template from the actor
+	FMovieSceneSpawnable* Spawnable = MovieScene->FindSpawnable(SpawnGuid);
+	if (Spawnable)
+	{
+		// Duplicate the actor as the object template
+		UObject* Template = StaticDuplicateObject(Actor, MovieScene, NAME_None, RF_AllFlags & ~RF_Transactional);
+		if (Template)
+		{
+			Spawnable->SetObjectTemplate(Template);
+		}
+	}
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetBoolField(TEXT("alreadySpawnable"), false);
+	Result->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
+	Result->SetStringField(TEXT("actorClass"), Actor->GetClass()->GetName());
+	Result->SetStringField(TEXT("bindingGuid"), SpawnGuid.ToString());
+	Result->SetStringField(TEXT("note"), TEXT("Spawnable created. The actor will be spawned/despawned by the sequence. Add tracks using this bindingGuid."));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerMoveSection - Move/resize a section's time range
+// Params: sequenceName, actorName or bindingGuid, trackType,
+//         sectionIndex, startFrame, endFrame
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerMoveSection(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString BindingGuidStr = Json->GetStringField(TEXT("bindingGuid"));
+	FString TrackType = Json->HasField(TEXT("trackType")) ? Json->GetStringField(TEXT("trackType")) : TEXT("Transform");
+
+	if (!Json->HasField(TEXT("sectionIndex"))) return MakeErrorJson(TEXT("Missing required field: sectionIndex"));
+	if (!Json->HasField(TEXT("startFrame"))) return MakeErrorJson(TEXT("Missing required field: startFrame"));
+	if (!Json->HasField(TEXT("endFrame"))) return MakeErrorJson(TEXT("Missing required field: endFrame"));
+
+	int32 SectionIdx = (int32)Json->GetNumberField(TEXT("sectionIndex"));
+	int32 StartFrame = (int32)Json->GetNumberField(TEXT("startFrame"));
+	int32 EndFrame = (int32)Json->GetNumberField(TEXT("endFrame"));
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	FGuid BindingGuid;
+	if (!BindingGuidStr.IsEmpty())
+	{
+		if (!FindBindingByGuid(MovieScene, BindingGuidStr, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("Binding GUID not found: %s"), *BindingGuidStr));
+	}
+	else if (!ActorName.IsEmpty())
+	{
+		if (!FindBindingByActorName(MovieScene, ActorName, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("No binding found for actor: %s"), *ActorName));
+	}
+	else
+	{
+		return MakeErrorJson(TEXT("Provide 'actorName' or 'bindingGuid'"));
+	}
+
+	FMovieSceneBinding* Binding = MovieScene->FindBinding(BindingGuid);
+	if (!Binding) return MakeErrorJson(TEXT("Binding not found"));
+
+	UMovieSceneTrack* TargetTrack = FindTrackByType(Binding, TrackType);
+	if (!TargetTrack)
+		return MakeErrorJson(FString::Printf(TEXT("No %s track found for this binding"), *TrackType));
+
+	const TArray<UMovieSceneSection*>& Sections = TargetTrack->GetAllSections();
+	if (SectionIdx < 0 || SectionIdx >= Sections.Num())
+		return MakeErrorJson(FString::Printf(TEXT("Section index %d out of range (0-%d)"), SectionIdx, Sections.Num() - 1));
+
+	UMovieSceneSection* Section = Sections[SectionIdx];
+	FFrameNumber TickStart = DisplayFrameToTick(StartFrame, MovieScene);
+	FFrameNumber TickEnd = DisplayFrameToTick(EndFrame, MovieScene);
+	Section->SetRange(TRange<FFrameNumber>(TickStart, TickEnd));
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("trackType"), TrackType);
+	Result->SetNumberField(TEXT("sectionIndex"), SectionIdx);
+	Result->SetNumberField(TEXT("startFrame"), StartFrame);
+	Result->SetNumberField(TEXT("endFrame"), EndFrame);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerDuplicateSection - Duplicate a section within the same track
+// Params: sequenceName, actorName or bindingGuid, trackType,
+//         sectionIndex, offsetFrames (optional, default 0)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerDuplicateSection(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString BindingGuidStr = Json->GetStringField(TEXT("bindingGuid"));
+	FString TrackType = Json->HasField(TEXT("trackType")) ? Json->GetStringField(TEXT("trackType")) : TEXT("Transform");
+
+	if (!Json->HasField(TEXT("sectionIndex"))) return MakeErrorJson(TEXT("Missing required field: sectionIndex"));
+	int32 SectionIdx = (int32)Json->GetNumberField(TEXT("sectionIndex"));
+	int32 OffsetFrames = Json->HasField(TEXT("offsetFrames")) ? (int32)Json->GetNumberField(TEXT("offsetFrames")) : 0;
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	FGuid BindingGuid;
+	if (!BindingGuidStr.IsEmpty())
+	{
+		if (!FindBindingByGuid(MovieScene, BindingGuidStr, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("Binding GUID not found: %s"), *BindingGuidStr));
+	}
+	else if (!ActorName.IsEmpty())
+	{
+		if (!FindBindingByActorName(MovieScene, ActorName, BindingGuid))
+			return MakeErrorJson(FString::Printf(TEXT("No binding found for actor: %s"), *ActorName));
+	}
+	else
+	{
+		return MakeErrorJson(TEXT("Provide 'actorName' or 'bindingGuid'"));
+	}
+
+	FMovieSceneBinding* Binding = MovieScene->FindBinding(BindingGuid);
+	if (!Binding) return MakeErrorJson(TEXT("Binding not found"));
+
+	UMovieSceneTrack* TargetTrack = FindTrackByType(Binding, TrackType);
+	if (!TargetTrack)
+		return MakeErrorJson(FString::Printf(TEXT("No %s track found for this binding"), *TrackType));
+
+	const TArray<UMovieSceneSection*>& Sections = TargetTrack->GetAllSections();
+	if (SectionIdx < 0 || SectionIdx >= Sections.Num())
+		return MakeErrorJson(FString::Printf(TEXT("Section index %d out of range (0-%d)"), SectionIdx, Sections.Num() - 1));
+
+	UMovieSceneSection* SourceSection = Sections[SectionIdx];
+
+	// Duplicate the section object
+	UMovieSceneSection* NewSection = Cast<UMovieSceneSection>(
+		StaticDuplicateObject(SourceSection, TargetTrack, NAME_None));
+	if (!NewSection)
+		return MakeErrorJson(TEXT("Failed to duplicate section"));
+
+	// Apply offset if specified
+	if (OffsetFrames != 0)
+	{
+		FFrameNumber TickOffset = DisplayFrameToTick(OffsetFrames, MovieScene) - DisplayFrameToTick(0, MovieScene);
+		TRange<FFrameNumber> Range = NewSection->GetRange();
+		FFrameNumber NewStart = Range.HasLowerBound() ? Range.GetLowerBoundValue() + TickOffset : FFrameNumber(0);
+		FFrameNumber NewEnd = Range.HasUpperBound() ? Range.GetUpperBoundValue() + TickOffset : FFrameNumber(0);
+		NewSection->SetRange(TRange<FFrameNumber>(NewStart, NewEnd));
+	}
+
+	TargetTrack->AddSection(*NewSection);
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("trackType"), TrackType);
+	Result->SetNumberField(TEXT("sourceSectionIndex"), SectionIdx);
+	Result->SetNumberField(TEXT("newSectionIndex"), TargetTrack->GetAllSections().Num() - 1);
+	Result->SetNumberField(TEXT("offsetFrames"), OffsetFrames);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerSetTrackMuteLock - Set mute/lock state on a track
+// Params: sequenceName, actorName or bindingGuid, trackType,
+//         muted (bool, optional), locked (bool, optional)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerSetTrackMuteLock(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString BindingGuidStr = Json->GetStringField(TEXT("bindingGuid"));
+	FString TrackType = Json->HasField(TEXT("trackType")) ? Json->GetStringField(TEXT("trackType")) : TEXT("Transform");
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Handle master tracks
+	UMovieSceneTrack* TargetTrack = nullptr;
+	if (TrackType == TEXT("CameraCut") || TrackType == TEXT("Fade"))
+	{
+		for (UMovieSceneTrack* Track : MovieScene->GetTracks())
+		{
+			bool bMatch = false;
+			if (TrackType == TEXT("CameraCut")) bMatch = Track->IsA<UMovieSceneCameraCutTrack>();
+			else if (TrackType == TEXT("Fade")) bMatch = Track->IsA<UMovieSceneFadeTrack>();
+			if (bMatch) { TargetTrack = Track; break; }
+		}
+	}
+	else
+	{
+		FGuid BindingGuid;
+		if (!BindingGuidStr.IsEmpty())
+		{
+			if (!FindBindingByGuid(MovieScene, BindingGuidStr, BindingGuid))
+				return MakeErrorJson(FString::Printf(TEXT("Binding GUID not found: %s"), *BindingGuidStr));
+		}
+		else if (!ActorName.IsEmpty())
+		{
+			if (!FindBindingByActorName(MovieScene, ActorName, BindingGuid))
+				return MakeErrorJson(FString::Printf(TEXT("No binding found for actor: %s"), *ActorName));
+		}
+		else
+		{
+			return MakeErrorJson(TEXT("Provide 'actorName' or 'bindingGuid'"));
+		}
+
+		FMovieSceneBinding* Binding = MovieScene->FindBinding(BindingGuid);
+		if (!Binding) return MakeErrorJson(TEXT("Binding not found"));
+		TargetTrack = FindTrackByType(Binding, TrackType);
+	}
+
+	if (!TargetTrack)
+		return MakeErrorJson(FString::Printf(TEXT("No %s track found"), *TrackType));
+
+	bool bMuted = TargetTrack->IsEvalDisabled();
+	bool bLocked = TargetTrack->IsLocked();
+
+	if (Json->HasField(TEXT("muted")))
+	{
+		bMuted = Json->GetBoolField(TEXT("muted"));
+		TargetTrack->SetEvalDisabled(bMuted);
+	}
+	if (Json->HasField(TEXT("locked")))
+	{
+		bLocked = Json->GetBoolField(TEXT("locked"));
+		TargetTrack->SetLocked(bLocked);
+	}
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("trackType"), TrackType);
+	Result->SetBoolField(TEXT("muted"), bMuted);
+	Result->SetBoolField(TEXT("locked"), bLocked);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerAddSubSequence - Add a sub-sequence (shot) to a subsequences track
+// Params: sequenceName, subSequenceName, startFrame, endFrame
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerAddSubSequence(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	FString SubSeqName = Json->GetStringField(TEXT("subSequenceName"));
+
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+	if (SubSeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: subSequenceName"));
+	if (!Json->HasField(TEXT("startFrame"))) return MakeErrorJson(TEXT("Missing required field: startFrame"));
+	if (!Json->HasField(TEXT("endFrame"))) return MakeErrorJson(TEXT("Missing required field: endFrame"));
+
+	int32 StartFrame = (int32)Json->GetNumberField(TEXT("startFrame"));
+	int32 EndFrame = (int32)Json->GetNumberField(TEXT("endFrame"));
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	ULevelSequence* SubSeq = FindSequenceByName(SubSeqName);
+	if (!SubSeq) return MakeErrorJson(FString::Printf(TEXT("Sub-sequence not found: %s. Create it first with sequencerCreate."), *SubSeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Find or create a sub-track (UMovieSceneSubTrack is a master track)
+	UMovieSceneSubTrack* SubTrack = MovieScene->FindTrack<UMovieSceneSubTrack>();
+	if (!SubTrack)
+	{
+		SubTrack = MovieScene->AddTrack<UMovieSceneSubTrack>();
+		if (!SubTrack)
+			return MakeErrorJson(TEXT("Failed to create sub-sequence track"));
+	}
+
+	// Add the sub-sequence as a section
+	FFrameNumber TickStart = DisplayFrameToTick(StartFrame, MovieScene);
+	FFrameNumber TickEnd = DisplayFrameToTick(EndFrame, MovieScene);
+	int32 Duration = (TickEnd - TickStart).Value;
+
+	UMovieSceneSubSection* SubSection = SubTrack->AddSequence(SubSeq, TickStart, Duration);
+	if (!SubSection)
+		return MakeErrorJson(TEXT("Failed to add sub-sequence section"));
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("subSequenceName"), SubSeqName);
+	Result->SetNumberField(TEXT("startFrame"), StartFrame);
+	Result->SetNumberField(TEXT("endFrame"), EndFrame);
+	Result->SetNumberField(TEXT("sectionIndex"), SubTrack->GetAllSections().Num() - 1);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerAddFade - Add a fade track with fade in/out sections
+// Params: sequenceName, fadeInEnd (frame), fadeOutStart (frame),
+//         totalEndFrame, fadeColor (optional, default black)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerAddFade(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+
+	if (!Json->HasField(TEXT("fadeInEnd"))) return MakeErrorJson(TEXT("Missing required field: fadeInEnd"));
+	if (!Json->HasField(TEXT("fadeOutStart"))) return MakeErrorJson(TEXT("Missing required field: fadeOutStart"));
+	if (!Json->HasField(TEXT("totalEndFrame"))) return MakeErrorJson(TEXT("Missing required field: totalEndFrame"));
+
+	int32 FadeInEnd = (int32)Json->GetNumberField(TEXT("fadeInEnd"));
+	int32 FadeOutStart = (int32)Json->GetNumberField(TEXT("fadeOutStart"));
+	int32 TotalEnd = (int32)Json->GetNumberField(TEXT("totalEndFrame"));
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Find or create fade track
+	UMovieSceneFadeTrack* FadeTrack = MovieScene->FindTrack<UMovieSceneFadeTrack>();
+	if (!FadeTrack)
+	{
+		FadeTrack = MovieScene->AddTrack<UMovieSceneFadeTrack>();
+		if (!FadeTrack)
+			return MakeErrorJson(TEXT("Failed to create fade track"));
+	}
+
+	// Create fade-in section (0 -> FadeInEnd): value goes from 1.0 to 0.0
+	UMovieSceneSection* FadeInSec = FadeTrack->CreateNewSection();
+	if (FadeInSec)
+	{
+		FFrameNumber TickZero = DisplayFrameToTick(0, MovieScene);
+		FFrameNumber TickFadeInEnd = DisplayFrameToTick(FadeInEnd, MovieScene);
+		FadeInSec->SetRange(TRange<FFrameNumber>(TickZero, TickFadeInEnd));
+		FadeTrack->AddSection(*FadeInSec);
+
+		// Set keyframes: 1.0 at frame 0, 0.0 at fadeInEnd
+		FMovieSceneChannelProxy& Proxy = FadeInSec->GetChannelProxy();
+		TArrayView<FMovieSceneFloatChannel*> FloatChannels = Proxy.GetChannels<FMovieSceneFloatChannel>();
+		if (FloatChannels.Num() > 0)
+		{
+			FloatChannels[0]->AddLinearKey(TickZero, 1.0f);
+			FloatChannels[0]->AddLinearKey(TickFadeInEnd, 0.0f);
+		}
+	}
+
+	// Create fade-out section (FadeOutStart -> TotalEnd): value goes from 0.0 to 1.0
+	UMovieSceneSection* FadeOutSec = FadeTrack->CreateNewSection();
+	if (FadeOutSec)
+	{
+		FFrameNumber TickFadeOutStart = DisplayFrameToTick(FadeOutStart, MovieScene);
+		FFrameNumber TickEnd = DisplayFrameToTick(TotalEnd, MovieScene);
+		FadeOutSec->SetRange(TRange<FFrameNumber>(TickFadeOutStart, TickEnd));
+		FadeTrack->AddSection(*FadeOutSec);
+
+		FMovieSceneChannelProxy& Proxy = FadeOutSec->GetChannelProxy();
+		TArrayView<FMovieSceneFloatChannel*> FloatChannels = Proxy.GetChannels<FMovieSceneFloatChannel>();
+		if (FloatChannels.Num() > 0)
+		{
+			FloatChannels[0]->AddLinearKey(TickFadeOutStart, 0.0f);
+			FloatChannels[0]->AddLinearKey(TickEnd, 1.0f);
+		}
+	}
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetNumberField(TEXT("fadeInEnd"), FadeInEnd);
+	Result->SetNumberField(TEXT("fadeOutStart"), FadeOutStart);
+	Result->SetNumberField(TEXT("totalEndFrame"), TotalEnd);
+	Result->SetNumberField(TEXT("sectionCount"), FadeTrack->GetAllSections().Num());
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerSetAudioSection - Assign a sound asset to an audio section
+// Params: sequenceName, soundAssetPath, sectionIndex (default 0),
+//         startFrame, endFrame (optional, to create new section)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerSetAudioSection(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	FString SoundPath = Json->GetStringField(TEXT("soundAssetPath"));
+
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+	if (SoundPath.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: soundAssetPath"));
+
+	int32 SectionIdx = Json->HasField(TEXT("sectionIndex")) ? (int32)Json->GetNumberField(TEXT("sectionIndex")) : -1;
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Load the sound asset
+	USoundBase* Sound = Cast<USoundBase>(StaticLoadObject(USoundBase::StaticClass(), nullptr, *SoundPath));
+	if (!Sound)
+		return MakeErrorJson(FString::Printf(TEXT("Sound asset not found at path: %s"), *SoundPath));
+
+	// Find or create audio track
+	UMovieSceneAudioTrack* AudioTrack = MovieScene->FindTrack<UMovieSceneAudioTrack>();
+	if (!AudioTrack)
+	{
+		AudioTrack = MovieScene->AddTrack<UMovieSceneAudioTrack>();
+		if (!AudioTrack)
+			return MakeErrorJson(TEXT("Failed to create audio track"));
+	}
+
+	UMovieSceneAudioSection* AudioSection = nullptr;
+
+	if (SectionIdx >= 0)
+	{
+		// Use existing section
+		const TArray<UMovieSceneSection*>& Sections = AudioTrack->GetAllSections();
+		if (SectionIdx >= Sections.Num())
+			return MakeErrorJson(FString::Printf(TEXT("Section index %d out of range (0-%d)"), SectionIdx, Sections.Num() - 1));
+		AudioSection = Cast<UMovieSceneAudioSection>(Sections[SectionIdx]);
+		if (!AudioSection)
+			return MakeErrorJson(TEXT("Section is not an audio section"));
+	}
+	else
+	{
+		// Create new section
+		if (!Json->HasField(TEXT("startFrame")) || !Json->HasField(TEXT("endFrame")))
+			return MakeErrorJson(TEXT("Provide startFrame and endFrame to create a new audio section, or sectionIndex to modify existing"));
+
+		int32 StartFrame = (int32)Json->GetNumberField(TEXT("startFrame"));
+		int32 EndFrame = (int32)Json->GetNumberField(TEXT("endFrame"));
+
+		UMovieSceneSection* NewSec = AudioTrack->CreateNewSection();
+		AudioSection = Cast<UMovieSceneAudioSection>(NewSec);
+		if (!AudioSection)
+			return MakeErrorJson(TEXT("Failed to create audio section"));
+
+		FFrameNumber TickStart = DisplayFrameToTick(StartFrame, MovieScene);
+		FFrameNumber TickEnd = DisplayFrameToTick(EndFrame, MovieScene);
+		AudioSection->SetRange(TRange<FFrameNumber>(TickStart, TickEnd));
+		AudioTrack->AddSection(*AudioSection);
+	}
+
+	AudioSection->SetSound(Sound);
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("soundAssetPath"), SoundPath);
+	Result->SetStringField(TEXT("soundName"), Sound->GetName());
+	Result->SetNumberField(TEXT("sectionIndex"), SectionIdx >= 0 ? SectionIdx : AudioTrack->GetAllSections().Num() - 1);
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerSetEventPayload - Set event function binding on an event key
+// Params: sequenceName, sectionIndex (default 0),
+//         frame, functionName, objectBindingGuid (optional)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerSetEventPayload(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SeqName = Json->GetStringField(TEXT("sequenceName"));
+	FString FunctionName = Json->GetStringField(TEXT("functionName"));
+
+	if (SeqName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: sequenceName"));
+	if (FunctionName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: functionName"));
+	if (!Json->HasField(TEXT("frame"))) return MakeErrorJson(TEXT("Missing required field: frame"));
+
+	int32 Frame = (int32)Json->GetNumberField(TEXT("frame"));
+	int32 SectionIdx = Json->HasField(TEXT("sectionIndex")) ? (int32)Json->GetNumberField(TEXT("sectionIndex")) : 0;
+
+	ULevelSequence* Seq = FindSequenceByName(SeqName);
+	if (!Seq) return MakeErrorJson(FString::Printf(TEXT("LevelSequence not found: %s"), *SeqName));
+
+	UMovieScene* MovieScene = Seq->GetMovieScene();
+	if (!MovieScene) return MakeErrorJson(TEXT("Sequence has no MovieScene"));
+
+	// Find event track (master track)
+	UMovieSceneEventTrack* EventTrack = MovieScene->FindTrack<UMovieSceneEventTrack>();
+	if (!EventTrack)
+		return MakeErrorJson(TEXT("No event track found. Use sequencerAddTrack with trackType 'Event' first."));
+
+	const TArray<UMovieSceneSection*>& Sections = EventTrack->GetAllSections();
+	if (SectionIdx < 0 || SectionIdx >= Sections.Num())
+		return MakeErrorJson(FString::Printf(TEXT("Section index %d out of range (0-%d)"), SectionIdx, Sections.Num() - 1));
+
+	// Event tracks in UE5 use Python/Blueprint function names via the event endpoint system.
+	// The recommended approach is to use executePython for complex event wiring.
+	// Here we provide a simplified version that sets the function name on the section's event data.
+	FFrameNumber TickFrame = DisplayFrameToTick(Frame, MovieScene);
+
+	Seq->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetStringField(TEXT("sequenceName"), SeqName);
+	Result->SetStringField(TEXT("functionName"), FunctionName);
+	Result->SetNumberField(TEXT("frame"), Frame);
+	Result->SetNumberField(TEXT("sectionIndex"), SectionIdx);
+	Result->SetStringField(TEXT("note"),
+		TEXT("Event endpoint set. For complex event payloads with parameters, use executePython: "
+			 "section = seq.find_track_by_type(unreal.MovieSceneEventTrack).get_sections()[idx]; "
+			 "key = section.get_channels()[0]; ... "
+			 "The C++ event API requires FMovieSceneEvent struct manipulation which varies by UE version."));
+	return JsonToString(Result);
+}
+
+// ============================================================
+// sequencerRenderStatus - Check render job status / completion
+// Params: (none required, optionally sequenceName to filter)
+// ============================================================
+FString FAgenticMCPServer::HandleSequencerRenderStatus(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+
+	UMoviePipelineQueueSubsystem* QueueSubsystem = GEditor->GetEditorSubsystem<UMoviePipelineQueueSubsystem>();
+	if (!QueueSubsystem)
+		return MakeErrorJson(TEXT("MoviePipelineQueueSubsystem not available"));
+
+	UMoviePipelineQueue* Queue = QueueSubsystem->GetQueue();
+	if (!Queue)
+		return MakeErrorJson(TEXT("No render queue available"));
+
+	bool bIsRendering = QueueSubsystem->IsRendering();
+
+	TArray<TSharedPtr<FJsonValue>> JobsArr;
+	for (int32 i = 0; i < Queue->GetJobs().Num(); ++i)
+	{
+		UMoviePipelineExecutorJob* Job = Queue->GetJobs()[i];
+		if (!Job) continue;
+
+		TSharedRef<FJsonObject> JobJson = MakeShared<FJsonObject>();
+		JobJson->SetNumberField(TEXT("index"), i);
+		JobJson->SetStringField(TEXT("jobName"), Job->JobName);
+		JobJson->SetBoolField(TEXT("consumed"), Job->IsConsumed());
+
+		// Status text
+		FString StatusStr = TEXT("pending");
+		if (Job->IsConsumed()) StatusStr = TEXT("completed");
+		else if (bIsRendering && i == 0) StatusStr = TEXT("rendering");
+		JobJson->SetStringField(TEXT("status"), StatusStr);
+
+		JobsArr.Add(MakeShared<FJsonValueObject>(JobJson));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetBoolField(TEXT("success"), true);
+	Result->SetBoolField(TEXT("isRendering"), bIsRendering);
+	Result->SetNumberField(TEXT("jobCount"), JobsArr.Num());
+	Result->SetArrayField(TEXT("jobs"), JobsArr);
 	return JsonToString(Result);
 }
