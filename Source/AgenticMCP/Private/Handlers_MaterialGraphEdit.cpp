@@ -488,7 +488,7 @@ FString FAgenticMCPServer::HandleMaterialDisconnectPin(const FString& Body)
 // materialSetTexture - Set a texture parameter on a material instance
 // Params: materialName, parameterName, texturePath
 // ============================================================
-FString FAgenticMCPServer::HandleMaterialSetTexture(const FString& Body)
+FString FAgenticMCPServer::HandleMaterialSetTextureParam(const FString& Body)
 {
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));

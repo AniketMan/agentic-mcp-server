@@ -81,7 +81,7 @@ FString FAgenticMCPServer::HandlePCGListGraphs(const FString& Body)
 // ============================================================
 // pcgGetGraph - Get details of a specific PCG graph
 // ============================================================
-FString FAgenticMCPServer::HandlePCGGetGraph(const FString& Body)
+FString FAgenticMCPServer::HandlePCGGetGraphInfo(const FString& Body)
 {
 #if !HAS_PCG_PLUGIN
 	return MakeErrorJson(TEXT("PCG plugin is not available in this build"));

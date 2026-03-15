@@ -197,7 +197,7 @@ FString FAgenticMCPServer::HandleAnimBPListMontages(const FString& Body)
 // ============================================================
 // animBPGetMontage - Get montage details
 // ============================================================
-FString FAgenticMCPServer::HandleAnimBPGetMontage(const FString& Body)
+FString FAgenticMCPServer::HandleAnimBPGetMontages(const FString& Body)
 {
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
@@ -258,7 +258,7 @@ FString FAgenticMCPServer::HandleAnimBPGetMontage(const FString& Body)
 // ============================================================
 // animBPListStates - List states in a state machine
 // ============================================================
-FString FAgenticMCPServer::HandleAnimBPListStates(const FString& Body)
+FString FAgenticMCPServer::HandleAnimBPGetStates(const FString& Body)
 {
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));

@@ -1787,7 +1787,7 @@ FString FAgenticMCPServer::HandleSequencerDuplicateSection(const FString& Body)
 // Params: sequenceName, actorName or bindingGuid, trackType,
 //         muted (bool, optional), locked (bool, optional)
 // ============================================================
-FString FAgenticMCPServer::HandleSequencerSetTrackMuteLock(const FString& Body)
+FString FAgenticMCPServer::HandleSequencerSetTrackMute(const FString& Body)
 {
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));

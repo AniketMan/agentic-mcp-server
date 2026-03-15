@@ -5509,6 +5509,204 @@
         "readOnlyHint": false,
         "destructiveHint": false
       }
+    },
+    {
+      "name": "animBPGetBlendSpace",
+      "description": "[Auto-generated] Handler: HandleAnimBPGetBlendSpace",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPListMontages",
+      "description": "[Auto-generated] Handler: HandleAnimBPListMontages",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "findReferences",
+      "description": "[Auto-generated] Handler: HandleFindReferences",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "getBlueprint",
+      "description": "[Auto-generated] Handler: HandleGetBlueprint",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "getGraph",
+      "description": "[Auto-generated] Handler: HandleGetGraph",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialGetGraph",
+      "description": "[Auto-generated] Handler: HandleMaterialGetGraph",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialSetScalar",
+      "description": "[Auto-generated] Handler: HandleMaterialSetScalar",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialSetVector",
+      "description": "[Auto-generated] Handler: HandleMaterialSetVector",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "pCGCleanup",
+      "description": "[Auto-generated] Handler: HandlePCGCleanup",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "pCGGenerate",
+      "description": "[Auto-generated] Handler: HandlePCGGenerate",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "pCGGetComponent",
+      "description": "[Auto-generated] Handler: HandlePCGGetComponent",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "pCGSetSeed",
+      "description": "[Auto-generated] Handler: HandlePCGSetSeed",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRControllers",
+      "description": "[Auto-generated] Handler: HandleXRControllers",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRGuardian",
+      "description": "[Auto-generated] Handler: HandleXRGuardian",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRHandTracking",
+      "description": "[Auto-generated] Handler: HandleXRHandTracking",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRPassthrough",
+      "description": "[Auto-generated] Handler: HandleXRPassthrough",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRRecenter",
+      "description": "[Auto-generated] Handler: HandleXRRecenter",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRSetDisplayFrequency",
+      "description": "[Auto-generated] Handler: HandleXRSetDisplayFrequency",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRSetGuardianVisibility",
+      "description": "[Auto-generated] Handler: HandleXRSetGuardianVisibility",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRSetPassthrough",
+      "description": "[Auto-generated] Handler: HandleXRSetPassthrough",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRSetPerformanceLevels",
+      "description": "[Auto-generated] Handler: HandleXRSetPerformanceLevels",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "xRStatus",
+      "description": "[Auto-generated] Handler: HandleXRStatus",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
     }
   ]
 }

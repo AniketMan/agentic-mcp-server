@@ -1851,6 +1851,333 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleExecutePythonCapture(Body);
 	});
+
+	// ---- AnimBlueprint (auto-generated routes) ----
+	HandlerMap.Add(TEXT("animBPGetBlendSpace"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetBlendSpace(Body);
+	});
+	HandlerMap.Add(TEXT("animBPListMontages"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPListMontages(Body);
+	});
+
+	// ---- Animation (auto-generated routes) ----
+	HandlerMap.Add(TEXT("animationPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimationPlay(Body);
+	});
+	HandlerMap.Add(TEXT("animationStop"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimationStop(Body);
+	});
+
+	// ---- Audio (auto-generated routes) ----
+	HandlerMap.Add(TEXT("audioDebugVisualize"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioDebugVisualize(Body);
+	});
+	HandlerMap.Add(TEXT("audioGetDeviceInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioGetDeviceInfo(Body);
+	});
+	HandlerMap.Add(TEXT("audioGetStats"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioGetStats(Body);
+	});
+	HandlerMap.Add(TEXT("audioGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioGetStatus(Body);
+	});
+	HandlerMap.Add(TEXT("audioListActiveSounds"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioListActiveSounds(Body);
+	});
+	HandlerMap.Add(TEXT("audioListSoundClasses"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioListSoundClasses(Body);
+	});
+	HandlerMap.Add(TEXT("audioPlaySound"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioPlaySound(Body);
+	});
+	HandlerMap.Add(TEXT("audioSetListener"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioSetListener(Body);
+	});
+	HandlerMap.Add(TEXT("audioSetVolume"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioSetVolume(Body);
+	});
+	HandlerMap.Add(TEXT("audioStopSound"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAudioStopSound(Body);
+	});
+
+	// ---- Collision (auto-generated routes) ----
+	HandlerMap.Add(TEXT("collisionTrace"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleCollisionTrace(Body);
+	});
+
+	// ---- Console (auto-generated routes) ----
+	HandlerMap.Add(TEXT("executeConsole"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleExecuteConsole(Body);
+	});
+	HandlerMap.Add(TEXT("getCVar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetCVar(Body);
+	});
+	HandlerMap.Add(TEXT("listCVars"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleListCVars(Body);
+	});
+	HandlerMap.Add(TEXT("setCVar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSetCVar(Body);
+	});
+
+	// ---- DataTable (auto-generated routes) ----
+	HandlerMap.Add(TEXT("dataTableRead"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDataTableRead(Body);
+	});
+	HandlerMap.Add(TEXT("dataTableWrite"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleDataTableWrite(Body);
+	});
+
+	// ---- Input (auto-generated routes) ----
+	HandlerMap.Add(TEXT("simulateInput"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSimulateInput(Body);
+	});
+
+	// ---- MaterialGraphEdit (auto-generated routes) ----
+	HandlerMap.Add(TEXT("materialGetGraph"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialGetGraph(Body);
+	});
+	HandlerMap.Add(TEXT("materialSetScalar"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialSetScalar(Body);
+	});
+	HandlerMap.Add(TEXT("materialSetVector"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialSetVector(Body);
+	});
+
+	// ---- Materials (auto-generated routes) ----
+	HandlerMap.Add(TEXT("materialSetParam"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialSetParam(Body);
+	});
+
+	// ---- MetaXR (auto-generated routes) ----
+	HandlerMap.Add(TEXT("xRControllers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRControllers(Body);
+	});
+	HandlerMap.Add(TEXT("xRGuardian"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRGuardian(Body);
+	});
+	HandlerMap.Add(TEXT("xRHandTracking"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRHandTracking(Body);
+	});
+	HandlerMap.Add(TEXT("xRPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRPassthrough(Body);
+	});
+	HandlerMap.Add(TEXT("xRRecenter"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRRecenter(Body);
+	});
+	HandlerMap.Add(TEXT("xRSetDisplayFrequency"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetDisplayFrequency(Body);
+	});
+	HandlerMap.Add(TEXT("xRSetGuardianVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetGuardianVisibility(Body);
+	});
+	HandlerMap.Add(TEXT("xRSetPassthrough"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetPassthrough(Body);
+	});
+	HandlerMap.Add(TEXT("xRSetPerformanceLevels"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRSetPerformanceLevels(Body);
+	});
+	HandlerMap.Add(TEXT("xRStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleXRStatus(Body);
+	});
+
+	// ---- Niagara (auto-generated routes) ----
+	HandlerMap.Add(TEXT("niagaraActivateSystem"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraActivateSystem(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraDebugHUD"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraDebugHUD(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetEmitters"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetEmitters(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetParameters"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetParameters(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetStats"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetStats(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetStatus(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraGetSystemInfo"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraGetSystemInfo(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraListSystems"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraListSystems(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraResetSystem"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraResetSystem(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraSetEmitterEnable"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraSetEmitterEnable(Body);
+	});
+	HandlerMap.Add(TEXT("niagaraSetParameter"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleNiagaraSetParameter(Body);
+	});
+
+	// ---- PCG (auto-generated routes) ----
+	HandlerMap.Add(TEXT("pCGCleanup"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGCleanup(Body);
+	});
+	HandlerMap.Add(TEXT("pCGGenerate"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGGenerate(Body);
+	});
+	HandlerMap.Add(TEXT("pCGGetComponent"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGGetComponent(Body);
+	});
+	HandlerMap.Add(TEXT("pCGSetSeed"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePCGSetSeed(Body);
+	});
+
+	// ---- PIE (auto-generated routes) ----
+	HandlerMap.Add(TEXT("getPIEState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetPIEState(Body);
+	});
+	HandlerMap.Add(TEXT("pausePIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePausePIE(Body);
+	});
+	HandlerMap.Add(TEXT("startPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStartPIE(Body);
+	});
+	HandlerMap.Add(TEXT("stepPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStepPIE(Body);
+	});
+	HandlerMap.Add(TEXT("stopPIE"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStopPIE(Body);
+	});
+
+	// ---- PixelStreaming (auto-generated routes) ----
+	HandlerMap.Add(TEXT("pixelStreamingGetCodec"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingGetCodec(Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingGetStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingGetStatus(Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingListPlayers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingListPlayers(Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingListStreamers"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingListStreamers(Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingSetCodec"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingSetCodec(Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingStart"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingStart(Body);
+	});
+	HandlerMap.Add(TEXT("pixelStreamingStop"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandlePixelStreamingStop(Body);
+	});
+
+	// ---- Read (auto-generated routes) ----
+	HandlerMap.Add(TEXT("findReferences"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleFindReferences(Body);
+	});
+	HandlerMap.Add(TEXT("getBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetBlueprint(Body);
+	});
+	HandlerMap.Add(TEXT("getGraph"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleGetGraph(Body);
+	});
+	HandlerMap.Add(TEXT("list"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleList(Body);
+	});
+	HandlerMap.Add(TEXT("search"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSearch(Body);
+	});
+
+	// ---- RenderDoc (auto-generated routes) ----
+	HandlerMap.Add(TEXT("renderDocCapture"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleRenderDocCapture(Body);
+	});
+
+	// ---- Story (auto-generated routes) ----
+	HandlerMap.Add(TEXT("storyAdvance"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryAdvance(Body);
+	});
+	HandlerMap.Add(TEXT("storyGoto"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryGoto(Body);
+	});
+	HandlerMap.Add(TEXT("storyPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryPlay(Body);
+	});
+	HandlerMap.Add(TEXT("storyState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleStoryState(Body);
+	});
+
 }
 
 // ============================================================
