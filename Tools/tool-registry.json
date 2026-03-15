@@ -5583,126 +5583,70 @@
       }
     },
     {
-      "name": "pCGCleanup",
-      "description": "[Auto-generated] Handler: HandlePCGCleanup",
-      "parameters": [],
+      "name": "pcgCleanup",
+      "description": "Clean up (remove) generated PCG output from a component",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor with PCG component",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "pcgGenerate",
+      "description": "Trigger PCG generation on a specific actor PCG component",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor with PCG component",
+          "required": true
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
       }
     },
     {
-      "name": "pCGGenerate",
-      "description": "[Auto-generated] Handler: HandlePCGGenerate",
-      "parameters": [],
+      "name": "pcgGetComponent",
+      "description": "Get PCG component details (graph ref, seed, generation status)",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor with PCG component",
+          "required": true
+        }
+      ],
       "annotations": {
-        "readOnlyHint": false,
+        "readOnlyHint": true,
         "destructiveHint": false
       }
     },
     {
-      "name": "pCGGetComponent",
-      "description": "[Auto-generated] Handler: HandlePCGGetComponent",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "pCGSetSeed",
-      "description": "[Auto-generated] Handler: HandlePCGSetSeed",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRControllers",
-      "description": "[Auto-generated] Handler: HandleXRControllers",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRGuardian",
-      "description": "[Auto-generated] Handler: HandleXRGuardian",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRHandTracking",
-      "description": "[Auto-generated] Handler: HandleXRHandTracking",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRPassthrough",
-      "description": "[Auto-generated] Handler: HandleXRPassthrough",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRRecenter",
-      "description": "[Auto-generated] Handler: HandleXRRecenter",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRSetDisplayFrequency",
-      "description": "[Auto-generated] Handler: HandleXRSetDisplayFrequency",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRSetGuardianVisibility",
-      "description": "[Auto-generated] Handler: HandleXRSetGuardianVisibility",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRSetPassthrough",
-      "description": "[Auto-generated] Handler: HandleXRSetPassthrough",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRSetPerformanceLevels",
-      "description": "[Auto-generated] Handler: HandleXRSetPerformanceLevels",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "xRStatus",
-      "description": "[Auto-generated] Handler: HandleXRStatus",
-      "parameters": [],
+      "name": "pcgSetSeed",
+      "description": "Set the seed on a PCG component",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        },
+        {
+          "name": "seed",
+          "type": "integer",
+          "description": "New seed value",
+          "required": true
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
