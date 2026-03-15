@@ -160,3 +160,131 @@ FString FAgenticMCPServer::HandleSettingsGetPlugins(const FString& Body)
 	Result->SetArrayField(TEXT("plugins"), PluginArr);
 	return JsonToString(Result);
 }
+
+// ============================================================================
+// EDITOR SETTINGS MUTATION HANDLERS
+// ============================================================================
+
+// --- settingsSetProject ---
+// Set project settings fields.
+// Body: { "projectName": "MyProject", "companyName": "MyStudio", "description": "..." }
+FString FAgenticMCPServer::HandleSettingsSetProject(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	UGeneralProjectSettings* Settings = GetMutableDefault<UGeneralProjectSettings>();
+	if (!Settings)
+	{
+		return MakeErrorJson(TEXT("Project settings not available"));
+	}
+
+	int32 Changed = 0;
+	FString Val;
+	if (Json->TryGetStringField(TEXT("projectName"), Val)) { Settings->ProjectName = Val; Changed++; }
+	if (Json->TryGetStringField(TEXT("companyName"), Val)) { Settings->CompanyName = Val; Changed++; }
+	if (Json->TryGetStringField(TEXT("description"), Val)) { Settings->Description = Val; Changed++; }
+	if (Json->TryGetStringField(TEXT("homepage"), Val)) { Settings->Homepage = Val; Changed++; }
+	if (Json->TryGetStringField(TEXT("projectVersion"), Val)) { Settings->ProjectVersion = Val; Changed++; }
+
+	Settings->TryUpdateDefaultConfigFile();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- settingsSetEditor ---
+// Set editor preference fields.
+// Body: { "autoSaveEnabled": true, "autoSaveInterval": 300 }
+FString FAgenticMCPServer::HandleSettingsSetEditor(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	int32 Changed = 0;
+	bool BoolVal;
+	double NumVal;
+
+	// Auto-save settings via CVar
+	if (Json->TryGetBoolField(TEXT("autoSaveEnabled"), BoolVal))
+	{
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("EditorAutoSave.Enabled"));
+		if (CVar) { CVar->Set(BoolVal ? 1 : 0); Changed++; }
+	}
+
+	if (Json->TryGetNumberField(TEXT("autoSaveInterval"), NumVal))
+	{
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("EditorAutoSave.IntervalSeconds"));
+		if (CVar) { CVar->Set((float)NumVal); Changed++; }
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- settingsSetRendering ---
+// Set rendering settings.
+// Body: { "defaultRHI": "Vulkan"|"DX12"|"DX11", "rayTracing": true, "nanite": true, "lumen": true, "vsm": true }
+FString FAgenticMCPServer::HandleSettingsSetRendering(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	int32 Changed = 0;
+	bool BoolVal;
+
+	if (Json->TryGetBoolField(TEXT("rayTracing"), BoolVal))
+	{
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.RayTracing"));
+		if (CVar) { CVar->Set(BoolVal ? 1 : 0); Changed++; }
+	}
+
+	if (Json->TryGetBoolField(TEXT("nanite"), BoolVal))
+	{
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Nanite"));
+		if (CVar) { CVar->Set(BoolVal ? 1 : 0); Changed++; }
+	}
+
+	if (Json->TryGetBoolField(TEXT("lumen"), BoolVal))
+	{
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Lumen.Supported"));
+		if (CVar) { CVar->Set(BoolVal ? 1 : 0); Changed++; }
+	}
+
+	if (Json->TryGetBoolField(TEXT("vsm"), BoolVal))
+	{
+		IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Shadow.Virtual.Enable"));
+		if (CVar) { CVar->Set(BoolVal ? 1 : 0); Changed++; }
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	Result->SetStringField(TEXT("note"), TEXT("Some settings require editor restart to take effect"));
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}

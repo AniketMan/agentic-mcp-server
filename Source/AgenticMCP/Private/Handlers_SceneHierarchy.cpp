@@ -19,6 +19,8 @@
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
+#include "ActorFolder.h"
+#include "ActorFolders.h"
 
 static UWorld* GetEditorWorld_Scene()
 {
@@ -234,4 +236,192 @@ FString FAgenticMCPServer::HandleSceneRenameActor(const FString& Body)
 	Result->SetStringField(TEXT("oldLabel"), OldLabel);
 	Result->SetStringField(TEXT("newLabel"), Actor->GetActorLabel());
 	return JsonToString(Result);
+}
+
+// ============================================================================
+// SCENE HIERARCHY MUTATION HANDLERS
+// ============================================================================
+
+// --- sceneCreateFolder ---
+// Create an actor folder in the outliner.
+// Body: { "folderPath": "Environment/Trees" }
+FString FAgenticMCPServer::HandleSceneCreateFolder(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString FolderPath = Json->GetStringField(TEXT("folderPath"));
+	if (FolderPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'folderPath'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	FActorFolders::Get().CreateFolder(*World, FFolder(FName(*FolderPath)));
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("folderPath"), FolderPath);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- sceneDeleteFolder ---
+// Delete an actor folder from the outliner.
+// Body: { "folderPath": "Environment/Trees" }
+FString FAgenticMCPServer::HandleSceneDeleteFolder(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString FolderPath = Json->GetStringField(TEXT("folderPath"));
+	if (FolderPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'folderPath'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	FActorFolders::Get().DeleteFolder(*World, FFolder(FName(*FolderPath)));
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("deletedFolder"), FolderPath);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- sceneSetActorLabel ---
+// Set the display name (label) of an actor.
+// Body: { "actorName": "StaticMeshActor_0", "label": "Hero_Platform" }
+FString FAgenticMCPServer::HandleSceneSetActorLabel(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString Label = Json->GetStringField(TEXT("label"));
+
+	if (ActorName.IsEmpty() || Label.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'actorName' or 'label'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	FoundActor->SetActorLabel(Label);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("label"), Label);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- sceneHideActor ---
+// Set editor visibility of an actor.
+// Body: { "actorName": "Cube_01", "hidden": true }
+FString FAgenticMCPServer::HandleSceneHideActor(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	bool bHidden = true;
+	Json->TryGetBoolField(TEXT("hidden"), bHidden);
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	FoundActor->SetIsTemporarilyHiddenInEditor(bHidden);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetBoolField(TEXT("hidden"), bHidden);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
 }

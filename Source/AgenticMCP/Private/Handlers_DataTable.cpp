@@ -284,3 +284,191 @@ FString FAgenticMCPServer::HandleDataTableWrite(const TMap<FString, FString>& Pa
 
 	return JsonToString(Result);
 }
+
+// ============================================================================
+// DATATABLE MUTATION HANDLERS
+// ============================================================================
+
+// --- dataTableAddRow ---
+// Add a new row to a DataTable.
+// Body: { "path": "/Game/Data/DT_Items", "rowName": "NewItem", "values": { "Name": "Sword", "Damage": 50 } }
+FString FAgenticMCPServer::HandleDataTableAddRow(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString TablePath = Json->GetStringField(TEXT("path"));
+	FString RowName = Json->GetStringField(TEXT("rowName"));
+	if (TablePath.IsEmpty() || RowName.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'path' or 'rowName'"));
+	}
+
+	UDataTable* DataTable = LoadObject<UDataTable>(nullptr, *TablePath);
+	if (!DataTable)
+	{
+		TablePath = TablePath + TEXT(".") + FPaths::GetBaseFilename(TablePath);
+		DataTable = LoadObject<UDataTable>(nullptr, *TablePath);
+	}
+	if (!DataTable)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("DataTable not found: %s"), *TablePath));
+	}
+
+	if (!DataTable->GetRowStruct())
+	{
+		return MakeErrorJson(TEXT("DataTable has no row struct"));
+	}
+
+	// Check if row already exists
+	if (DataTable->FindRowUnchecked(FName(*RowName)))
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Row already exists: %s"), *RowName));
+	}
+
+	// Add empty row
+	DataTable->Modify();
+	FTableRowBase* NewRow = (FTableRowBase*)FMemory::Malloc(DataTable->GetRowStruct()->GetStructureSize());
+	DataTable->GetRowStruct()->InitializeStruct(NewRow);
+	DataTable->AddRow(FName(*RowName), *NewRow);
+
+	// Now set values if provided
+	const TSharedPtr<FJsonObject>* ValuesObj = nullptr;
+	if (Json->TryGetObjectField(TEXT("values"), ValuesObj) && ValuesObj)
+	{
+		uint8* RowData = DataTable->FindRowUnchecked(FName(*RowName));
+		if (RowData)
+		{
+			for (TFieldIterator<FProperty> PropIt(DataTable->GetRowStruct()); PropIt; ++PropIt)
+			{
+				FProperty* Prop = *PropIt;
+				FString PropName = Prop->GetName();
+				if ((*ValuesObj)->HasField(PropName))
+				{
+					FString ValueStr = (*ValuesObj)->Values.Find(PropName)->Get()->AsString();
+					void* ValuePtr = Prop->ContainerPtrToValuePtr<void>(RowData);
+					Prop->ImportText_Direct(*ValueStr, ValuePtr, nullptr, PPF_None);
+				}
+			}
+		}
+	}
+
+	FMemory::Free(NewRow);
+	DataTable->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("rowName"), RowName);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- dataTableDeleteRow ---
+// Delete a row from a DataTable.
+// Body: { "path": "/Game/Data/DT_Items", "rowName": "OldItem" }
+FString FAgenticMCPServer::HandleDataTableDeleteRow(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString TablePath = Json->GetStringField(TEXT("path"));
+	FString RowName = Json->GetStringField(TEXT("rowName"));
+	if (TablePath.IsEmpty() || RowName.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'path' or 'rowName'"));
+	}
+
+	UDataTable* DataTable = LoadObject<UDataTable>(nullptr, *TablePath);
+	if (!DataTable)
+	{
+		TablePath = TablePath + TEXT(".") + FPaths::GetBaseFilename(TablePath);
+		DataTable = LoadObject<UDataTable>(nullptr, *TablePath);
+	}
+	if (!DataTable)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("DataTable not found: %s"), *TablePath));
+	}
+
+	if (!DataTable->FindRowUnchecked(FName(*RowName)))
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Row not found: %s"), *RowName));
+	}
+
+	DataTable->Modify();
+	DataTable->RemoveRow(FName(*RowName));
+	DataTable->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("deletedRow"), RowName);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- dataTableGetSchema ---
+// Get the row struct schema (field names, types) for a DataTable.
+// Body: { "path": "/Game/Data/DT_Items" }
+FString FAgenticMCPServer::HandleDataTableGetSchema(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString TablePath = Json->GetStringField(TEXT("path"));
+	if (TablePath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'path'"));
+	}
+
+	UDataTable* DataTable = LoadObject<UDataTable>(nullptr, *TablePath);
+	if (!DataTable)
+	{
+		TablePath = TablePath + TEXT(".") + FPaths::GetBaseFilename(TablePath);
+		DataTable = LoadObject<UDataTable>(nullptr, *TablePath);
+	}
+	if (!DataTable)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("DataTable not found: %s"), *TablePath));
+	}
+
+	if (!DataTable->GetRowStruct())
+	{
+		return MakeErrorJson(TEXT("DataTable has no row struct"));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> FieldsArr;
+	for (TFieldIterator<FProperty> PropIt(DataTable->GetRowStruct()); PropIt; ++PropIt)
+	{
+		FProperty* Prop = *PropIt;
+		TSharedRef<FJsonObject> FieldObj = MakeShared<FJsonObject>();
+		FieldObj->SetStringField(TEXT("name"), Prop->GetName());
+		FieldObj->SetStringField(TEXT("type"), Prop->GetCPPType());
+		FieldObj->SetNumberField(TEXT("size"), Prop->GetSize());
+		FieldObj->SetNumberField(TEXT("offset"), Prop->GetOffset_ForInternal());
+		FieldsArr.Add(MakeShared<FJsonValueObject>(FieldObj));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("structName"), DataTable->GetRowStruct()->GetName());
+	Result->SetNumberField(TEXT("rowCount"), DataTable->GetRowMap().Num());
+	Result->SetArrayField(TEXT("fields"), FieldsArr);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}

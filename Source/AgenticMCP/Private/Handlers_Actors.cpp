@@ -518,3 +518,311 @@ FString FAgenticMCPServer::HandleSetActorTransform(const FString& Body)
 	Result->SetBoolField(TEXT("success"), true);
 	return JsonToString(Result);
 }
+
+// ============================================================================
+// ACTOR MUTATION HANDLERS
+// ============================================================================
+
+// --- actorDuplicate ---
+// Duplicate an actor in the level.
+// Body: { "actorName": "Cube_01", "newName": "Cube_02" (optional), "offset": [100,0,0] (optional) }
+FString FAgenticMCPServer::HandleActorDuplicate(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	if (ActorName.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'actorName'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* SourceActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			SourceActor = *It;
+			break;
+		}
+	}
+	if (!SourceActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	// Select the actor and duplicate via editor
+	GEditor->SelectNone(false, true, false);
+	GEditor->SelectActor(SourceActor, true, false, true);
+	GEditor->edactDuplicateSelected(World->PersistentLevel, false);
+
+	// Find the newly created actor (last selected)
+	AActor* NewActor = nullptr;
+	for (FSelectionIterator It(GEditor->GetSelectedActorIterator()); It; ++It)
+	{
+		NewActor = Cast<AActor>(*It);
+	}
+
+	if (!NewActor)
+	{
+		return MakeErrorJson(TEXT("Duplication failed"));
+	}
+
+	// Apply offset if provided
+	const TArray<TSharedPtr<FJsonValue>>* OffsetArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("offset"), OffsetArray) && OffsetArray->Num() >= 3)
+	{
+		FVector Offset((*OffsetArray)[0]->AsNumber(), (*OffsetArray)[1]->AsNumber(), (*OffsetArray)[2]->AsNumber());
+		NewActor->SetActorLocation(SourceActor->GetActorLocation() + Offset);
+	}
+
+	// Rename if requested
+	FString NewName;
+	if (Json->TryGetStringField(TEXT("newName"), NewName) && !NewName.IsEmpty())
+	{
+		NewActor->SetActorLabel(NewName);
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("newActorName"), NewActor->GetActorLabel());
+	Result->SetStringField(TEXT("newActorPath"), NewActor->GetPathName());
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- actorSetMobility ---
+// Set actor mobility (Static, Stationary, Movable).
+// Body: { "actorName": "Cube_01", "mobility": "Movable" }
+FString FAgenticMCPServer::HandleActorSetMobility(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString Mobility = Json->GetStringField(TEXT("mobility"));
+
+	if (ActorName.IsEmpty() || Mobility.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'actorName' or 'mobility'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	USceneComponent* RootComp = FoundActor->GetRootComponent();
+	if (!RootComp)
+	{
+		return MakeErrorJson(TEXT("Actor has no root component"));
+	}
+
+	EComponentMobility::Type MobilityType;
+	if (Mobility == TEXT("Static")) MobilityType = EComponentMobility::Static;
+	else if (Mobility == TEXT("Stationary")) MobilityType = EComponentMobility::Stationary;
+	else if (Mobility == TEXT("Movable")) MobilityType = EComponentMobility::Movable;
+	else
+	{
+		return MakeErrorJson(TEXT("Invalid mobility. Use: Static, Stationary, Movable"));
+	}
+
+	RootComp->SetMobility(MobilityType);
+	FoundActor->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("mobility"), Mobility);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- actorSetTags ---
+// Set, add, or remove actor tags.
+// Body: { "actorName": "Cube_01", "tags": ["Interactive", "Destructible"], "mode": "set"|"add"|"remove" }
+FString FAgenticMCPServer::HandleActorSetTags(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString Mode = TEXT("set");
+	Json->TryGetStringField(TEXT("mode"), Mode);
+
+	const TArray<TSharedPtr<FJsonValue>>* TagsArray = nullptr;
+	if (!Json->TryGetArrayField(TEXT("tags"), TagsArray))
+	{
+		return MakeErrorJson(TEXT("Missing 'tags' array"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	TArray<FName> NewTags;
+	for (const TSharedPtr<FJsonValue>& Val : *TagsArray)
+	{
+		NewTags.Add(FName(*Val->AsString()));
+	}
+
+	if (Mode == TEXT("set"))
+	{
+		FoundActor->Tags = NewTags;
+	}
+	else if (Mode == TEXT("add"))
+	{
+		for (const FName& Tag : NewTags)
+		{
+			FoundActor->Tags.AddUnique(Tag);
+		}
+	}
+	else if (Mode == TEXT("remove"))
+	{
+		for (const FName& Tag : NewTags)
+		{
+			FoundActor->Tags.Remove(Tag);
+		}
+	}
+	else
+	{
+		return MakeErrorJson(TEXT("Invalid mode. Use: set, add, remove"));
+	}
+
+	FoundActor->MarkPackageDirty();
+
+	TArray<TSharedPtr<FJsonValue>> TagsOut;
+	for (const FName& Tag : FoundActor->Tags)
+	{
+		TagsOut.Add(MakeShared<FJsonValueString>(Tag.ToString()));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetArrayField(TEXT("tags"), TagsOut);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- actorSetLayer ---
+// Set the editor layer for an actor.
+// Body: { "actorName": "Cube_01", "layer": "Environment" }
+FString FAgenticMCPServer::HandleActorSetLayer(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString Layer = Json->GetStringField(TEXT("layer"));
+
+	if (ActorName.IsEmpty() || Layer.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'actorName' or 'layer'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	FoundActor->Layers.Empty();
+	FoundActor->Layers.Add(FName(*Layer));
+	FoundActor->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("layer"), Layer);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}

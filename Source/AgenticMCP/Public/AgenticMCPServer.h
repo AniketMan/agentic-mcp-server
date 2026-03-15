@@ -570,6 +570,50 @@ private:
 	FString HandlePCGGetComponent(const FString& Body);
 	FString HandlePCGSetSeed(const FString& Body);
 
+	// --- New mutation handlers ---
+	FString HandleLandscapeSculpt(const FString& Body);
+	FString HandleLandscapePaint(const FString& Body);
+	FString HandleLandscapeAddLayer(const FString& Body);
+	FString HandleLandscapeRemoveLayer(const FString& Body);
+	FString HandleLandscapeImportHeightmap(const FString& Body);
+	FString HandleLandscapeExportHeightmap(const FString& Body);
+	FString HandleFoliageAdd(const FString& Body);
+	FString HandleFoliageRemove(const FString& Body);
+	FString HandleFoliageSetDensity(const FString& Body);
+	FString HandleSkelMeshSetMorphTarget(const FString& Body);
+	FString HandleSkelMeshAddSocket(const FString& Body);
+	FString HandleSkelMeshRemoveSocket(const FString& Body);
+	FString HandleSkelMeshSetMaterial(const FString& Body);
+	FString HandleSkelMeshSetPhysicsAsset(const FString& Body);
+	FString HandleDataTableAddRow(const FString& Body);
+	FString HandleDataTableDeleteRow(const FString& Body);
+	FString HandleDataTableGetSchema(const FString& Body);
+	FString HandleLevelCreate(const FString& Body);
+	FString HandleLevelSave(const FString& Body);
+	FString HandleLevelAddSublevel(const FString& Body);
+	FString HandleLevelSetCurrentLevel(const FString& Body);
+	FString HandleLevelBuildLighting(const FString& Body);
+	FString HandleLevelBuildNavigation(const FString& Body);
+	FString HandleActorDuplicate(const FString& Body);
+	FString HandleActorSetMobility(const FString& Body);
+	FString HandleActorSetTags(const FString& Body);
+	FString HandleActorSetLayer(const FString& Body);
+	FString HandlePhysicsAddConstraint(const FString& Body);
+	FString HandlePhysicsRemoveConstraint(const FString& Body);
+	FString HandlePhysicsSetMass(const FString& Body);
+	FString HandlePhysicsSetDamping(const FString& Body);
+	FString HandlePhysicsSetGravity(const FString& Body);
+	FString HandlePhysicsApplyImpulse(const FString& Body);
+	FString HandleSceneCreateFolder(const FString& Body);
+	FString HandleSceneDeleteFolder(const FString& Body);
+	FString HandleSceneSetActorLabel(const FString& Body);
+	FString HandleSceneHideActor(const FString& Body);
+	FString HandleSettingsSetProject(const FString& Body);
+	FString HandleSettingsSetEditor(const FString& Body);
+	FString HandleSettingsSetRendering(const FString& Body);
+	FString HandleAssetMove(const FString& Body);
+
+
 	// ---- PIE (auto-generated declarations) ----
 
 	// ---- PixelStreaming (auto-generated declarations) ----

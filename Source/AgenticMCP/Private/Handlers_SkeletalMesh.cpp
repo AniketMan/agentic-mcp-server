@@ -20,6 +20,9 @@
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshLODRenderData.h"
 #include "ReferenceSkeleton.h"
+#include "PhysicsEngine/PhysicsAsset.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Materials/MaterialInterface.h"
 
 // ============================================================
 // skelMeshList - List all skeletal mesh assets
@@ -300,4 +303,320 @@ FString FAgenticMCPServer::HandleSkelMeshGetSockets(const FString& Body)
 	Result->SetNumberField(TEXT("socketCount"), SocketArr.Num());
 	Result->SetArrayField(TEXT("sockets"), SocketArr);
 	return JsonToString(Result);
+}
+
+// ============================================================================
+// SKELETAL MESH MUTATION HANDLERS
+// ============================================================================
+
+// --- skelMeshSetMorphTarget ---
+// Set morph target weight on a SkeletalMeshComponent in the world.
+// Body: { "actorName": "SK_Mannequin", "morphTarget": "smile", "weight": 1.0 }
+FString FAgenticMCPServer::HandleSkelMeshSetMorphTarget(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	FString MorphTarget = Json->GetStringField(TEXT("morphTarget"));
+	double Weight = 1.0;
+	Json->TryGetNumberField(TEXT("weight"), Weight);
+
+	if (ActorName.IsEmpty() || MorphTarget.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'actorName' or 'morphTarget'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	USkeletalMeshComponent* SkelComp = FoundActor->FindComponentByClass<USkeletalMeshComponent>();
+	if (!SkelComp)
+	{
+		return MakeErrorJson(TEXT("Actor has no SkeletalMeshComponent"));
+	}
+
+	SkelComp->SetMorphTarget(FName(*MorphTarget), (float)Weight);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("morphTarget"), MorphTarget);
+	Result->SetNumberField(TEXT("weight"), Weight);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- skelMeshAddSocket ---
+// Add a socket to a skeletal mesh asset.
+// Body: { "meshPath": "/Game/Meshes/SK_Mannequin", "socketName": "WeaponSocket", "boneName": "hand_r", "relativeLocation": [0,0,0], "relativeRotation": [0,0,0] }
+FString FAgenticMCPServer::HandleSkelMeshAddSocket(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString MeshPath = Json->GetStringField(TEXT("meshPath"));
+	FString SocketName = Json->GetStringField(TEXT("socketName"));
+	FString BoneName = Json->GetStringField(TEXT("boneName"));
+
+	if (MeshPath.IsEmpty() || SocketName.IsEmpty() || BoneName.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'meshPath', 'socketName', or 'boneName'"));
+	}
+
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *MeshPath);
+	if (!Mesh)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Skeletal mesh not found: %s"), *MeshPath));
+	}
+
+	// Check if socket already exists
+	if (Mesh->FindSocket(FName(*SocketName)))
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Socket already exists: %s"), *SocketName));
+	}
+
+	USkeletalMeshSocket* NewSocket = NewObject<USkeletalMeshSocket>(Mesh);
+	NewSocket->SocketName = FName(*SocketName);
+	NewSocket->BoneName = FName(*BoneName);
+
+	const TArray<TSharedPtr<FJsonValue>>* LocArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("relativeLocation"), LocArray) && LocArray->Num() >= 3)
+	{
+		NewSocket->RelativeLocation = FVector((*LocArray)[0]->AsNumber(), (*LocArray)[1]->AsNumber(), (*LocArray)[2]->AsNumber());
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* RotArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("relativeRotation"), RotArray) && RotArray->Num() >= 3)
+	{
+		NewSocket->RelativeRotation = FRotator((*RotArray)[0]->AsNumber(), (*RotArray)[1]->AsNumber(), (*RotArray)[2]->AsNumber());
+	}
+
+	Mesh->GetMeshOnlySocketList().Add(NewSocket);
+	Mesh->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("socketName"), SocketName);
+	Result->SetStringField(TEXT("boneName"), BoneName);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- skelMeshRemoveSocket ---
+// Remove a socket from a skeletal mesh asset.
+// Body: { "meshPath": "/Game/Meshes/SK_Mannequin", "socketName": "WeaponSocket" }
+FString FAgenticMCPServer::HandleSkelMeshRemoveSocket(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString MeshPath = Json->GetStringField(TEXT("meshPath"));
+	FString SocketName = Json->GetStringField(TEXT("socketName"));
+
+	if (MeshPath.IsEmpty() || SocketName.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'meshPath' or 'socketName'"));
+	}
+
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *MeshPath);
+	if (!Mesh)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Skeletal mesh not found: %s"), *MeshPath));
+	}
+
+	TArray<USkeletalMeshSocket*>& Sockets = Mesh->GetMeshOnlySocketList();
+	bool bRemoved = false;
+	for (int32 i = Sockets.Num() - 1; i >= 0; i--)
+	{
+		if (Sockets[i] && Sockets[i]->SocketName == FName(*SocketName))
+		{
+			Sockets.RemoveAt(i);
+			bRemoved = true;
+			break;
+		}
+	}
+
+	if (!bRemoved)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Socket not found: %s"), *SocketName));
+	}
+
+	Mesh->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("removedSocket"), SocketName);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- skelMeshSetMaterial ---
+// Set a material on a skeletal mesh component's material slot.
+// Body: { "actorName": "SK_Mannequin", "slotIndex": 0, "materialPath": "/Game/Materials/M_Skin" }
+FString FAgenticMCPServer::HandleSkelMeshSetMaterial(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	int32 SlotIndex = (int32)Json->GetNumberField(TEXT("slotIndex"));
+	FString MaterialPath = Json->GetStringField(TEXT("materialPath"));
+
+	if (ActorName.IsEmpty() || MaterialPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'actorName' or 'materialPath'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+	}
+
+	USkeletalMeshComponent* SkelComp = FoundActor->FindComponentByClass<USkeletalMeshComponent>();
+	if (!SkelComp)
+	{
+		return MakeErrorJson(TEXT("Actor has no SkeletalMeshComponent"));
+	}
+
+	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, *MaterialPath);
+	if (!Material)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Material not found: %s"), *MaterialPath));
+	}
+
+	if (SlotIndex < 0 || SlotIndex >= SkelComp->GetNumMaterials())
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Slot index %d out of range (0-%d)"), SlotIndex, SkelComp->GetNumMaterials() - 1));
+	}
+
+	SkelComp->SetMaterial(SlotIndex, Material);
+	FoundActor->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("slotIndex"), SlotIndex);
+	Result->SetStringField(TEXT("material"), MaterialPath);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- skelMeshSetPhysicsAsset ---
+// Assign a physics asset to a skeletal mesh.
+// Body: { "meshPath": "/Game/Meshes/SK_Mannequin", "physicsAssetPath": "/Game/Physics/PA_Mannequin" }
+FString FAgenticMCPServer::HandleSkelMeshSetPhysicsAsset(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString MeshPath = Json->GetStringField(TEXT("meshPath"));
+	FString PhysicsAssetPath = Json->GetStringField(TEXT("physicsAssetPath"));
+
+	if (MeshPath.IsEmpty() || PhysicsAssetPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'meshPath' or 'physicsAssetPath'"));
+	}
+
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *MeshPath);
+	if (!Mesh)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Skeletal mesh not found: %s"), *MeshPath));
+	}
+
+	UPhysicsAsset* PhysAsset = LoadObject<UPhysicsAsset>(nullptr, *PhysicsAssetPath);
+	if (!PhysAsset)
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Physics asset not found: %s"), *PhysicsAssetPath));
+	}
+
+	Mesh->SetPhysicsAsset(PhysAsset);
+	Mesh->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("meshPath"), MeshPath);
+	Result->SetStringField(TEXT("physicsAsset"), PhysicsAssetPath);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
 }

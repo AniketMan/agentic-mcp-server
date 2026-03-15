@@ -20,6 +20,8 @@
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
+#include "FileHelpers.h"
+#include "NavigationSystem.h"
 
 // ============================================================
 // Helper: Get the current editor world
@@ -501,4 +503,288 @@ FString FAgenticMCPServer::HandleGetLevelBlueprint(const FString& Body)
 		TEXT("Level blueprint for '%s' not found. The level may not be loaded. "
 			 "Use list-levels to see available levels, or load-level to add it."),
 		*LevelName));
+}
+
+// ============================================================================
+// LEVEL MUTATION HANDLERS
+// ============================================================================
+
+// --- levelCreate ---
+// Create a new map asset.
+// Body: { "path": "/Game/Maps/NewLevel", "template": "Default" (optional) }
+FString FAgenticMCPServer::HandleLevelCreate(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString MapPath = Json->GetStringField(TEXT("path"));
+	if (MapPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'path'"));
+	}
+
+	FString TemplateName;
+	Json->TryGetStringField(TEXT("template"), TemplateName);
+
+	// Create the new level
+	UWorld* NewWorld = UWorld::CreateWorld(EWorldType::Editor, false);
+	if (!NewWorld)
+	{
+		return MakeErrorJson(TEXT("Failed to create new world"));
+	}
+
+	FString PackageName = MapPath;
+	if (!PackageName.StartsWith(TEXT("/")))
+	{
+		PackageName = TEXT("/Game/") + PackageName;
+	}
+
+	// Save the world to the package
+	bool bSaved = FEditorFileUtils::SaveLevel(NewWorld->PersistentLevel, *PackageName);
+	if (!bSaved)
+	{
+		return MakeErrorJson(TEXT("Failed to save new level"));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("path"), PackageName);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- levelSave ---
+// Save the current level.
+// Body: {} or { "all": true }
+FString FAgenticMCPServer::HandleLevelSave(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+
+	bool bSaveAll = false;
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (FJsonSerializer::Deserialize(Reader, Json) && Json.IsValid())
+	{
+		Json->TryGetBoolField(TEXT("all"), bSaveAll);
+	}
+
+	bool bSuccess = false;
+	if (bSaveAll)
+	{
+		bSuccess = FEditorFileUtils::SaveDirtyPackages(false, true, true);
+	}
+	else
+	{
+		UWorld* World = GEditor->GetEditorWorldContext().World();
+		if (!World)
+		{
+			return MakeErrorJson(TEXT("No editor world"));
+		}
+		FString MapName = World->GetMapName();
+		bSuccess = FEditorFileUtils::SaveLevel(World->PersistentLevel);
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), bSuccess ? TEXT("ok") : TEXT("failed"));
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- levelAddSublevel ---
+// Add a streaming sublevel to the current level.
+// Body: { "path": "/Game/Maps/SubLevel_01" }
+FString FAgenticMCPServer::HandleLevelAddSublevel(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString SublevelPath = Json->GetStringField(TEXT("path"));
+	if (SublevelPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'path'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	ULevelStreaming* StreamingLevel = NewObject<ULevelStreamingDynamic>(World, ULevelStreamingDynamic::StaticClass());
+	if (!StreamingLevel)
+	{
+		return MakeErrorJson(TEXT("Failed to create streaming level"));
+	}
+
+	StreamingLevel->SetWorldAssetByPackageName(FName(*SublevelPath));
+	StreamingLevel->SetShouldBeLoaded(true);
+	StreamingLevel->SetShouldBeVisible(true);
+	World->AddStreamingLevel(StreamingLevel);
+	World->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("sublevel"), SublevelPath);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- levelSetCurrentLevel ---
+// Set the active level for editing (in multi-level setups).
+// Body: { "levelName": "SubLevel_01" }
+FString FAgenticMCPServer::HandleLevelSetCurrentLevel(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString LevelName = Json->GetStringField(TEXT("levelName"));
+	if (LevelName.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'levelName'"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	// Check persistent level
+	if (World->PersistentLevel && World->PersistentLevel->GetOuter()->GetName().Contains(LevelName))
+	{
+		World->SetCurrentLevel(World->PersistentLevel);
+		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+		Result->SetStringField(TEXT("status"), TEXT("ok"));
+		Result->SetStringField(TEXT("currentLevel"), LevelName);
+		FString Out;
+		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+		FJsonSerializer::Serialize(Result, Writer);
+		return Out;
+	}
+
+	// Check streaming levels
+	for (ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
+	{
+		if (StreamingLevel && StreamingLevel->GetWorldAssetPackageName().Contains(LevelName))
+		{
+			ULevel* Level = StreamingLevel->GetLoadedLevel();
+			if (Level)
+			{
+				World->SetCurrentLevel(Level);
+				TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+				Result->SetStringField(TEXT("status"), TEXT("ok"));
+				Result->SetStringField(TEXT("currentLevel"), LevelName);
+				FString Out;
+				TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+				FJsonSerializer::Serialize(Result, Writer);
+				return Out;
+			}
+			else
+			{
+				return MakeErrorJson(FString::Printf(TEXT("Level '%s' found but not loaded"), *LevelName));
+			}
+		}
+	}
+
+	return MakeErrorJson(FString::Printf(TEXT("Level not found: %s"), *LevelName));
+}
+
+// --- levelBuildLighting ---
+// Build lighting for the current level.
+// Body: { "quality": "Preview"|"Medium"|"High"|"Production" }
+FString FAgenticMCPServer::HandleLevelBuildLighting(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+
+	FString Quality = TEXT("Preview");
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (FJsonSerializer::Deserialize(Reader, Json) && Json.IsValid())
+	{
+		Json->TryGetStringField(TEXT("quality"), Quality);
+	}
+
+	// Set quality level
+	int32 QualityLevel = 0; // Preview
+	if (Quality == TEXT("Medium")) QualityLevel = 1;
+	else if (Quality == TEXT("High")) QualityLevel = 2;
+	else if (Quality == TEXT("Production")) QualityLevel = 3;
+
+	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *FString::Printf(TEXT("BUILD LIGHTING QUALITY=%d"), QualityLevel));
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("quality"), Quality);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}
+
+// --- levelBuildNavigation ---
+// Build navigation mesh for the current level.
+// Body: {}
+FString FAgenticMCPServer::HandleLevelBuildNavigation(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+	{
+		return MakeErrorJson(TEXT("No editor world"));
+	}
+
+	UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (!NavSys)
+	{
+		return MakeErrorJson(TEXT("No navigation system in world"));
+	}
+
+	NavSys->Build();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
 }

@@ -5865,6 +5865,809 @@
         "readOnlyHint": false,
         "destructiveHint": false
       }
+    },
+    {
+      "name": "landscapeSculpt",
+      "description": "Sculpt the landscape heightmap at a world location (raise/lower/flatten/smooth)",
+      "parameters": [
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "Sculpt mode: raise, lower, flatten, smooth",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x, y, z]",
+          "required": true
+        },
+        {
+          "name": "radius",
+          "type": "number",
+          "description": "Brush radius in world units",
+          "required": true
+        },
+        {
+          "name": "strength",
+          "type": "number",
+          "description": "Brush strength 0.0-1.0",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "landscapePaint",
+      "description": "Paint a landscape layer weight at a world location",
+      "parameters": [
+        {
+          "name": "layerName",
+          "type": "string",
+          "description": "Name of the paint layer",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x, y, z]",
+          "required": true
+        },
+        {
+          "name": "radius",
+          "type": "number",
+          "description": "Brush radius in world units",
+          "required": true
+        },
+        {
+          "name": "weight",
+          "type": "number",
+          "description": "Paint weight 0.0-1.0",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "landscapeAddLayer",
+      "description": "Add a new paint layer to the landscape",
+      "parameters": [
+        {
+          "name": "layerName",
+          "type": "string",
+          "description": "Name for the new layer",
+          "required": true
+        },
+        {
+          "name": "hardness",
+          "type": "number",
+          "description": "Layer hardness 0.0-1.0",
+          "required": false
+        },
+        {
+          "name": "noWeightBlend",
+          "type": "boolean",
+          "description": "If true, layer uses no-weight blending",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "landscapeRemoveLayer",
+      "description": "Remove a paint layer from the landscape",
+      "parameters": [
+        {
+          "name": "layerName",
+          "type": "string",
+          "description": "Name of the layer to remove",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "landscapeImportHeightmap",
+      "description": "Import a heightmap from an R16/RAW file",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "Absolute path to the heightmap file (.r16 or .raw)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "landscapeExportHeightmap",
+      "description": "Export the landscape heightmap to an R16 file",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "Absolute path for the exported file",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "foliageAdd",
+      "description": "Add foliage instances at specified world locations",
+      "parameters": [
+        {
+          "name": "foliageType",
+          "type": "string",
+          "description": "Asset path of the static mesh for foliage",
+          "required": true
+        },
+        {
+          "name": "locations",
+          "type": "array",
+          "description": "Array of [x,y,z] location arrays",
+          "required": true
+        },
+        {
+          "name": "scale",
+          "type": "number",
+          "description": "Uniform scale for instances",
+          "required": false
+        },
+        {
+          "name": "randomRotation",
+          "type": "boolean",
+          "description": "Randomize yaw rotation",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "foliageRemove",
+      "description": "Remove foliage instances within a radius of a location",
+      "parameters": [
+        {
+          "name": "location",
+          "type": "array",
+          "description": "Center location [x, y, z]",
+          "required": true
+        },
+        {
+          "name": "radius",
+          "type": "number",
+          "description": "Removal radius in world units",
+          "required": true
+        },
+        {
+          "name": "foliageType",
+          "type": "string",
+          "description": "Optional: only remove this mesh type",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "foliageSetDensity",
+      "description": "Set density scaling for a foliage type",
+      "parameters": [
+        {
+          "name": "foliageType",
+          "type": "string",
+          "description": "Asset path of the foliage mesh",
+          "required": true
+        },
+        {
+          "name": "density",
+          "type": "number",
+          "description": "Density value 0.0-1.0",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "skelMeshSetMorphTarget",
+      "description": "Set morph target weight on a skeletal mesh component",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "morphTarget",
+          "type": "string",
+          "description": "Morph target name",
+          "required": true
+        },
+        {
+          "name": "weight",
+          "type": "number",
+          "description": "Weight value 0.0-1.0",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "skelMeshAddSocket",
+      "description": "Add a socket to a skeletal mesh asset",
+      "parameters": [
+        {
+          "name": "meshPath",
+          "type": "string",
+          "description": "Asset path of the skeletal mesh",
+          "required": true
+        },
+        {
+          "name": "socketName",
+          "type": "string",
+          "description": "Name for the new socket",
+          "required": true
+        },
+        {
+          "name": "boneName",
+          "type": "string",
+          "description": "Bone to attach the socket to",
+          "required": true
+        },
+        {
+          "name": "relativeLocation",
+          "type": "array",
+          "description": "Relative location [x,y,z]",
+          "required": false
+        },
+        {
+          "name": "relativeRotation",
+          "type": "array",
+          "description": "Relative rotation [pitch,yaw,roll]",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "skelMeshRemoveSocket",
+      "description": "Remove a socket from a skeletal mesh asset",
+      "parameters": [
+        {
+          "name": "meshPath",
+          "type": "string",
+          "description": "Asset path of the skeletal mesh",
+          "required": true
+        },
+        {
+          "name": "socketName",
+          "type": "string",
+          "description": "Name of the socket to remove",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "skelMeshSetMaterial",
+      "description": "Set a material on a skeletal mesh component's material slot",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "slotIndex",
+          "type": "number",
+          "description": "Material slot index",
+          "required": true
+        },
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Asset path of the material",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "skelMeshSetPhysicsAsset",
+      "description": "Assign a physics asset to a skeletal mesh",
+      "parameters": [
+        {
+          "name": "meshPath",
+          "type": "string",
+          "description": "Asset path of the skeletal mesh",
+          "required": true
+        },
+        {
+          "name": "physicsAssetPath",
+          "type": "string",
+          "description": "Asset path of the physics asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "dataTableAddRow",
+      "description": "Add a new row to a DataTable",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Asset path of the DataTable",
+          "required": true
+        },
+        {
+          "name": "rowName",
+          "type": "string",
+          "description": "Name for the new row",
+          "required": true
+        },
+        {
+          "name": "values",
+          "type": "object",
+          "description": "Key-value pairs for row fields",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "dataTableDeleteRow",
+      "description": "Delete a row from a DataTable",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Asset path of the DataTable",
+          "required": true
+        },
+        {
+          "name": "rowName",
+          "type": "string",
+          "description": "Name of the row to delete",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "dataTableGetSchema",
+      "description": "Get the row struct schema (field names and types) for a DataTable",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Asset path of the DataTable",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "levelCreate",
+      "description": "Create a new map asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path for the new level",
+          "required": true
+        },
+        {
+          "name": "template",
+          "type": "string",
+          "description": "Template name (optional)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "levelSave",
+      "description": "Save the current level or all dirty packages",
+      "parameters": [
+        {
+          "name": "all",
+          "type": "boolean",
+          "description": "If true, save all dirty packages",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "levelAddSublevel",
+      "description": "Add a streaming sublevel to the current level",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Asset path of the sublevel map",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "levelSetCurrentLevel",
+      "description": "Set the active level for editing in multi-level setups",
+      "parameters": [
+        {
+          "name": "levelName",
+          "type": "string",
+          "description": "Name of the level to make current",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "levelBuildLighting",
+      "description": "Build lighting for the current level",
+      "parameters": [
+        {
+          "name": "quality",
+          "type": "string",
+          "description": "Quality: Preview, Medium, High, Production",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "levelBuildNavigation",
+      "description": "Build navigation mesh for the current level",
+      "parameters": []
+    },
+    {
+      "name": "actorDuplicate",
+      "description": "Duplicate an actor in the level",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name or label of the actor to duplicate",
+          "required": true
+        },
+        {
+          "name": "newName",
+          "type": "string",
+          "description": "Label for the duplicated actor",
+          "required": false
+        },
+        {
+          "name": "offset",
+          "type": "array",
+          "description": "Position offset [x,y,z] from original",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "actorSetMobility",
+      "description": "Set actor mobility (Static, Stationary, Movable)",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "mobility",
+          "type": "string",
+          "description": "Static, Stationary, or Movable",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "actorSetTags",
+      "description": "Set, add, or remove actor tags",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "tags",
+          "type": "array",
+          "description": "Array of tag strings",
+          "required": true
+        },
+        {
+          "name": "mode",
+          "type": "string",
+          "description": "set, add, or remove",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "actorSetLayer",
+      "description": "Set the editor layer for an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "layer",
+          "type": "string",
+          "description": "Layer name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "physicsAddConstraint",
+      "description": "Add a physics constraint between two actors",
+      "parameters": [
+        {
+          "name": "actor1",
+          "type": "string",
+          "description": "First actor name",
+          "required": true
+        },
+        {
+          "name": "actor2",
+          "type": "string",
+          "description": "Second actor name",
+          "required": true
+        },
+        {
+          "name": "constraintType",
+          "type": "string",
+          "description": "Fixed, Hinge, Prismatic, or BallSocket",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "physicsRemoveConstraint",
+      "description": "Remove a physics constraint actor by name",
+      "parameters": [
+        {
+          "name": "constraintName",
+          "type": "string",
+          "description": "Name of the constraint actor",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "physicsSetMass",
+      "description": "Override mass on an actor's root component",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "mass",
+          "type": "number",
+          "description": "Mass in kg",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "physicsSetDamping",
+      "description": "Set linear and angular damping on an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "linearDamping",
+          "type": "number",
+          "description": "Linear damping value",
+          "required": false
+        },
+        {
+          "name": "angularDamping",
+          "type": "number",
+          "description": "Angular damping value",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "physicsSetGravity",
+      "description": "Enable or disable gravity on an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Enable or disable gravity",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "physicsApplyImpulse",
+      "description": "Apply a one-shot impulse to an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "impulse",
+          "type": "array",
+          "description": "Impulse vector [x,y,z]",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location for impulse [x,y,z]",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "sceneCreateFolder",
+      "description": "Create an actor folder in the outliner",
+      "parameters": [
+        {
+          "name": "folderPath",
+          "type": "string",
+          "description": "Folder path (e.g. Environment/Trees)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sceneDeleteFolder",
+      "description": "Delete an actor folder from the outliner",
+      "parameters": [
+        {
+          "name": "folderPath",
+          "type": "string",
+          "description": "Folder path to delete",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sceneSetActorLabel",
+      "description": "Set the display name (label) of an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Current actor name or label",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "New display label",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sceneHideActor",
+      "description": "Set editor visibility of an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "hidden",
+          "type": "boolean",
+          "description": "True to hide, false to show",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "settingsSetProject",
+      "description": "Set project settings fields (name, company, description, version)",
+      "parameters": [
+        {
+          "name": "projectName",
+          "type": "string",
+          "description": "Project name",
+          "required": false
+        },
+        {
+          "name": "companyName",
+          "type": "string",
+          "description": "Company name",
+          "required": false
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Project description",
+          "required": false
+        },
+        {
+          "name": "homepage",
+          "type": "string",
+          "description": "Project homepage URL",
+          "required": false
+        },
+        {
+          "name": "projectVersion",
+          "type": "string",
+          "description": "Project version string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "settingsSetEditor",
+      "description": "Set editor preference fields",
+      "parameters": [
+        {
+          "name": "autoSaveEnabled",
+          "type": "boolean",
+          "description": "Enable/disable auto-save",
+          "required": false
+        },
+        {
+          "name": "autoSaveInterval",
+          "type": "number",
+          "description": "Auto-save interval in seconds",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "settingsSetRendering",
+      "description": "Set rendering settings (ray tracing, nanite, lumen, VSM)",
+      "parameters": [
+        {
+          "name": "rayTracing",
+          "type": "boolean",
+          "description": "Enable/disable ray tracing",
+          "required": false
+        },
+        {
+          "name": "nanite",
+          "type": "boolean",
+          "description": "Enable/disable Nanite",
+          "required": false
+        },
+        {
+          "name": "lumen",
+          "type": "boolean",
+          "description": "Enable/disable Lumen",
+          "required": false
+        },
+        {
+          "name": "vsm",
+          "type": "boolean",
+          "description": "Enable/disable Virtual Shadow Maps",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "assetMove",
+      "description": "Move an asset to a different content folder",
+      "parameters": [
+        {
+          "name": "sourcePath",
+          "type": "string",
+          "description": "Current asset path",
+          "required": true
+        },
+        {
+          "name": "destPath",
+          "type": "string",
+          "description": "Destination asset path",
+          "required": true
+        }
+      ]
     }
   ]
 }

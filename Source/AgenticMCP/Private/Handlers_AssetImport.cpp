@@ -296,3 +296,65 @@ FString FAgenticMCPServer::HandleAssetListByType(const FString& Body)
 	Result->SetArrayField(TEXT("assets"), AssetArr);
 	return JsonToString(Result);
 }
+
+// ============================================================================
+// ASSET MOVE HANDLER
+// ============================================================================
+
+// --- assetMove ---
+// Move an asset to a different content folder.
+// Body: { "sourcePath": "/Game/OldFolder/MyAsset", "destPath": "/Game/NewFolder/MyAsset" }
+FString FAgenticMCPServer::HandleAssetMove(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+	{
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+	}
+
+	FString SourcePath = Json->GetStringField(TEXT("sourcePath"));
+	FString DestPath = Json->GetStringField(TEXT("destPath"));
+
+	if (SourcePath.IsEmpty() || DestPath.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Missing 'sourcePath' or 'destPath'"));
+	}
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	FAssetData AssetData = AssetRegistryModule.Get().GetAssetByObjectPath(FSoftObjectPath(SourcePath));
+	if (!AssetData.IsValid())
+	{
+		return MakeErrorJson(FString::Printf(TEXT("Asset not found: %s"), *SourcePath));
+	}
+
+	UObject* Asset = AssetData.GetAsset();
+	if (!Asset)
+	{
+		return MakeErrorJson(TEXT("Failed to load asset"));
+	}
+
+	TArray<FAssetRenameData> RenameData;
+	RenameData.Add(FAssetRenameData(Asset, FPaths::GetPath(DestPath), FPaths::GetBaseFilename(DestPath)));
+
+	FAssetToolsModule& AssetToolsModule = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools");
+	bool bSuccess = AssetToolsModule.Get().RenameAssets(RenameData);
+
+	if (!bSuccess)
+	{
+		return MakeErrorJson(TEXT("Asset move failed"));
+	}
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("from"), SourcePath);
+	Result->SetStringField(TEXT("to"), DestPath);
+	FString Out;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, Writer);
+	return Out;
+}

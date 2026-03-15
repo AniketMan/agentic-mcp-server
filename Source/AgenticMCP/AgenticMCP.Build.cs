@@ -38,7 +38,7 @@ public class AgenticMCP : ModuleRules
 			"KismetCompiler",     // Blueprint compilation
 			"EditorSubsystem",    // UEditorSubsystem base class
 			"LevelEditor",        // Level management APIs
-			"Landscape",          // Landscape actor support
+			"Landscape", "NavigationSystem",          // Landscape actor support
 			"Foliage",            // Foliage editing APIs
 			"RHI",                // Render hardware interface (for nullrhi commandlet)
 			"ImageWrapper",       // PNG/JPEG compression for screenshots

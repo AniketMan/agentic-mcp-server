@@ -1904,6 +1904,50 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleGetBlueprint(Body);
 	});
 	HandlerMap.Add(TEXT("getGraph"), [this](const TMap<FString, FString>& Params, const FString& Body)
+
+	// --- New mutation routes ---
+	HandlerMap.Add(TEXT("landscapeSculpt"), [this](const FString& Body) { return HandleLandscapeSculpt(Body); });
+	HandlerMap.Add(TEXT("landscapePaint"), [this](const FString& Body) { return HandleLandscapePaint(Body); });
+	HandlerMap.Add(TEXT("landscapeAddLayer"), [this](const FString& Body) { return HandleLandscapeAddLayer(Body); });
+	HandlerMap.Add(TEXT("landscapeRemoveLayer"), [this](const FString& Body) { return HandleLandscapeRemoveLayer(Body); });
+	HandlerMap.Add(TEXT("landscapeImportHeightmap"), [this](const FString& Body) { return HandleLandscapeImportHeightmap(Body); });
+	HandlerMap.Add(TEXT("landscapeExportHeightmap"), [this](const FString& Body) { return HandleLandscapeExportHeightmap(Body); });
+	HandlerMap.Add(TEXT("foliageAdd"), [this](const FString& Body) { return HandleFoliageAdd(Body); });
+	HandlerMap.Add(TEXT("foliageRemove"), [this](const FString& Body) { return HandleFoliageRemove(Body); });
+	HandlerMap.Add(TEXT("foliageSetDensity"), [this](const FString& Body) { return HandleFoliageSetDensity(Body); });
+	HandlerMap.Add(TEXT("skelMeshSetMorphTarget"), [this](const FString& Body) { return HandleSkelMeshSetMorphTarget(Body); });
+	HandlerMap.Add(TEXT("skelMeshAddSocket"), [this](const FString& Body) { return HandleSkelMeshAddSocket(Body); });
+	HandlerMap.Add(TEXT("skelMeshRemoveSocket"), [this](const FString& Body) { return HandleSkelMeshRemoveSocket(Body); });
+	HandlerMap.Add(TEXT("skelMeshSetMaterial"), [this](const FString& Body) { return HandleSkelMeshSetMaterial(Body); });
+	HandlerMap.Add(TEXT("skelMeshSetPhysicsAsset"), [this](const FString& Body) { return HandleSkelMeshSetPhysicsAsset(Body); });
+	HandlerMap.Add(TEXT("dataTableAddRow"), [this](const FString& Body) { return HandleDataTableAddRow(Body); });
+	HandlerMap.Add(TEXT("dataTableDeleteRow"), [this](const FString& Body) { return HandleDataTableDeleteRow(Body); });
+	HandlerMap.Add(TEXT("dataTableGetSchema"), [this](const FString& Body) { return HandleDataTableGetSchema(Body); });
+	HandlerMap.Add(TEXT("levelCreate"), [this](const FString& Body) { return HandleLevelCreate(Body); });
+	HandlerMap.Add(TEXT("levelSave"), [this](const FString& Body) { return HandleLevelSave(Body); });
+	HandlerMap.Add(TEXT("levelAddSublevel"), [this](const FString& Body) { return HandleLevelAddSublevel(Body); });
+	HandlerMap.Add(TEXT("levelSetCurrentLevel"), [this](const FString& Body) { return HandleLevelSetCurrentLevel(Body); });
+	HandlerMap.Add(TEXT("levelBuildLighting"), [this](const FString& Body) { return HandleLevelBuildLighting(Body); });
+	HandlerMap.Add(TEXT("levelBuildNavigation"), [this](const FString& Body) { return HandleLevelBuildNavigation(Body); });
+	HandlerMap.Add(TEXT("actorDuplicate"), [this](const FString& Body) { return HandleActorDuplicate(Body); });
+	HandlerMap.Add(TEXT("actorSetMobility"), [this](const FString& Body) { return HandleActorSetMobility(Body); });
+	HandlerMap.Add(TEXT("actorSetTags"), [this](const FString& Body) { return HandleActorSetTags(Body); });
+	HandlerMap.Add(TEXT("actorSetLayer"), [this](const FString& Body) { return HandleActorSetLayer(Body); });
+	HandlerMap.Add(TEXT("physicsAddConstraint"), [this](const FString& Body) { return HandlePhysicsAddConstraint(Body); });
+	HandlerMap.Add(TEXT("physicsRemoveConstraint"), [this](const FString& Body) { return HandlePhysicsRemoveConstraint(Body); });
+	HandlerMap.Add(TEXT("physicsSetMass"), [this](const FString& Body) { return HandlePhysicsSetMass(Body); });
+	HandlerMap.Add(TEXT("physicsSetDamping"), [this](const FString& Body) { return HandlePhysicsSetDamping(Body); });
+	HandlerMap.Add(TEXT("physicsSetGravity"), [this](const FString& Body) { return HandlePhysicsSetGravity(Body); });
+	HandlerMap.Add(TEXT("physicsApplyImpulse"), [this](const FString& Body) { return HandlePhysicsApplyImpulse(Body); });
+	HandlerMap.Add(TEXT("sceneCreateFolder"), [this](const FString& Body) { return HandleSceneCreateFolder(Body); });
+	HandlerMap.Add(TEXT("sceneDeleteFolder"), [this](const FString& Body) { return HandleSceneDeleteFolder(Body); });
+	HandlerMap.Add(TEXT("sceneSetActorLabel"), [this](const FString& Body) { return HandleSceneSetActorLabel(Body); });
+	HandlerMap.Add(TEXT("sceneHideActor"), [this](const FString& Body) { return HandleSceneHideActor(Body); });
+	HandlerMap.Add(TEXT("settingsSetProject"), [this](const FString& Body) { return HandleSettingsSetProject(Body); });
+	HandlerMap.Add(TEXT("settingsSetEditor"), [this](const FString& Body) { return HandleSettingsSetEditor(Body); });
+	HandlerMap.Add(TEXT("settingsSetRendering"), [this](const FString& Body) { return HandleSettingsSetRendering(Body); });
+	HandlerMap.Add(TEXT("assetMove"), [this](const FString& Body) { return HandleAssetMove(Body); });
+
 	{
 		return HandleGetGraph(Body);
 	});
