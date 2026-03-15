@@ -332,8 +332,14 @@ private:
 	// ---- Sequencer Editing Handlers (Handlers_SequencerEdit.cpp) ----
 	FString HandleSequencerCreate(const FString& Body);
 	FString HandleSequencerAddTrack(const FString& Body);
+	FString HandleSequencerAddSection(const FString& Body);
+	FString HandleSequencerSetKeyframe(const FString& Body);
+	FString HandleSequencerDeleteSection(const FString& Body);
+	FString HandleSequencerBindActor(const FString& Body);
+	FString HandleSequencerAddCameraCut(const FString& Body);
 	FString HandleSequencerGetTracks(const FString& Body);
 	FString HandleSequencerSetPlayRange(const FString& Body);
+	FString HandleSequencerRender(const FString& Body);
 
 	// ---- Landscape / Foliage Handlers (Handlers_Landscape.cpp) ----
 	FString HandleLandscapeList(const FString& Body);

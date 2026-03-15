@@ -1441,6 +1441,30 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSequencerSetPlayRange(Body);
 	});
+	HandlerMap.Add(TEXT("sequencerAddSection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerAddSection(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerSetKeyframe"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerSetKeyframe(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerDeleteSection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerDeleteSection(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerBindActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerBindActor(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerAddCameraCut"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerAddCameraCut(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerRender"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerRender(Body);
+	});
 
 	// ---- Landscape / Foliage Handlers ----
 	HandlerMap.Add(TEXT("landscapeList"), [this](const TMap<FString, FString>& Params, const FString& Body)

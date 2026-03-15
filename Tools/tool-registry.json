@@ -2872,7 +2872,7 @@
     },
     {
       "name": "sequencerSetPlayRange",
-      "description": "SequencerSetPlayRange",
+      "description": "Set the playback range (start/end frames) of a level sequence",
       "parameters": [
         {
           "name": "sequenceName",
@@ -2882,20 +2882,314 @@
         },
         {
           "name": "startFrame",
-          "type": "string",
-          "description": "startFrame parameter",
+          "type": "number",
+          "description": "Start frame number",
           "required": true
         },
         {
           "name": "endFrame",
-          "type": "string",
-          "description": "endFrame parameter",
+          "type": "number",
+          "description": "End frame number",
           "required": true
         }
       ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerAddSection",
+      "description": "Add a section (time range) to a track in a level sequence. The section defines the frame range over which keyframes can be placed.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the bound actor (alternative to bindingGuid)",
+          "required": false
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding (alternative to actorName)",
+          "required": false
+        },
+        {
+          "name": "trackType",
+          "type": "string",
+          "description": "Track type: Transform, Float, Bool, Visibility, SkeletalAnimation",
+          "required": false
+        },
+        {
+          "name": "startFrame",
+          "type": "number",
+          "description": "Start frame number for the section",
+          "required": true
+        },
+        {
+          "name": "endFrame",
+          "type": "number",
+          "description": "End frame number for the section",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerSetKeyframe",
+      "description": "Set a keyframe value at a specific frame in a sequencer track. For Transform tracks use lx/ly/lz (location), rx/ry/rz (rotation), sx/sy/sz (scale) or location/rotation/scale objects. For Float tracks use 'value'. For Bool/Visibility tracks use 'value' (true/false).",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the bound actor (alternative to bindingGuid)",
+          "required": false
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding (alternative to actorName)",
+          "required": false
+        },
+        {
+          "name": "trackType",
+          "type": "string",
+          "description": "Track type: Transform, Float, Bool, Visibility",
+          "required": false
+        },
+        {
+          "name": "frame",
+          "type": "number",
+          "description": "Frame number to set the keyframe at",
+          "required": true
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section within the track (default 0)",
+          "required": false
+        },
+        {
+          "name": "interpolation",
+          "type": "string",
+          "description": "Interpolation mode: cubic, linear, constant (default cubic)",
+          "required": false
+        },
+        {
+          "name": "lx",
+          "type": "number",
+          "description": "Location X (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "ly",
+          "type": "number",
+          "description": "Location Y (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "lz",
+          "type": "number",
+          "description": "Location Z (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "rx",
+          "type": "number",
+          "description": "Rotation X/Pitch (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "ry",
+          "type": "number",
+          "description": "Rotation Y/Yaw (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "rz",
+          "type": "number",
+          "description": "Rotation Z/Roll (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "sx",
+          "type": "number",
+          "description": "Scale X (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "sy",
+          "type": "number",
+          "description": "Scale Y (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "sz",
+          "type": "number",
+          "description": "Scale Z (Transform tracks)",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Value for Float (number) or Bool (true/false) tracks",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerDeleteSection",
+      "description": "Remove a section from a track in a level sequence by index",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the bound actor (alternative to bindingGuid)",
+          "required": false
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding (alternative to actorName)",
+          "required": false
+        },
+        {
+          "name": "trackType",
+          "type": "string",
+          "description": "Track type: Transform, Float, Bool, Visibility",
+          "required": false
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section to remove",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerBindActor",
+      "description": "Bind an actor to a level sequence as a possessable. Returns the binding GUID for use in other sequencer calls.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor to bind",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerAddCameraCut",
+      "description": "Add a camera cut section to a level sequence. Creates the CameraCut track if needed, binds the camera actor, and adds a cut section for the specified frame range.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "cameraActorName",
+          "type": "string",
+          "description": "Name of the CameraActor in the level",
+          "required": true
+        },
+        {
+          "name": "startFrame",
+          "type": "number",
+          "description": "Start frame for the camera cut",
+          "required": true
+        },
+        {
+          "name": "endFrame",
+          "type": "number",
+          "description": "End frame for the camera cut",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerRender",
+      "description": "Queue a level sequence for rendering to an image sequence via Movie Render Pipeline. Configures output format, resolution, and anti-aliasing.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence to render",
+          "required": true
+        },
+        {
+          "name": "outputDir",
+          "type": "string",
+          "description": "Output directory path (default: ProjectSaved/MovieRenders)",
+          "required": false
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "description": "Image format: png, exr, jpg (default: png)",
+          "required": false
+        },
+        {
+          "name": "resolution",
+          "type": "string",
+          "description": "Output resolution e.g. 1920x1080 (default: 1920x1080)",
+          "required": false
+        },
+        {
+          "name": "antiAliasing",
+          "type": "number",
+          "description": "Spatial sample count for anti-aliasing (1-64, default: 1)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
       }
     },
     {
