@@ -16,7 +16,7 @@
  * Automatically starts the AgenticMCP HTTP server when the UE5 editor opens.
  * The MCP TypeScript wrapper connects to this server over localhost:9847.
  *
- * This is the preferred serving mode — zero extra RAM, instant startup,
+ * This is the preferred serving mode -- zero extra RAM, instant startup,
  * full access to all editor APIs including level management.
  */
 UCLASS()

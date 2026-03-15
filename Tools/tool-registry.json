@@ -337,7 +337,14 @@
     {
       "name": "animBPGetMontages",
       "description": "AnimBPGetMontages",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -346,7 +353,14 @@
     {
       "name": "animBPGetSlotGroups",
       "description": "AnimBPGetSlotGroups",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -355,7 +369,20 @@
     {
       "name": "animBPGetStates",
       "description": "AnimBPGetStates",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        },
+        {
+          "name": "stateMachine",
+          "type": "string",
+          "description": "stateMachine parameter",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -364,7 +391,20 @@
     {
       "name": "animBPGetTransitions",
       "description": "AnimBPGetTransitions",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        },
+        {
+          "name": "stateMachine",
+          "type": "string",
+          "description": "stateMachine parameter",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -2168,7 +2208,20 @@
     {
       "name": "pcgExecuteGraph",
       "description": "PCGExecuteGraph",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor in the level",
+          "required": false
+        },
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "Graph name",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -2177,7 +2230,14 @@
     {
       "name": "pcgGetGraphInfo",
       "description": "PCGGetGraphInfo",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -2186,7 +2246,26 @@
     {
       "name": "pcgGetNodeSettings",
       "description": "PCGGetNodeSettings",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "Graph name",
+          "required": false
+        },
+        {
+          "name": "nodeName",
+          "type": "string",
+          "description": "Node name within the graph",
+          "required": false
+        },
+        {
+          "name": "nodeIndex",
+          "type": "number",
+          "description": "Index of the node",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -2213,7 +2292,38 @@
     {
       "name": "pcgSetNodeSettings",
       "description": "PCGSetNodeSettings",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "Graph name",
+          "required": false
+        },
+        {
+          "name": "nodeName",
+          "type": "string",
+          "description": "Node name within the graph",
+          "required": false
+        },
+        {
+          "name": "nodeIndex",
+          "type": "number",
+          "description": "Index of the node",
+          "required": false
+        },
+        {
+          "name": "propertyName",
+          "type": "string",
+          "description": "Property name to set",
+          "required": false
+        },
+        {
+          "name": "propertyValue",
+          "type": "string",
+          "description": "Property value to set",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
@@ -5513,7 +5623,14 @@
     {
       "name": "animBPGetBlendSpace",
       "description": "[Auto-generated] Handler: HandleAnimBPGetBlendSpace",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5522,7 +5639,14 @@
     {
       "name": "animBPListMontages",
       "description": "[Auto-generated] Handler: HandleAnimBPListMontages",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "filter parameter",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5531,7 +5655,14 @@
     {
       "name": "findReferences",
       "description": "[Auto-generated] Handler: HandleFindReferences",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "asset",
+          "type": "string",
+          "description": "asset parameter",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5540,7 +5671,14 @@
     {
       "name": "getBlueprint",
       "description": "[Auto-generated] Handler: HandleGetBlueprint",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset or object name",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5549,7 +5687,20 @@
     {
       "name": "getGraph",
       "description": "[Auto-generated] Handler: HandleGetGraph",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint asset name or path",
+          "required": false
+        },
+        {
+          "name": "graph",
+          "type": "string",
+          "description": "graph parameter",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5558,7 +5709,14 @@
     {
       "name": "materialGetGraph",
       "description": "[Auto-generated] Handler: HandleMaterialGetGraph",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Material asset name or path",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5567,7 +5725,26 @@
     {
       "name": "materialSetScalar",
       "description": "[Auto-generated] Handler: HandleMaterialSetScalar",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Material asset name or path",
+          "required": false
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "Parameter name",
+          "required": false
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "description": "Value to set",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false
@@ -5576,7 +5753,44 @@
     {
       "name": "materialSetVector",
       "description": "[Auto-generated] Handler: HandleMaterialSetVector",
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Material asset name or path",
+          "required": false
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "Parameter name",
+          "required": false
+        },
+        {
+          "name": "r",
+          "type": "number",
+          "description": "Red channel (0-1)",
+          "required": false
+        },
+        {
+          "name": "g",
+          "type": "number",
+          "description": "Green channel (0-1)",
+          "required": false
+        },
+        {
+          "name": "b",
+          "type": "number",
+          "description": "Blue channel (0-1)",
+          "required": false
+        },
+        {
+          "name": "a",
+          "type": "number",
+          "description": "Alpha channel (0-1)",
+          "required": false
+        }
+      ],
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": false

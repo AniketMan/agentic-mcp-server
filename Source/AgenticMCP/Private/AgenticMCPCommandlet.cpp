@@ -39,7 +39,7 @@ int32 UAgenticMCPCommandlet::Main(const FString& Params)
 		TEXT("AgenticMCP: Commandlet ready - port %d (%d Blueprints, %d Maps). Waiting for requests..."),
 		Port, Server.GetBlueprintCount(), Server.GetMapCount());
 
-	// Main tick loop — process requests until shutdown is requested
+	// Main tick loop -- process requests until shutdown is requested
 	// We tick at ~60Hz to keep response latency low without burning CPU
 	const double TickInterval = 1.0 / 60.0;
 

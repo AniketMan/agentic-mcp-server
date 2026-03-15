@@ -581,7 +581,7 @@ FString FAgenticMCPServer::HandleGetPinInfo(const FString& Body)
 		return JsonToString(Result);
 	}
 
-	// No pinName specified — return all pins on the node
+	// No pinName specified -- return all pins on the node
 	TArray<TSharedPtr<FJsonValue>> PinArray;
 	for (UEdGraphPin* Pin : Node->Pins)
 	{

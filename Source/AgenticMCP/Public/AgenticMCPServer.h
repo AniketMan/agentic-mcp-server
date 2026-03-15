@@ -25,7 +25,7 @@ class UWorld;
 class AActor;
 
 // ============================================================
-// Snapshot data structures — for graph state backup/restore
+// Snapshot data structures -- for graph state backup/restore
 // ============================================================
 
 struct FAgenticPinConnectionRecord
@@ -123,7 +123,7 @@ private:
 	bool bIsEditor = false;
 
 	// ============================================================
-	// Handler declarations — organized by category
+	// Handler declarations -- organized by category
 	// ============================================================
 
 	// ---- Asset registry rescan ----

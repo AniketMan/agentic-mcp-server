@@ -12,7 +12,7 @@ void UAgenticMCPEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection
 {
 	Super::Initialize(Collection);
 
-	// Don't start in commandlet mode — the commandlet has its own server instance.
+	// Don't start in commandlet mode -- the commandlet has its own server instance.
 	if (IsRunningCommandlet())
 	{
 		return;

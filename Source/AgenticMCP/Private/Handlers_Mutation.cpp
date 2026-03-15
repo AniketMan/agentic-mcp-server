@@ -372,7 +372,7 @@ FString FAgenticMCPServer::HandleAddNode(const FString& Body)
 				if (ExistingEvent->bOverrideFunction &&
 					ExistingEvent->EventReference.GetMemberName() == FName(*FunctionName))
 				{
-					// Already exists — return it
+					// Already exists -- return it
 					TSharedPtr<FJsonObject> NodeState = SerializeNode(ExistingEvent);
 					TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 					Result->SetBoolField(TEXT("success"), true);

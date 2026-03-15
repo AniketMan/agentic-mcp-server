@@ -444,7 +444,7 @@ bool FAgenticMCPServer::SaveBlueprintPackage(UBlueprint* BP)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AgenticMCP: Blueprint compilation crashed (SEH caught) for '%s'"),
 			*BP->GetName());
-		// Continue to save anyway — the Blueprint may still be in a usable state
+		// Continue to save anyway -- the Blueprint may still be in a usable state
 	}
 #else
 	FKismetEditorUtilities::CompileBlueprint(BP, CompileOpts, nullptr);
@@ -457,7 +457,7 @@ bool FAgenticMCPServer::SaveBlueprintPackage(UBlueprint* BP)
 	FString PackageFilename;
 	if (!FPackageName::DoesPackageExist(Package->GetName(), &PackageFilename))
 	{
-		// New package — derive filename from package name
+		// New package -- derive filename from package name
 		PackageFilename = FPackageName::LongPackageNameToFilename(
 			Package->GetName(), FPackageName::GetAssetPackageExtension());
 	}
@@ -1964,7 +1964,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 			});
 	};
 
-	// ---- /api/health — answered directly on HTTP thread (no asset access needed) ----
+	// ---- /api/health -- answered directly on HTTP thread (no asset access needed) ----
 	Router->BindRoute(FHttpPath(TEXT("/api/health")), EHttpServerRequestVerbs::VERB_GET,
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
@@ -2005,7 +2005,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				return true;
 			}));
 
-	// ---- /api/shutdown — commandlet only ----
+	// ---- /api/shutdown -- commandlet only ----
 	Router->BindRoute(FHttpPath(TEXT("/api/shutdown")), EHttpServerRequestVerbs::VERB_POST,
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
@@ -2027,7 +2027,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				return true;
 			}));
 
-	// ---- /mcp/status — MCP bridge health check ----
+	// ---- /mcp/status -- MCP bridge health check ----
 	Router->BindRoute(FHttpPath(TEXT("/mcp/status")), EHttpServerRequestVerbs::VERB_GET,
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
@@ -2045,7 +2045,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				return true;
 			}));
 
-	// ---- /mcp/tools — Auto-discovery of all registered tools ----
+	// ---- /mcp/tools -- Auto-discovery of all registered tools ----
 	Router->BindRoute(FHttpPath(TEXT("/mcp/tools")), EHttpServerRequestVerbs::VERB_GET,
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
@@ -2065,7 +2065,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 				return true;
 			}));
 
-	// ---- /mcp/tool/<name> — Execute a tool by name (queued to game thread) ----
+	// ---- /mcp/tool/<name> -- Execute a tool by name (queued to game thread) ----
 	Router->BindRoute(FHttpPath(TEXT("/mcp/tool")), EHttpServerRequestVerbs::VERB_POST,
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
@@ -2157,7 +2157,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 	Router->BindRoute(FHttpPath(TEXT("/api/references")), EHttpServerRequestVerbs::VERB_GET,
 		QueuedHandler(TEXT("references")));
 
-	// Blueprint Read (POST — need body for complex queries)
+	// Blueprint Read (POST -- need body for complex queries)
 	Router->BindRoute(FHttpPath(TEXT("/api/list-classes")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("listClasses")));
 	Router->BindRoute(FHttpPath(TEXT("/api/list-functions")), EHttpServerRequestVerbs::VERB_POST,

@@ -311,7 +311,7 @@ FString FAgenticMCPServer::HandleSpawnActor(const FString& Body)
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// Use FTransform overload — works on UE 5.4 through 5.7+
+	// Use FTransform overload -- works on UE 5.4 through 5.7+
 	FTransform SpawnTransform(FRotator(Rotation.Pitch, Rotation.Yaw, Rotation.Roll).Quaternion(), Location, Scale);
 	AActor* NewActor = World->SpawnActor<AActor>(ActorClass, SpawnTransform, SpawnParams);
 	if (!NewActor)
