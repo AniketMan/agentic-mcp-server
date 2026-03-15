@@ -1984,6 +1984,70 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("pythonExecString"), [this](const FString& Body) { return HandlePythonExecString(Body); });
 
 
+	// --- New subsystem routes ---
+	HandlerMap.Add(TEXT("mRGGetStatus"), [this](const FString& Body) { return HandleMRGGetStatus(Body); });
+	HandlerMap.Add(TEXT("mRGCreateConfig"), [this](const FString& Body) { return HandleMRGCreateConfig(Body); });
+	HandlerMap.Add(TEXT("mRGRender"), [this](const FString& Body) { return HandleMRGRender(Body); });
+	HandlerMap.Add(TEXT("mRGListConfigs"), [this](const FString& Body) { return HandleMRGListConfigs(Body); });
+	HandlerMap.Add(TEXT("clothList"), [this](const FString& Body) { return HandleClothList(Body); });
+	HandlerMap.Add(TEXT("clothCreateAsset"), [this](const FString& Body) { return HandleClothCreateAsset(Body); });
+	HandlerMap.Add(TEXT("clothSetConfig"), [this](const FString& Body) { return HandleClothSetConfig(Body); });
+	HandlerMap.Add(TEXT("gASList"), [this](const FString& Body) { return HandleGASList(Body); });
+	HandlerMap.Add(TEXT("gASCreateAbility"), [this](const FString& Body) { return HandleGASCreateAbility(Body); });
+	HandlerMap.Add(TEXT("gASCreateEffect"), [this](const FString& Body) { return HandleGASCreateEffect(Body); });
+	HandlerMap.Add(TEXT("gASAddModifier"), [this](const FString& Body) { return HandleGASAddModifier(Body); });
+	HandlerMap.Add(TEXT("massList"), [this](const FString& Body) { return HandleMassList(Body); });
+	HandlerMap.Add(TEXT("massCreateConfig"), [this](const FString& Body) { return HandleMassCreateConfig(Body); });
+	HandlerMap.Add(TEXT("massAddTrait"), [this](const FString& Body) { return HandleMassAddTrait(Body); });
+	HandlerMap.Add(TEXT("interchangeGetStatus"), [this](const FString& Body) { return HandleInterchangeGetStatus(Body); });
+	HandlerMap.Add(TEXT("interchangeImport"), [this](const FString& Body) { return HandleInterchangeImport(Body); });
+	HandlerMap.Add(TEXT("interchangeExport"), [this](const FString& Body) { return HandleInterchangeExport(Body); });
+	HandlerMap.Add(TEXT("vCamList"), [this](const FString& Body) { return HandleVCamList(Body); });
+	HandlerMap.Add(TEXT("vCamCreate"), [this](const FString& Body) { return HandleVCamCreate(Body); });
+	HandlerMap.Add(TEXT("vCamAddModifier"), [this](const FString& Body) { return HandleVCamAddModifier(Body); });
+	HandlerMap.Add(TEXT("variantList"), [this](const FString& Body) { return HandleVariantList(Body); });
+	HandlerMap.Add(TEXT("variantCreate"), [this](const FString& Body) { return HandleVariantCreate(Body); });
+	HandlerMap.Add(TEXT("variantAddSet"), [this](const FString& Body) { return HandleVariantAddSet(Body); });
+	HandlerMap.Add(TEXT("variantAddVariant"), [this](const FString& Body) { return HandleVariantAddVariant(Body); });
+	HandlerMap.Add(TEXT("composureList"), [this](const FString& Body) { return HandleComposureList(Body); });
+	HandlerMap.Add(TEXT("composureCreateElement"), [this](const FString& Body) { return HandleComposureCreateElement(Body); });
+	HandlerMap.Add(TEXT("composureAddPass"), [this](const FString& Body) { return HandleComposureAddPass(Body); });
+	HandlerMap.Add(TEXT("waterList"), [this](const FString& Body) { return HandleWaterList(Body); });
+	HandlerMap.Add(TEXT("waterCreate"), [this](const FString& Body) { return HandleWaterCreate(Body); });
+	HandlerMap.Add(TEXT("waterSetProperties"), [this](const FString& Body) { return HandleWaterSetProperties(Body); });
+	HandlerMap.Add(TEXT("sCGetStatus"), [this](const FString& Body) { return HandleSCGetStatus(Body); });
+	HandlerMap.Add(TEXT("sCCheckout"), [this](const FString& Body) { return HandleSCCheckout(Body); });
+	HandlerMap.Add(TEXT("sCSubmit"), [this](const FString& Body) { return HandleSCSubmit(Body); });
+	HandlerMap.Add(TEXT("sCRevert"), [this](const FString& Body) { return HandleSCRevert(Body); });
+	HandlerMap.Add(TEXT("sCHistory"), [this](const FString& Body) { return HandleSCHistory(Body); });
+	HandlerMap.Add(TEXT("replicationGetSettings"), [this](const FString& Body) { return HandleReplicationGetSettings(Body); });
+	HandlerMap.Add(TEXT("replicationSetSettings"), [this](const FString& Body) { return HandleReplicationSetSettings(Body); });
+	HandlerMap.Add(TEXT("replicationList"), [this](const FString& Body) { return HandleReplicationList(Body); });
+	HandlerMap.Add(TEXT("controlRigList"), [this](const FString& Body) { return HandleControlRigList(Body); });
+	HandlerMap.Add(TEXT("controlRigCreate"), [this](const FString& Body) { return HandleControlRigCreate(Body); });
+	HandlerMap.Add(TEXT("controlRigGetGraph"), [this](const FString& Body) { return HandleControlRigGetGraph(Body); });
+	HandlerMap.Add(TEXT("controlRigAddControl"), [this](const FString& Body) { return HandleControlRigAddControl(Body); });
+	HandlerMap.Add(TEXT("controlRigAddBone"), [this](const FString& Body) { return HandleControlRigAddBone(Body); });
+	HandlerMap.Add(TEXT("controlRigSetupIK"), [this](const FString& Body) { return HandleControlRigSetupIK(Body); });
+	HandlerMap.Add(TEXT("chaosList"), [this](const FString& Body) { return HandleChaosList(Body); });
+	HandlerMap.Add(TEXT("chaosCreateGeometryCollection"), [this](const FString& Body) { return HandleChaosCreateGeometryCollection(Body); });
+	HandlerMap.Add(TEXT("chaosFracture"), [this](const FString& Body) { return HandleChaosFracture(Body); });
+	HandlerMap.Add(TEXT("chaosSpawnField"), [this](const FString& Body) { return HandleChaosSpawnField(Body); });
+	HandlerMap.Add(TEXT("inputListActions"), [this](const FString& Body) { return HandleInputListActions(Body); });
+	HandlerMap.Add(TEXT("inputListMappingContexts"), [this](const FString& Body) { return HandleInputListMappingContexts(Body); });
+	HandlerMap.Add(TEXT("inputCreateAction"), [this](const FString& Body) { return HandleInputCreateAction(Body); });
+	HandlerMap.Add(TEXT("inputCreateMappingContext"), [this](const FString& Body) { return HandleInputCreateMappingContext(Body); });
+	HandlerMap.Add(TEXT("inputAddMapping"), [this](const FString& Body) { return HandleInputAddMapping(Body); });
+	HandlerMap.Add(TEXT("liveLinkGetStatus"), [this](const FString& Body) { return HandleLiveLinkGetStatus(Body); });
+	HandlerMap.Add(TEXT("liveLinkListSources"), [this](const FString& Body) { return HandleLiveLinkListSources(Body); });
+	HandlerMap.Add(TEXT("liveLinkAddSource"), [this](const FString& Body) { return HandleLiveLinkAddSource(Body); });
+	HandlerMap.Add(TEXT("liveLinkRemoveSource"), [this](const FString& Body) { return HandleLiveLinkRemoveSource(Body); });
+	HandlerMap.Add(TEXT("mediaList"), [this](const FString& Body) { return HandleMediaList(Body); });
+	HandlerMap.Add(TEXT("mediaCreatePlayer"), [this](const FString& Body) { return HandleMediaCreatePlayer(Body); });
+	HandlerMap.Add(TEXT("mediaCreateSource"), [this](const FString& Body) { return HandleMediaCreateSource(Body); });
+	HandlerMap.Add(TEXT("mediaSetSource"), [this](const FString& Body) { return HandleMediaSetSource(Body); });
+
+
 	{
 		return HandleGetGraph(Body);
 	});

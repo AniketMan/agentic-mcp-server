@@ -209,7 +209,6 @@ FString FAgenticMCPServer::HandleAudioSetVolume(const TMap<FString, FString>& Pa
 	return JsonToString(Result);
 }
 
-FString FAgenticMCPServer::HandleAudioGetStats
 
 FString FAgenticMCPServer::HandleAudioGetStats(const TMap<FString, FString>& Params, const FString& Body)
 {

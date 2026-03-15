@@ -7426,6 +7426,1379 @@
           "required": true
         }
       ]
+    },
+    {
+      "name": "mRGGetStatus",
+      "description": "Get Movie Render Graph module status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "mRGCreateConfig",
+      "description": "Create a Movie Render Graph config asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Config asset name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Cinematics/RenderConfigs)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "mRGRender",
+      "description": "Execute a render using Movie Render Graph",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "Path to the LevelSequence to render",
+          "required": true
+        },
+        {
+          "name": "configPath",
+          "type": "string",
+          "description": "Path to MRG config asset",
+          "required": false
+        },
+        {
+          "name": "outputDir",
+          "type": "string",
+          "description": "Output directory",
+          "required": false
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "description": "Output format: png/exr/jpg",
+          "required": false
+        },
+        {
+          "name": "resolutionX",
+          "type": "number",
+          "description": "Horizontal resolution",
+          "required": false
+        },
+        {
+          "name": "resolutionY",
+          "type": "number",
+          "description": "Vertical resolution",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "mRGListConfigs",
+      "description": "List all Movie Render Graph config assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "clothList",
+      "description": "List all skeletal meshes with cloth data",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "clothCreateAsset",
+      "description": "Create a cloth asset on a skeletal mesh",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "meshPath",
+          "type": "string",
+          "description": "Path to skeletal mesh",
+          "required": true
+        },
+        {
+          "name": "clothName",
+          "type": "string",
+          "description": "Name for the cloth asset",
+          "required": true
+        },
+        {
+          "name": "section",
+          "type": "number",
+          "description": "Mesh section index (default 0)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "clothSetConfig",
+      "description": "Set cloth simulation config properties",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "meshPath",
+          "type": "string",
+          "description": "Path to skeletal mesh",
+          "required": true
+        },
+        {
+          "name": "clothIndex",
+          "type": "number",
+          "description": "Cloth asset index (default 0)",
+          "required": false
+        },
+        {
+          "name": "mass",
+          "type": "number",
+          "description": "Mass scale",
+          "required": false
+        },
+        {
+          "name": "friction",
+          "type": "number",
+          "description": "Friction coefficient",
+          "required": false
+        },
+        {
+          "name": "damping",
+          "type": "number",
+          "description": "Damping value",
+          "required": false
+        },
+        {
+          "name": "stiffness",
+          "type": "number",
+          "description": "Stiffness value",
+          "required": false
+        },
+        {
+          "name": "gravityScale",
+          "type": "number",
+          "description": "Gravity scale multiplier",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "gASList",
+      "description": "List all GAS assets (Abilities, Effects)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "gASCreateAbility",
+      "description": "Create a Gameplay Ability Blueprint",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Ability name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/GAS)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "gASCreateEffect",
+      "description": "Create a Gameplay Effect Blueprint",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Effect name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/GAS)",
+          "required": false
+        },
+        {
+          "name": "durationType",
+          "type": "string",
+          "description": "Duration: Instant/Infinite/HasDuration",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "gASAddModifier",
+      "description": "Add an attribute modifier to a Gameplay Effect",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "effectPath",
+          "type": "string",
+          "description": "Path to the effect blueprint",
+          "required": true
+        },
+        {
+          "name": "attribute",
+          "type": "string",
+          "description": "Attribute name to modify",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "type": "string",
+          "description": "Operation: Add/Multiply/Override",
+          "required": false
+        },
+        {
+          "name": "magnitude",
+          "type": "number",
+          "description": "Modifier magnitude value",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "massList",
+      "description": "List all Mass Entity config assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "massCreateConfig",
+      "description": "Create a Mass Entity Config asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Config name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Mass)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "massAddTrait",
+      "description": "Add a trait to a Mass Entity Config",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "configPath",
+          "type": "string",
+          "description": "Path to config asset",
+          "required": true
+        },
+        {
+          "name": "traitClass",
+          "type": "string",
+          "description": "Trait class name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "interchangeGetStatus",
+      "description": "Get Interchange module status and supported formats",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "interchangeImport",
+      "description": "Import an asset using the Interchange pipeline",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "Path to the file to import (FBX/glTF/USD/OBJ/ABC)",
+          "required": true
+        },
+        {
+          "name": "destinationPath",
+          "type": "string",
+          "description": "Content destination path (default /Game/Imports)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "interchangeExport",
+      "description": "Export an asset using the Interchange pipeline",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "assetPath",
+          "type": "string",
+          "description": "Content path of asset to export",
+          "required": true
+        },
+        {
+          "name": "outputPath",
+          "type": "string",
+          "description": "File system output path",
+          "required": true
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "description": "Export format: fbx/gltf/obj",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "vCamList",
+      "description": "List all VCam-capable actors in the scene",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "vCamCreate",
+      "description": "Create a VCam actor with VCam component",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Camera name",
+          "required": false
+        },
+        {
+          "name": "location",
+          "type": "object",
+          "description": "Location {x,y,z}",
+          "required": false
+        },
+        {
+          "name": "rotation",
+          "type": "object",
+          "description": "Rotation {pitch,yaw,roll}",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "vCamAddModifier",
+      "description": "Add a modifier to a VCam component",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "VCam actor name",
+          "required": true
+        },
+        {
+          "name": "modifierClass",
+          "type": "string",
+          "description": "Modifier class name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "variantList",
+      "description": "List all Variant Manager assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "variantCreate",
+      "description": "Create a Level Variant Sets asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Asset name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Variants)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "variantAddSet",
+      "description": "Add a variant set to a Level Variant Sets asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "assetPath",
+          "type": "string",
+          "description": "Path to LevelVariantSets asset",
+          "required": true
+        },
+        {
+          "name": "setName",
+          "type": "string",
+          "description": "Name for the variant set",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "variantAddVariant",
+      "description": "Add a variant to a variant set",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "assetPath",
+          "type": "string",
+          "description": "Path to LevelVariantSets asset",
+          "required": true
+        },
+        {
+          "name": "setIndex",
+          "type": "number",
+          "description": "Index of the variant set",
+          "required": false
+        },
+        {
+          "name": "variantName",
+          "type": "string",
+          "description": "Name for the variant",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "composureList",
+      "description": "List all Composure elements in the scene",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "composureCreateElement",
+      "description": "Create a Composure compositing element",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Element name",
+          "required": true
+        },
+        {
+          "name": "elementType",
+          "type": "string",
+          "description": "Type: CG/MediaPlate/Empty",
+          "required": false
+        },
+        {
+          "name": "location",
+          "type": "object",
+          "description": "Location {x,y,z}",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "composureAddPass",
+      "description": "Add a compositing pass to an element",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "elementName",
+          "type": "string",
+          "description": "Element actor name",
+          "required": true
+        },
+        {
+          "name": "passType",
+          "type": "string",
+          "description": "Pass class name",
+          "required": true
+        },
+        {
+          "name": "passName",
+          "type": "string",
+          "description": "Display name for the pass",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "waterList",
+      "description": "List all water bodies in the scene",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "waterCreate",
+      "description": "Create a water body actor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "waterType",
+          "type": "string",
+          "description": "Type: Ocean/River/Lake/Custom",
+          "required": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name",
+          "required": false
+        },
+        {
+          "name": "location",
+          "type": "object",
+          "description": "Location {x,y,z}",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "waterSetProperties",
+      "description": "Set water body properties",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Water body actor name",
+          "required": true
+        },
+        {
+          "name": "waveAmplitude",
+          "type": "number",
+          "description": "Wave amplitude",
+          "required": false
+        },
+        {
+          "name": "waveFrequency",
+          "type": "number",
+          "description": "Wave frequency",
+          "required": false
+        },
+        {
+          "name": "opacity",
+          "type": "number",
+          "description": "Water opacity",
+          "required": false
+        },
+        {
+          "name": "maxWaveHeight",
+          "type": "number",
+          "description": "Maximum wave height",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "sCGetStatus",
+      "description": "Get source control status for files",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "paths",
+          "type": "array",
+          "description": "Array of file paths to check",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sCCheckout",
+      "description": "Check out files from source control",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "paths",
+          "type": "array",
+          "description": "Array of file paths to check out",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sCSubmit",
+      "description": "Submit files to source control",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "paths",
+          "type": "array",
+          "description": "Array of file paths to submit",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Changelist description",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sCRevert",
+      "description": "Revert files in source control",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "paths",
+          "type": "array",
+          "description": "Array of file paths to revert",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "sCHistory",
+      "description": "Get source control history for a file",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "File path",
+          "required": true
+        },
+        {
+          "name": "maxRevisions",
+          "type": "number",
+          "description": "Max revisions to return (default 10)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "replicationGetSettings",
+      "description": "Get replication settings for an actor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "replicationSetSettings",
+      "description": "Set replication settings for an actor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "replicates",
+          "type": "boolean",
+          "description": "Enable replication",
+          "required": false
+        },
+        {
+          "name": "alwaysRelevant",
+          "type": "boolean",
+          "description": "Always relevant to all clients",
+          "required": false
+        },
+        {
+          "name": "replicateMovement",
+          "type": "boolean",
+          "description": "Replicate movement",
+          "required": false
+        },
+        {
+          "name": "netUpdateFrequency",
+          "type": "number",
+          "description": "Net update frequency (Hz)",
+          "required": false
+        },
+        {
+          "name": "netCullDistance",
+          "type": "number",
+          "description": "Net cull distance (units)",
+          "required": false
+        },
+        {
+          "name": "netPriority",
+          "type": "number",
+          "description": "Net priority",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "replicationList",
+      "description": "List all replicated actors in the scene",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "controlRigList",
+      "description": "List all Control Rig assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "controlRigCreate",
+      "description": "Create a Control Rig asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Rig name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Rigs)",
+          "required": false
+        },
+        {
+          "name": "skeletonPath",
+          "type": "string",
+          "description": "Path to skeleton asset",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "controlRigAddControl",
+      "description": "Add a control to a Control Rig",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "rigPath",
+          "type": "string",
+          "description": "Path to Control Rig asset",
+          "required": true
+        },
+        {
+          "name": "controlName",
+          "type": "string",
+          "description": "Control name",
+          "required": true
+        },
+        {
+          "name": "controlType",
+          "type": "string",
+          "description": "Type: Float/Vector2D/Position/Rotator/Scale/Transform/Bool",
+          "required": false
+        },
+        {
+          "name": "parentBone",
+          "type": "string",
+          "description": "Parent bone name",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "controlRigAddBone",
+      "description": "Add a bone to a Control Rig hierarchy",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "rigPath",
+          "type": "string",
+          "description": "Path to Control Rig asset",
+          "required": true
+        },
+        {
+          "name": "boneName",
+          "type": "string",
+          "description": "Bone name",
+          "required": true
+        },
+        {
+          "name": "parentBone",
+          "type": "string",
+          "description": "Parent bone name",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "controlRigGetGraph",
+      "description": "Get the hierarchy of a Control Rig",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "rigPath",
+          "type": "string",
+          "description": "Path to Control Rig asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "chaosCreateGeometryCollection",
+      "description": "Create a Geometry Collection from a static mesh",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "meshPath",
+          "type": "string",
+          "description": "Path to source static mesh",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Geometry Collection name",
+          "required": false
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Destruction)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "chaosFracture",
+      "description": "Apply fracture pattern to a Geometry Collection",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "collectionPath",
+          "type": "string",
+          "description": "Path to Geometry Collection",
+          "required": true
+        },
+        {
+          "name": "fractureType",
+          "type": "string",
+          "description": "Type: Uniform/Clustered/Radial/Planar",
+          "required": false
+        },
+        {
+          "name": "numPieces",
+          "type": "number",
+          "description": "Number of fracture pieces (default 10)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "chaosSpawnField",
+      "description": "Add a destruction field to the scene",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "fieldType",
+          "type": "string",
+          "description": "Type: RadialFalloff/RadialVector/UniformVector/Noise",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "object",
+          "description": "Location {x,y,z}",
+          "required": false
+        },
+        {
+          "name": "magnitude",
+          "type": "number",
+          "description": "Field magnitude",
+          "required": false
+        },
+        {
+          "name": "radius",
+          "type": "number",
+          "description": "Field radius",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "chaosList",
+      "description": "List all Geometry Collections and destruction fields",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "inputCreateAction",
+      "description": "Create an Enhanced Input Action asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Action name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Input)",
+          "required": false
+        },
+        {
+          "name": "valueType",
+          "type": "string",
+          "description": "Type: Bool/Float/Vector2D/Vector3D",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "inputCreateMappingContext",
+      "description": "Create an Input Mapping Context asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Context name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Input)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "inputAddMapping",
+      "description": "Add a key mapping to an Input Mapping Context",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "contextPath",
+          "type": "string",
+          "description": "Path to Input Mapping Context",
+          "required": true
+        },
+        {
+          "name": "actionPath",
+          "type": "string",
+          "description": "Path to Input Action",
+          "required": true
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "description": "Key name (e.g. W, SpaceBar, LeftMouseButton)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "inputListActions",
+      "description": "List all Enhanced Input assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "liveLinkGetStatus",
+      "description": "Get Live Link status and connected sources",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "liveLinkAddSource",
+      "description": "Add a Live Link source",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "sourceType",
+          "type": "string",
+          "description": "Source type: FreeD/MessageBus/MVN/OptiTrack",
+          "required": true
+        },
+        {
+          "name": "connectionString",
+          "type": "string",
+          "description": "Connection address or identifier",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "liveLinkRemoveSource",
+      "description": "Remove a Live Link source",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "sourceName",
+          "type": "string",
+          "description": "Source name to remove",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "liveLinkListSources",
+      "description": "List all Live Link subjects",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "mediaCreatePlayer",
+      "description": "Create a Media Player and associated assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Player name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Media)",
+          "required": false
+        },
+        {
+          "name": "createTexture",
+          "type": "boolean",
+          "description": "Also create a MediaTexture (default true)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "mediaCreateSource",
+      "description": "Create a Media Source asset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Source name",
+          "required": true
+        },
+        {
+          "name": "sourceType",
+          "type": "string",
+          "description": "Type: File/Stream/Image/Platform",
+          "required": false
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path (default /Game/Media)",
+          "required": false
+        },
+        {
+          "name": "mediaPath",
+          "type": "string",
+          "description": "Path to media file or stream URL",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "mediaList",
+      "description": "List all media assets (players, sources, textures)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "mediaSetSource",
+      "description": "Set the source on a Media Player",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "playerPath",
+          "type": "string",
+          "description": "Path to Media Player asset",
+          "required": true
+        },
+        {
+          "name": "sourcePath",
+          "type": "string",
+          "description": "Path to Media Source asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "controlRigSetupIK",
+      "description": "Set up an IK chain in a Control Rig",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "parameters": [
+        {
+          "name": "rigPath",
+          "type": "string",
+          "description": "Path to Control Rig asset",
+          "required": true
+        },
+        {
+          "name": "chainName",
+          "type": "string",
+          "description": "IK chain name",
+          "required": true
+        },
+        {
+          "name": "startBone",
+          "type": "string",
+          "description": "Start bone name",
+          "required": true
+        },
+        {
+          "name": "endBone",
+          "type": "string",
+          "description": "End bone name",
+          "required": true
+        },
+        {
+          "name": "solverType",
+          "type": "string",
+          "description": "Solver: FABRIK/CCDIK/TwoBone",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "inputListMappingContexts",
+      "description": "List all Input Mapping Context assets",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
     }
   ]
 }

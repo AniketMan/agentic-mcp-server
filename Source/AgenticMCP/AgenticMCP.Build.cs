@@ -66,7 +66,27 @@ public class AgenticMCP : ModuleRules
 			"PropertyEditor",     // Property editing for settings
 			"EditorStyle",        // Editor style for widget inspection
 			"OculusXRHMD",        // Meta XR HMD APIs
-			"OculusXRInput"       // Meta XR Input/Hand tracking APIs
+			"OculusXRInput",      // Meta XR Input/Hand tracking APIs
+			"ControlRig",         // Control Rig editing APIs
+			"RigVM",              // Rig VM for Control Rig execution
+			"GeometryCollectionEngine", // Chaos Geometry Collection
+			"ChaosSolverEngine",  // Chaos destruction solver
+			"FieldSystemEngine",  // Chaos field system (radial/vector fields)
+			"EnhancedInput",      // Enhanced Input system
+			"LiveLinkInterface",  // Live Link base interfaces
+			"LiveLink",           // Live Link runtime
+			"MediaAssets",        // Media Player, Media Source, Media Texture
+			"MovieRenderPipelineRenderPasses", // MRG render passes
+			"ClothingSystemRuntimeInterface", // Cloth simulation interfaces
+			"GameplayAbilities",  // Gameplay Ability System
+			"GameplayTags",       // Gameplay Tags (used by GAS)
+			"MassEntity",         // Mass Entity framework
+			"InterchangeCore",    // Interchange pipeline core
+			"InterchangeEngine",  // Interchange pipeline engine
+			"VCamCore",           // Virtual Camera core
+			"VariantManagerContent", // Variant Manager content types
+			"Composure",          // Composure compositing
+			"Water"               // Water system
 		});
 
 		// ---- Conditionally available modules ----

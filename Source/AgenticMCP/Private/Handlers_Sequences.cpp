@@ -41,6 +41,10 @@
 // ============================================================
 FString FAgenticMCPServer::HandleListSequences(const FString& Body)
 {
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+
     TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
     TArray<TSharedPtr<FJsonValue>> SequencesArray;
 

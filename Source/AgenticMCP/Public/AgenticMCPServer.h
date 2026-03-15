@@ -660,4 +660,68 @@ private:
 
 	// ---- Story (auto-generated declarations) ----
 
+
+	// --- New subsystem handlers ---
+	FString HandleMRGGetStatus(const FString& Body);
+	FString HandleMRGCreateConfig(const FString& Body);
+	FString HandleMRGRender(const FString& Body);
+	FString HandleMRGListConfigs(const FString& Body);
+	FString HandleClothList(const FString& Body);
+	FString HandleClothCreateAsset(const FString& Body);
+	FString HandleClothSetConfig(const FString& Body);
+	FString HandleGASList(const FString& Body);
+	FString HandleGASCreateAbility(const FString& Body);
+	FString HandleGASCreateEffect(const FString& Body);
+	FString HandleGASAddModifier(const FString& Body);
+	FString HandleMassList(const FString& Body);
+	FString HandleMassCreateConfig(const FString& Body);
+	FString HandleMassAddTrait(const FString& Body);
+	FString HandleInterchangeGetStatus(const FString& Body);
+	FString HandleInterchangeImport(const FString& Body);
+	FString HandleInterchangeExport(const FString& Body);
+	FString HandleVCamList(const FString& Body);
+	FString HandleVCamCreate(const FString& Body);
+	FString HandleVCamAddModifier(const FString& Body);
+	FString HandleVariantList(const FString& Body);
+	FString HandleVariantCreate(const FString& Body);
+	FString HandleVariantAddSet(const FString& Body);
+	FString HandleVariantAddVariant(const FString& Body);
+	FString HandleComposureList(const FString& Body);
+	FString HandleComposureCreateElement(const FString& Body);
+	FString HandleComposureAddPass(const FString& Body);
+	FString HandleWaterList(const FString& Body);
+	FString HandleWaterCreate(const FString& Body);
+	FString HandleWaterSetProperties(const FString& Body);
+	FString HandleSCGetStatus(const FString& Body);
+	FString HandleSCCheckout(const FString& Body);
+	FString HandleSCSubmit(const FString& Body);
+	FString HandleSCRevert(const FString& Body);
+	FString HandleSCHistory(const FString& Body);
+	FString HandleReplicationGetSettings(const FString& Body);
+	FString HandleReplicationSetSettings(const FString& Body);
+	FString HandleReplicationList(const FString& Body);
+	FString HandleControlRigList(const FString& Body);
+	FString HandleControlRigCreate(const FString& Body);
+	FString HandleControlRigGetGraph(const FString& Body);
+	FString HandleControlRigAddControl(const FString& Body);
+	FString HandleControlRigAddBone(const FString& Body);
+	FString HandleControlRigSetupIK(const FString& Body);
+	FString HandleChaosList(const FString& Body);
+	FString HandleChaosCreateGeometryCollection(const FString& Body);
+	FString HandleChaosFracture(const FString& Body);
+	FString HandleChaosSpawnField(const FString& Body);
+	FString HandleInputListActions(const FString& Body);
+	FString HandleInputListMappingContexts(const FString& Body);
+	FString HandleInputCreateAction(const FString& Body);
+	FString HandleInputCreateMappingContext(const FString& Body);
+	FString HandleInputAddMapping(const FString& Body);
+	FString HandleLiveLinkGetStatus(const FString& Body);
+	FString HandleLiveLinkListSources(const FString& Body);
+	FString HandleLiveLinkAddSource(const FString& Body);
+	FString HandleLiveLinkRemoveSource(const FString& Body);
+	FString HandleMediaList(const FString& Body);
+	FString HandleMediaCreatePlayer(const FString& Body);
+	FString HandleMediaCreateSource(const FString& Body);
+	FString HandleMediaSetSource(const FString& Body);
+
 };

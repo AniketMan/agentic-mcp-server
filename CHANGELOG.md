@@ -6,7 +6,7 @@ All notable changes to AgenticMCP are documented in this file.
 
 ### Summary
 
-Full mutation coverage for every major Unreal Engine 5.6 editor subsystem. The plugin went from 192 read-heavy tools to 329 tools with complete CRUD across all subsystems. Every handler now has proper error handling via `MakeErrorJson`. All deprecated UE API calls have been replaced.
+Full mutation coverage for every major Unreal Engine 5.6 editor subsystem. The plugin went from 192 read-heavy tools to 390 tools with complete CRUD across all subsystems. Every handler now has proper error handling via `MakeErrorJson`. All deprecated UE API calls have been replaced.
 
 ### Added
 
@@ -200,10 +200,10 @@ Full mutation coverage for every major Unreal Engine 5.6 editor subsystem. The p
 
 ### Changed
 
-- `tool-registry.json` updated from 192 to 329 tools
+- `tool-registry.json` updated from 192 to 390 tools
 - `CAPABILITIES.md` rewritten to reflect full CRUD coverage across all 32 subsystem categories
 - `README.md` rewritten with complete tool inventory
-- `SYSTEM.md` updated to reference 329 tools
+- `SYSTEM.md` updated to reference 390 tools
 - `Build.cs` updated with `MovieRenderPipelineCore` and `BehaviorTreeEditor` module dependencies
 - Compatibility narrowed from "5.4 through 5.7+" to "5.6" to match validated API surface
 

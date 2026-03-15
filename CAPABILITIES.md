@@ -4,7 +4,7 @@ This document is the **permanent capabilities manifest** for the AgenticMCP plug
 
 Do not guess. Do not hallucinate capabilities. If it is not listed here, it is not available.
 
-**329 tools. Full read-write access to every major Unreal Engine 5.6 editor subsystem.**
+**390 tools. Full read-write access to every major Unreal Engine 5.6 editor subsystem.**
 
 ---
 

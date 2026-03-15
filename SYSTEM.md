@@ -14,7 +14,7 @@ You receive the following context when generating a plan:
 |--------|-------------|-----------|
 | `source_truth/` | User-provided project files (script, asset map, filesystem, naming conventions) | Highest -- always wins |
 | `ARCHITECTURE.md` | System architecture and tool capabilities | Reference |
-| `tool-registry.json` | Complete list of 329 tools with parameters and descriptions | Reference |
+| `tool-registry.json` | Complete list of 390 tools with parameters and descriptions | Reference |
 | Execution feedback | Success/failure reports from previous plan attempts | Feedback |
 
 ## What You Produce

@@ -25,6 +25,10 @@
 // ============================================================
 FString FAgenticMCPServer::HandleBuildGetStatus(const FString& Body)
 {
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Check if a build is in progress

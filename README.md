@@ -2,7 +2,7 @@
 
 A dual-path MCP (Model Context Protocol) server for Unreal Engine 5.6. Gives AI agents full read-write access to every major editor subsystem -- Blueprints, Sequencer, Materials, Niagara, Landscape, Animation, AI, Audio, Lighting, PCG, Physics, UMG, and more -- with an offline fallback when the editor is not running.
 
-**329 tools. 44 handler files. 27,000+ lines of C++. Full CRUD across every subsystem.**
+**390 tools. 44 handler files. 27,000+ lines of C++. Full CRUD across every subsystem.**
 
 ## What Makes This Different
 
