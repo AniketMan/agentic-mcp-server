@@ -18,6 +18,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPAudio, Log, All);
 
 FString FAgenticMCPServer::HandleAudioGetStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine)
+	{
+		return MakeErrorJson(TEXT("Engine not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> StatusObj = MakeShared<FJsonObject>();
 
@@ -72,6 +76,10 @@ FString FAgenticMCPServer::HandleAudioListActiveSounds(const TMap<FString, FStri
 
 FString FAgenticMCPServer::HandleAudioGetDeviceInfo(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine)
+	{
+		return MakeErrorJson(TEXT("Engine not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> DevicesArray;
 
@@ -89,6 +97,10 @@ FString FAgenticMCPServer::HandleAudioGetDeviceInfo(const TMap<FString, FString>
 
 FString FAgenticMCPServer::HandleAudioListSoundClasses(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine)
+	{
+		return MakeErrorJson(TEXT("Engine not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> ClassesArray;
 
@@ -392,6 +404,10 @@ FString FAgenticMCPServer::HandleAudioSetListener(const TMap<FString, FString>& 
 
 FString FAgenticMCPServer::HandleAudioDebugVisualize(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEditor || !GEditor->GetEditorWorldContext().World())
+	{
+		return MakeErrorJson(TEXT("No editor world available"));
+	}
 	TSharedPtr<FJsonObject> JsonBody = ParseBodyJson(Body);
 	bool bEnable = true;
 	if (JsonBody.IsValid())

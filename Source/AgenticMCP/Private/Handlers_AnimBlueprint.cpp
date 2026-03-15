@@ -33,6 +33,10 @@
 // ============================================================
 FString FAgenticMCPServer::HandleAnimBPList(const FString& Body)
 {
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 
@@ -162,6 +166,10 @@ FString FAgenticMCPServer::HandleAnimBPGetGraph(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleAnimBPListMontages(const FString& Body)
 {
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 

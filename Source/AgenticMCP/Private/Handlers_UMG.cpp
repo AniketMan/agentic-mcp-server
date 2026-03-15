@@ -36,6 +36,10 @@
 // ============================================================
 FString FAgenticMCPServer::HandleUMGListWidgets(const FString& Body)
 {
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
 	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	IAssetRegistry& AR = ARM.Get();
 

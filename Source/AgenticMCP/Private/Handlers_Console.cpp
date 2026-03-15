@@ -148,6 +148,10 @@ FString FAgenticMCPServer::HandleSetCVar(const TMap<FString, FString>& Params, c
 
 FString FAgenticMCPServer::HandleListCVars(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!IConsoleManager::IsAvailable())
+	{
+		return MakeErrorJson(TEXT("Console manager not available"));
+	}
 	TSharedPtr<FJsonObject> BodyJson = ParseBodyJson(Body);
 
 	FString Filter;

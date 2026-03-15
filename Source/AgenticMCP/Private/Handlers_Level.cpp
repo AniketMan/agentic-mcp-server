@@ -359,6 +359,10 @@ FString FAgenticMCPServer::HandleSetStreamingLevelVisibility(const FString& Body
 
 FString FAgenticMCPServer::HandleGetOutputLog(const FString& Body)
 {
+	if (!GLog)
+	{
+		return MakeErrorJson(TEXT("Log system not available"));
+	}
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 
 	int32 NumLines = 50;

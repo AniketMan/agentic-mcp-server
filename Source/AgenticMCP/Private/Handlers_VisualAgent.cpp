@@ -1554,6 +1554,10 @@ FString FAgenticMCPServer::HandleRestoreState(const FString& Body)
 
 FString FAgenticMCPServer::HandleListStates(const FString& Body)
 {
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
 	TArray<TSharedPtr<FJsonValue>> StatesArray;
 
 	for (const auto& Pair : SavedSnapshots)

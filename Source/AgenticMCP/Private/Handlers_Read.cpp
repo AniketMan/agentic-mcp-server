@@ -35,6 +35,10 @@
 
 FString FAgenticMCPServer::HandleList(const TMap<FString, FString>& Params)
 {
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
 	FString Filter = Params.Contains(TEXT("filter")) ? Params[TEXT("filter")] : TEXT("");
 	FString Type = Params.Contains(TEXT("type")) ? Params[TEXT("type")] : TEXT("all");
 

@@ -17,6 +17,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPPixelStreaming, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingGetStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	{
+		return MakeErrorJson(TEXT("PixelStreaming module not loaded"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	bool bModuleLoaded = FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming"));

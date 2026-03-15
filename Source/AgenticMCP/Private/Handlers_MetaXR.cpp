@@ -14,6 +14,10 @@
 
 FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine || !GEngine->XRSystem.IsValid())
+	{
+		return MakeErrorJson(TEXT("XR system not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Device info
@@ -100,6 +104,10 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 
 FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine || !GEngine->XRSystem.IsValid())
+	{
+		return MakeErrorJson(TEXT("XR system not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Guardian status
@@ -178,6 +186,10 @@ FString FAgenticMCPServer::HandleXRSetGuardianVisibility(const TMap<FString, FSt
 
 FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine || !GEngine->XRSystem.IsValid())
+	{
+		return MakeErrorJson(TEXT("XR system not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Check if hand tracking is enabled
@@ -248,6 +260,10 @@ FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Pa
 
 FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine || !GEngine->XRSystem.IsValid())
+	{
+		return MakeErrorJson(TEXT("XR system not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Left controller
@@ -273,6 +289,10 @@ FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Par
 
 FString FAgenticMCPServer::HandleXRPassthrough(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine || !GEngine->XRSystem.IsValid())
+	{
+		return MakeErrorJson(TEXT("XR system not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	bool bSupported = UOculusXRFunctionLibrary::IsPassthroughSupported();
@@ -385,6 +405,10 @@ FString FAgenticMCPServer::HandleXRSetPerformanceLevels(const TMap<FString, FStr
 
 FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEngine || !GEngine->XRSystem.IsValid())
+	{
+		return MakeErrorJson(TEXT("XR system not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Reset position and rotation to current HMD pose

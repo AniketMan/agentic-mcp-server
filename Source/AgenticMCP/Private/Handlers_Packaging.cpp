@@ -90,6 +90,10 @@ FString FAgenticMCPServer::HandleBuildLighting(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSourceControlGetStatus(const FString& Body)
 {
+	if (!ISourceControlModule::Get().IsEnabled())
+	{
+		return MakeErrorJson(TEXT("Source control not enabled"));
+	}
 	ISourceControlModule& SCModule = ISourceControlModule::Get();
 	ISourceControlProvider& Provider = SCModule.GetProvider();
 

@@ -26,6 +26,10 @@
 // ============================================================
 FString FAgenticMCPServer::HandleSettingsGetProject(const FString& Body)
 {
+	if (!GetDefault<UGeneralProjectSettings>())
+	{
+		return MakeErrorJson(TEXT("Project settings not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// General project settings
@@ -58,6 +62,10 @@ FString FAgenticMCPServer::HandleSettingsGetProject(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSettingsGetEditor(const FString& Body)
 {
+	if (!GetMutableDefault<UEditorPerProjectUserSettings>())
+	{
+		return MakeErrorJson(TEXT("Editor settings not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	// Experimental settings
@@ -81,6 +89,10 @@ FString FAgenticMCPServer::HandleSettingsGetEditor(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSettingsGetRendering(const FString& Body)
 {
+	if (!GetDefault<URendererSettings>())
+	{
+		return MakeErrorJson(TEXT("Renderer settings not available"));
+	}
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 
 	const URendererSettings* RenderSettings = GetDefault<URendererSettings>();
@@ -102,6 +114,10 @@ FString FAgenticMCPServer::HandleSettingsGetRendering(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSettingsGetPlugins(const FString& Body)
 {
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
 	TSharedPtr<FJsonObject> BodyJson = ParseBodyJson(Body);
 	FString Filter;
 	bool bEnabledOnly = false;
