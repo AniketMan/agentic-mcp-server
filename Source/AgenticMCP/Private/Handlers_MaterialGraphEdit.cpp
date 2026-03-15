@@ -23,7 +23,7 @@
 #include "Materials/MaterialExpressionTextureCoordinate.h"
 #include "Materials/MaterialExpressionAdd.h"
 #include "Materials/MaterialExpressionMultiply.h"
-#include "Materials/MaterialExpressionLerp.h"
+#include "Materials/MaterialExpressionLinearInterpolate.h"
 #include "Materials/MaterialExpressionConstant.h"
 #include "Materials/MaterialExpressionConstant3Vector.h"
 #include "Materials/MaterialExpressionConstant4Vector.h"
@@ -188,7 +188,7 @@ FString FAgenticMCPServer::HandleMaterialAddNode(const FString& Body)
 	}
 	else if (NodeType == TEXT("Lerp"))
 	{
-		NewExpr = NewObject<UMaterialExpressionLerp>(Material);
+		NewExpr = NewObject<UMaterialExpressionLinearInterpolate>(Material);
 	}
 	else if (NodeType == TEXT("Constant"))
 	{

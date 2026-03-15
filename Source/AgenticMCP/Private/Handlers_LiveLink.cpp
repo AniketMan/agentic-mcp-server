@@ -73,9 +73,6 @@ FString FAgenticMCPServer::HandleLiveLinkListSources(const FString& Body)
 
     FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
     GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
-    if (!Python)
-        return MakeErrorJson(TEXT("Failed to get PythonScriptPlugin"));
-    }
 
 
     FString Result;
