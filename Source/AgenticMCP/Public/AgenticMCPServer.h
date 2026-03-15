@@ -542,36 +542,16 @@ private:
 	FString HandleAnimBPListMontages(const FString& Body);
 
 	// ---- Animation (auto-generated declarations) ----
-	FString HandleAnimationPlay(const FString& Body);
-	FString HandleAnimationStop(const FString& Body);
 
 	// ---- Audio (auto-generated declarations) ----
-	FString HandleAudioDebugVisualize(const FString& Body);
-	FString HandleAudioGetDeviceInfo(const FString& Body);
-	FString HandleAudioGetStats(const FString& Body);
-	FString HandleAudioGetStatus(const FString& Body);
-	FString HandleAudioListActiveSounds(const FString& Body);
-	FString HandleAudioListSoundClasses(const FString& Body);
-	FString HandleAudioPlaySound(const FString& Body);
-	FString HandleAudioSetListener(const FString& Body);
-	FString HandleAudioSetVolume(const FString& Body);
-	FString HandleAudioStopSound(const FString& Body);
 
 	// ---- Collision (auto-generated declarations) ----
-	FString HandleCollisionTrace(const FString& Body);
 
 	// ---- Console (auto-generated declarations) ----
-	FString HandleExecuteConsole(const FString& Body);
-	FString HandleGetCVar(const FString& Body);
-	FString HandleListCVars(const FString& Body);
-	FString HandleSetCVar(const FString& Body);
 
 	// ---- DataTable (auto-generated declarations) ----
-	FString HandleDataTableRead(const FString& Body);
-	FString HandleDataTableWrite(const FString& Body);
 
 	// ---- Input (auto-generated declarations) ----
-	FString HandleSimulateInput(const FString& Body);
 
 	// ---- MaterialGraphEdit (auto-generated declarations) ----
 	FString HandleMaterialGetGraph(const FString& Body);
@@ -579,32 +559,10 @@ private:
 	FString HandleMaterialSetVector(const FString& Body);
 
 	// ---- Materials (auto-generated declarations) ----
-	FString HandleMaterialSetParam(const FString& Body);
 
 	// ---- MetaXR (auto-generated declarations) ----
-	FString HandleXRControllers(const FString& Body);
-	FString HandleXRGuardian(const FString& Body);
-	FString HandleXRHandTracking(const FString& Body);
-	FString HandleXRPassthrough(const FString& Body);
-	FString HandleXRRecenter(const FString& Body);
-	FString HandleXRSetDisplayFrequency(const FString& Body);
-	FString HandleXRSetGuardianVisibility(const FString& Body);
-	FString HandleXRSetPassthrough(const FString& Body);
-	FString HandleXRSetPerformanceLevels(const FString& Body);
-	FString HandleXRStatus(const FString& Body);
 
 	// ---- Niagara (auto-generated declarations) ----
-	FString HandleNiagaraActivateSystem(const FString& Body);
-	FString HandleNiagaraDebugHUD(const FString& Body);
-	FString HandleNiagaraGetEmitters(const FString& Body);
-	FString HandleNiagaraGetParameters(const FString& Body);
-	FString HandleNiagaraGetStats(const FString& Body);
-	FString HandleNiagaraGetStatus(const FString& Body);
-	FString HandleNiagaraGetSystemInfo(const FString& Body);
-	FString HandleNiagaraListSystems(const FString& Body);
-	FString HandleNiagaraResetSystem(const FString& Body);
-	FString HandleNiagaraSetEmitterEnable(const FString& Body);
-	FString HandleNiagaraSetParameter(const FString& Body);
 
 	// ---- PCG (auto-generated declarations) ----
 	FString HandlePCGCleanup(const FString& Body);
@@ -613,35 +571,13 @@ private:
 	FString HandlePCGSetSeed(const FString& Body);
 
 	// ---- PIE (auto-generated declarations) ----
-	FString HandleGetPIEState(const FString& Body);
-	FString HandlePausePIE(const FString& Body);
-	FString HandleStartPIE(const FString& Body);
-	FString HandleStepPIE(const FString& Body);
-	FString HandleStopPIE(const FString& Body);
 
 	// ---- PixelStreaming (auto-generated declarations) ----
-	FString HandlePixelStreamingGetCodec(const FString& Body);
-	FString HandlePixelStreamingGetStatus(const FString& Body);
-	FString HandlePixelStreamingListPlayers(const FString& Body);
-	FString HandlePixelStreamingListStreamers(const FString& Body);
-	FString HandlePixelStreamingSetCodec(const FString& Body);
-	FString HandlePixelStreamingStart(const FString& Body);
-	FString HandlePixelStreamingStop(const FString& Body);
 
 	// ---- Read (auto-generated declarations) ----
-	FString HandleFindReferences(const FString& Body);
-	FString HandleGetBlueprint(const FString& Body);
-	FString HandleGetGraph(const FString& Body);
-	FString HandleList(const FString& Body);
-	FString HandleSearch(const FString& Body);
 
 	// ---- RenderDoc (auto-generated declarations) ----
-	FString HandleRenderDocCapture(const FString& Body);
 
 	// ---- Story (auto-generated declarations) ----
-	FString HandleStoryAdvance(const FString& Body);
-	FString HandleStoryGoto(const FString& Body);
-	FString HandleStoryPlay(const FString& Body);
-	FString HandleStoryState(const FString& Body);
 
 };
