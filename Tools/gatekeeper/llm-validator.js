@@ -4,10 +4,11 @@
  * Uses a small local model via llama.cpp HTTP server to validate
  * the semantic correctness of plan steps against UE API docs.
  * 
- * Three llama.cpp servers must be running (see models/start-all.bat):
- *   - Validator:  port 8080  (Llama 3.2 3B Instruct Q4_K_M)
- *   - Worker:     port 8081  (Llama 3.1 8B Instruct Q4_K_M)
- *   - QA Auditor: port 8082  (Llama 3.2 3B Instruct Q4_K_M)
+ * Four inference servers must be running (see models/start-all.bat):
+ *   - Validator:         port 8080  (Llama 3.2 3B Instruct Q4_K_M via llama.cpp)
+ *   - Worker:            port 8081  (Llama 3.1 8B Instruct Q4_K_M via llama.cpp)
+ *   - QA Auditor:        port 8082  (Llama 3.2 3B Instruct Q4_K_M via llama.cpp)
+ *   - Spatial Reasoner:  port 8083  (Cosmos Reason2 2B INT8 via vLLM)
  *
  * System prompts are loaded from models/instructions/*.md and injected
  * per-request via the /v1/chat/completions endpoint (system role message).
@@ -19,10 +20,11 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Three inference endpoints -- one per role
+// Four inference endpoints -- one per role
 const VALIDATOR_URL  = process.env.LLAMA_VALIDATOR_URL  || 'http://localhost:8080';
 const WORKER_URL     = process.env.LLAMA_WORKER_URL     || 'http://localhost:8081';
 const QA_AUDITOR_URL = process.env.LLAMA_QA_AUDITOR_URL || 'http://localhost:8082';
+const SPATIAL_URL    = process.env.COSMOS_SPATIAL_URL    || 'http://localhost:8083';
 
 // Legacy fallback: if LLAMA_CPP_URL is set, use it for all roles
 const LLAMA_CPP_URL = process.env.LLAMA_CPP_URL || null;
@@ -32,7 +34,7 @@ const MAX_RETRIES = parseInt(process.env.MAX_WORKER_RETRIES || '3', 10);
 // Load instruction MDs for each role (injected as system prompt per-request)
 const INSTRUCTIONS_DIR = join(__dirname, '..', '..', 'models', 'instructions');
 const ROLE_INSTRUCTIONS = {};
-for (const [role, file] of [['validator', 'validator.md'], ['worker', 'worker.md'], ['qa', 'qa-auditor.md']]) {
+for (const [role, file] of [['validator', 'validator.md'], ['worker', 'worker.md'], ['qa', 'qa-auditor.md'], ['spatial', 'spatial-reasoner.md']]) {
   const path = join(INSTRUCTIONS_DIR, file);
   if (existsSync(path)) {
     ROLE_INSTRUCTIONS[role] = readFileSync(path, 'utf-8');
@@ -113,6 +115,7 @@ function getUrlForRole(role = 'worker') {
   switch (role) {
     case 'validator':  return VALIDATOR_URL;
     case 'qa':         return QA_AUDITOR_URL;
+    case 'spatial':    return SPATIAL_URL;
     case 'worker':
     default:           return WORKER_URL;
   }
@@ -290,9 +293,64 @@ async function executeWithConfidenceGate(step, toolDef) {
   };
 }
 
+/**
+ * Run spatial analysis on a screenshot via Cosmos Reason2.
+ * Accepts a base64-encoded image and a question about the scene.
+ * Returns natural language analysis of spatial/physics issues.
+ */
+async function runSpatialAnalysis(imageBase64, question) {
+  const systemPrompt = ROLE_INSTRUCTIONS['spatial'] || 'You are a spatial reasoning agent. Analyze the image for physics, spatial, and lighting issues.';
+  const url = getUrlForRole('spatial');
+
+  try {
+    const resp = await fetch(`${url}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'nvidia/Cosmos-Reason2-2B',
+        messages: [
+          { role: 'system', content: [{ type: 'text', text: systemPrompt }] },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } },
+            { type: 'text', text: question },
+          ]},
+        ],
+        max_tokens: 1024,
+        temperature: 0.2,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Spatial server returned ${resp.status}`);
+    }
+
+    const result = await resp.json();
+    const content = result.choices?.[0]?.message?.content?.trim();
+    return { success: true, analysis: content };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Check if the Spatial Reasoner (Cosmos Reason2) is available.
+ */
+async function isSpatialAvailable() {
+  try {
+    const url = getUrlForRole('spatial');
+    const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
 export {
   isLLMAvailable,
+  isSpatialAvailable,
   runWorkerInference,
+  runSpatialAnalysis,
   executeWithConfidenceGate,
   loadContextForTool,
   getUrlForRole,
@@ -302,4 +360,5 @@ export {
   VALIDATOR_URL,
   WORKER_URL,
   QA_AUDITOR_URL,
+  SPATIAL_URL,
 };
