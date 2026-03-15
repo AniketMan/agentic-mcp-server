@@ -1465,6 +1465,196 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleSequencerRender(Body);
 	});
+	HandlerMap.Add(TEXT("sequencerDeleteTrack"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerDeleteTrack(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerGetKeyframes"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerGetKeyframes(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerAddSpawnable"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerAddSpawnable(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerMoveSection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerMoveSection(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerDuplicateSection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerDuplicateSection(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerSetTrackMute"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerSetTrackMute(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerAddSubSequence"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerAddSubSequence(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerAddFade"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerAddFade(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerSetAudioSection"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerSetAudioSection(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerSetEventPayload"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerSetEventPayload(Body);
+	});
+	HandlerMap.Add(TEXT("sequencerRenderStatus"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleSequencerRenderStatus(Body);
+	});
+
+	// ---- Material Graph Mutation Handlers ----
+	HandlerMap.Add(TEXT("materialAddNode"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialAddNode(Body);
+	});
+	HandlerMap.Add(TEXT("materialDeleteNode"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialDeleteNode(Body);
+	});
+	HandlerMap.Add(TEXT("materialConnectPins"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialConnectPins(Body);
+	});
+	HandlerMap.Add(TEXT("materialDisconnectPin"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialDisconnectPin(Body);
+	});
+	HandlerMap.Add(TEXT("materialSetTextureParam"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialSetTextureParam(Body);
+	});
+	HandlerMap.Add(TEXT("materialCreateInstance"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialCreateInstance(Body);
+	});
+	HandlerMap.Add(TEXT("materialAssignToActor"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleMaterialAssignToActor(Body);
+	});
+
+	// ---- UMG Widget Mutation Handlers ----
+	HandlerMap.Add(TEXT("umgCreateWidget"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGCreateWidget(Body);
+	});
+	HandlerMap.Add(TEXT("umgAddChild"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGAddChild(Body);
+	});
+	HandlerMap.Add(TEXT("umgRemoveChild"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGRemoveChild(Body);
+	});
+	HandlerMap.Add(TEXT("umgSetWidgetProperty"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGSetWidgetProperty(Body);
+	});
+	HandlerMap.Add(TEXT("umgBindEvent"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGBindEvent(Body);
+	});
+	HandlerMap.Add(TEXT("umgGetWidgetChildren"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleUMGGetWidgetChildren(Body);
+	});
+
+	// ---- Animation Blueprint Mutation Handlers ----
+	HandlerMap.Add(TEXT("animBPAddState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPAddState(Body);
+	});
+	HandlerMap.Add(TEXT("animBPRemoveState"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPRemoveState(Body);
+	});
+	HandlerMap.Add(TEXT("animBPAddTransition"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPAddTransition(Body);
+	});
+	HandlerMap.Add(TEXT("animBPSetTransitionRule"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPSetTransitionRule(Body);
+	});
+	HandlerMap.Add(TEXT("animBPSetStateAnimation"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPSetStateAnimation(Body);
+	});
+	HandlerMap.Add(TEXT("animBPGetStateMachine"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPGetStateMachine(Body);
+	});
+	HandlerMap.Add(TEXT("animBPAddBlendNode"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleAnimBPAddBlendNode(Body);
+	});
+
+	// ---- AI / Behavior Tree Mutation Handlers ----
+	HandlerMap.Add(TEXT("btAddTask"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTAddTask(Body);
+	});
+	HandlerMap.Add(TEXT("btAddComposite"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTAddComposite(Body);
+	});
+	HandlerMap.Add(TEXT("btRemoveNode"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTRemoveNode(Body);
+	});
+	HandlerMap.Add(TEXT("btAddDecorator"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTAddDecorator(Body);
+	});
+	HandlerMap.Add(TEXT("btAddService"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTAddService(Body);
+	});
+	HandlerMap.Add(TEXT("btSetBlackboardValue"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTSetBlackboardValue(Body);
+	});
+	HandlerMap.Add(TEXT("btWireNodes"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTWireNodes(Body);
+	});
+	HandlerMap.Add(TEXT("btGetTree"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBTGetTree(Body);
+	});
+
+	// ---- Component Manipulation Handlers ----
+	HandlerMap.Add(TEXT("componentList"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleComponentList(Body);
+	});
+	HandlerMap.Add(TEXT("componentRemove"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleComponentRemove(Body);
+	});
+	HandlerMap.Add(TEXT("componentSetProperty"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleComponentSetProperty(Body);
+	});
+	HandlerMap.Add(TEXT("componentSetTransform"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleComponentSetTransform(Body);
+	});
+	HandlerMap.Add(TEXT("componentSetVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleComponentSetVisibility(Body);
+	});
+	HandlerMap.Add(TEXT("componentSetCollision"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleComponentSetCollision(Body);
+	});
 
 	// ---- Landscape / Foliage Handlers ----
 	HandlerMap.Add(TEXT("landscapeList"), [this](const TMap<FString, FString>& Params, const FString& Body)
