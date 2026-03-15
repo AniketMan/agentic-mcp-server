@@ -1,6 +1,6 @@
 // AgenticMCP.Build.cs
 // Module build rules for the AgenticMCP editor plugin.
-// This plugin is Editor-only — it will NOT be included in packaged builds.
+// This plugin is Editor-only -- it will NOT be included in packaged builds.
 
 using UnrealBuildTool;
 
@@ -10,7 +10,7 @@ public class AgenticMCP : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		// Allow missing modules at link time — optional subsystems (Niagara,
+		// Allow missing modules at link time -- optional subsystems (Niagara,
 		// OculusXR, PCG, etc.) may not be present in every project.
 		bPrecompile = false;
 

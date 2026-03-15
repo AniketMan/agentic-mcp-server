@@ -1,20 +1,23 @@
 # AgenticMCP
 
-A dual-path MCP (Model Context Protocol) server for Unreal Engine 5. Gives AI agents direct access to Blueprint manipulation, actor management, and level editing — with an offline fallback when the editor is not running.
+A dual-path MCP (Model Context Protocol) server for Unreal Engine 5.6. Gives AI agents full read-write access to every major editor subsystem -- Blueprints, Sequencer, Materials, Niagara, Landscape, Animation, AI, Audio, Lighting, PCG, Physics, UMG, and more -- with an offline fallback when the editor is not running.
+
+**329 tools. 44 handler files. 27,000+ lines of C++. Full CRUD across every subsystem.**
 
 ## What Makes This Different
 
-Every other UE5 MCP tool requires the editor to be running. AgenticMCP has two execution paths:
+Every other UE5 MCP tool requires the editor to be running and only covers a handful of operations. AgenticMCP has two execution paths and complete editor coverage:
 
-1. **Live Editor** — C++ plugin runs inside UE5, exposes the full UEdGraph API over HTTP. Real-time compilation, validation, and the complete tool set.
-2. **Offline Fallback** — Python binary injector reads and modifies `.umap` files directly. Works when the editor is closed. Supports reading level data, inspecting actors, and generating Blueprint paste text.
+1. **Live Editor** -- C++ plugin runs inside UE5, exposes the full UEdGraph API and every editor subsystem over HTTP. Real-time compilation, validation, and the complete tool set.
+2. **Offline Fallback** -- Python binary injector reads and modifies `.umap` files directly. Works when the editor is closed. Supports reading level data, inspecting actors, and generating Blueprint paste text.
 
 Additionally:
-- **Snapshot/Rollback** — Save graph state before destructive operations, restore if something breaks.
-- **Validation Endpoint** — Pre-compilation error checking with detailed diagnostics.
-- **Auto-Discovery** — The MCP bridge dynamically discovers tools from the C++ plugin. No hardcoded tool lists.
-- **Context Injection** — Optionally injects UE5 API documentation into tool responses so the AI agent has reference material.
-- **Async Task Queue** — Long-running operations (compilation, batch edits) run asynchronously with progress reporting.
+- **Snapshot/Rollback** -- Save graph state before destructive operations, restore if something breaks.
+- **Validation Endpoint** -- Pre-compilation error checking with detailed diagnostics.
+- **Auto-Discovery** -- The MCP bridge dynamically discovers tools from the C++ plugin. No hardcoded tool lists.
+- **Context Injection** -- Optionally injects UE5 API documentation into tool responses so the AI agent has reference material.
+- **Async Task Queue** -- Long-running operations (compilation, batch edits) run asynchronously with progress reporting.
+- **Inference-Gated Determinism** -- Three-layer architecture (Planner, Gatekeeper, Workers) ensures safe, predictable execution. See `ARCHITECTURE.md`.
 
 ## Architecture
 
@@ -117,493 +120,513 @@ Add to `.cursor/mcp.json`:
 | `AGENTIC_FALLBACK_ENABLED` | `true` | Enable offline binary injector |
 | `AGENTIC_PROJECT_ROOT` | (auto-detect) | UE project root for fallback |
 
-## HTTP API
-
-All live editor endpoints are at `http://localhost:9847/api/<endpoint>`.
-
-> **Note**: Port 9847 is the default for the editor plugin. Port 3000 is reserved for DevmateMCP.
-
-### Health and Lifecycle
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/health` | GET | Server status, asset counts |
-| `/mcp/status` | GET | Connection status for MCP bridge |
-| `/mcp/tools` | GET | Auto-discovery of all available tools |
-| `/mcp/tool/{name}` | POST | Execute a tool by name |
-
-### Blueprint Read
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/list` | GET | List Blueprints and Maps |
-| `/api/blueprint` | GET | Get Blueprint details |
-| `/api/graph` | GET | Get graph nodes and connections |
-| `/api/search` | GET | Search assets by name |
-| `/api/references` | GET | Find asset references |
-| `/api/list-classes` | POST | List UClasses |
-| `/api/list-functions` | POST | List UFunctions on a class |
-| `/api/list-properties` | POST | List UProperties on a class |
-| `/api/get-pin-info` | POST | Get pin details |
-| `/api/rescan` | GET | Force asset registry refresh |
-
-### Blueprint Mutation
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/add-node` | POST | Add a node to a graph |
-| `/api/delete-node` | POST | Delete a node |
-| `/api/connect-pins` | POST | Connect two pins |
-| `/api/disconnect-pin` | POST | Break pin connections |
-| `/api/set-pin-default` | POST | Set pin default value |
-| `/api/move-node` | POST | Move a node |
-| `/api/refresh-all-nodes` | POST | Refresh all nodes |
-| `/api/create-blueprint` | POST | Create new Blueprint |
-| `/api/create-graph` | POST | Create function/macro graph |
-| `/api/delete-graph` | POST | Delete a graph |
-| `/api/add-variable` | POST | Add a variable |
-| `/api/remove-variable` | POST | Remove a variable |
-| `/api/compile-blueprint` | POST | Compile and save |
-| `/api/set-node-comment` | POST | Set node comment |
-
-### Actor Management
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/list-actors` | POST | List actors in world |
-| `/api/get-actor` | POST | Get actor details |
-| `/api/spawn-actor` | POST | Spawn a new actor |
-| `/api/delete-actor` | POST | Delete an actor |
-| `/api/set-actor-property` | POST | Set actor property |
-| `/api/set-actor-transform` | POST | Set actor transform |
-
-### Level Management
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/list-levels` | POST | List levels |
-| `/api/load-level` | POST | Load a sublevel |
-| `/api/unload-level` | POST | Unload a sublevel |
-| `/api/get-level-blueprint` | POST | Get level blueprint |
-
-### Visual Agent / Automation
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/screenshot` | POST | Capture viewport screenshot (base64 JPEG) |
-| `/api/scene-snapshot` | POST | Get hierarchical scene tree with short refs |
-| `/api/focus-actor` | POST | Move editor camera to focus on an actor |
-| `/api/select-actor` | POST | Select actor(s) in the editor |
-| `/api/set-viewport` | POST | Set camera position and rotation |
-| `/api/move-actor` | POST | Move/transform an actor |
-| `/api/get-camera` | POST | Get current viewport camera position, rotation, FOV |
-| `/api/list-viewports` | POST | List all editor viewports with positions and types |
-| `/api/get-selection` | POST | Get currently selected actors with transforms |
-| `/api/wait-ready` | POST | Wait for assets/compile/render to complete |
-| `/api/resolve-ref` | POST | Resolve a short ref (a0, a1.c0) to actor/component |
-| `/api/draw-debug` | POST | Draw debug shapes in viewport |
-| `/api/clear-debug` | POST | Clear debug drawings |
-
-#### get-camera
-
-Returns the current editor viewport camera position, rotation, and settings.
-
-**Request:** `POST /api/get-camera`
-```json
-{}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "x": -888.39,
-  "y": 583.01,
-  "z": 237.47,
-  "pitch": -3.2,
-  "yaw": -20.2,
-  "roll": 0,
-  "fov": 90,
-  "viewMode": "Static"
-}
-```
-
-#### list-viewports
-
-Returns all available editor viewports with their positions and view types.
-
-**Request:** `POST /api/list-viewports`
-```json
-{}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "count": 4,
-  "viewports": [
-    {
-      "index": 0,
-      "isActive": false,
-      "isRealtime": false,
-      "x": -1215.38,
-      "y": 18.71,
-      "z": 285.17,
-      "pitch": 0,
-      "yaw": 0,
-      "roll": 0,
-      "fov": 90,
-      "viewType": "Right"
-    },
-    {
-      "index": 1,
-      "isActive": true,
-      "isRealtime": false,
-      "viewType": "Perspective"
-    }
-  ]
-}
-```
-
-#### get-selection
-
-Returns the currently selected actors in the editor with their transforms.
-
-**Request:** `POST /api/get-selection`
-```json
-{}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "count": 1,
-  "selected": [
-    {
-      "name": "1M_Cube10_0",
-      "label": "Table",
-      "class": "StaticMeshActor",
-      "x": 193.41,
-      "y": 262.10,
-      "z": 0,
-      "pitch": 0,
-      "yaw": 50.0,
-      "roll": 0
-    }
-  ]
-}
-```
-
-### Validation and Safety
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/validate-blueprint` | POST | Compile and validate (no save) |
-| `/api/snapshot-graph` | POST | Take graph snapshot |
-| `/api/restore-graph` | POST | Restore from snapshot |
-
-### PIE Control (Play-In-Editor)
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/start-pie` | POST | Start a PIE session (modes: SelectedViewport, NewEditorWindow, VR, MobilePreview) |
-| `/api/stop-pie` | POST | Stop the current PIE session |
-| `/api/pause-pie` | POST | Pause/resume the PIE session |
-| `/api/step-pie` | POST | Single-step the paused PIE session |
-| `/api/get-pie-state` | POST | Get PIE state (isRunning, isPaused, timeSeconds) |
-
-### Console Commands
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/execute-console` | POST | Execute a console command |
-| `/api/get-cvar` | POST | Get a console variable value |
-| `/api/set-cvar` | POST | Set a console variable value |
-
-### Audio System
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/audio/status` | GET | Get audio system status |
-| `/api/audio/active-sounds` | GET | List currently playing sounds |
-| `/api/audio/device-info` | GET | Get audio device information |
-| `/api/audio/sound-classes` | GET | List sound classes |
-| `/api/audio/set-volume` | POST | Set volume for a sound class |
-| `/api/audio/stats` | GET | Get audio statistics |
-| `/api/audio/play` | POST | Play a sound at location |
-| `/api/audio/stop` | POST | Stop a playing sound |
-| `/api/audio/set-listener` | POST | Set listener position/rotation |
-| `/api/audio/debug-visualize` | POST | Toggle audio debug visualization |
-
-### Niagara Particle Systems
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/niagara/status` | GET | Get Niagara system status |
-| `/api/niagara/systems` | GET | List active Niagara systems in the world |
-| `/api/niagara/system-info` | POST | Get detailed info about a Niagara system |
-| `/api/niagara/emitters` | POST | Get emitters for a Niagara component |
-| `/api/niagara/set-parameter` | POST | Set a Niagara parameter value |
-| `/api/niagara/get-parameters` | POST | Get all parameters for a Niagara component |
-| `/api/niagara/activate` | POST | Activate a Niagara system |
-| `/api/niagara/set-emitter-enable` | POST | Enable/disable a specific emitter |
-| `/api/niagara/reset` | POST | Reset a Niagara system |
-| `/api/niagara/stats` | GET | Get Niagara performance statistics |
-| `/api/niagara/debug-hud` | POST | Toggle Niagara debug HUD |
-
-### Pixel Streaming
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/pixelstreaming/status` | GET | Get Pixel Streaming status |
-| `/api/pixelstreaming/start` | POST | Start Pixel Streaming |
-| `/api/pixelstreaming/stop` | POST | Stop Pixel Streaming |
-| `/api/pixelstreaming/streamers` | GET | List active streamers |
-| `/api/pixelstreaming/codec` | GET | Get current codec settings |
-| `/api/pixelstreaming/set-codec` | POST | Set codec settings |
-| `/api/pixelstreaming/players` | GET | List connected players |
-
-### Level Sequences
-
-### PIE Control (Play-In-Editor)
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/start-pie` | POST | Start a PIE session (modes: SelectedViewport, NewEditorWindow, VR, MobilePreview) |
-| `/api/stop-pie` | POST | Stop the current PIE session |
-| `/api/pause-pie` | POST | Pause/resume the PIE session |
-| `/api/step-pie` | POST | Single-step the paused PIE session |
-| `/api/get-pie-state` | POST | Get PIE state (isRunning, isPaused, timeSeconds) |
-
-### Console Commands
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/execute-console` | POST | Execute a console command |
-| `/api/get-cvar` | POST | Get a console variable value |
-| `/api/set-cvar` | POST | Set a console variable value |
-
-### Audio System
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/audio/status` | GET | Get audio system status |
-| `/api/audio/active-sounds` | GET | List currently playing sounds |
-| `/api/audio/device-info` | GET | Get audio device information |
-| `/api/audio/sound-classes` | GET | List sound classes |
-| `/api/audio/set-volume` | POST | Set volume for a sound class |
-| `/api/audio/stats` | GET | Get audio statistics |
-| `/api/audio/play` | POST | Play a sound at location |
-| `/api/audio/stop` | POST | Stop a playing sound |
-| `/api/audio/set-listener` | POST | Set listener position/rotation |
-| `/api/audio/debug-visualize` | POST | Toggle audio debug visualization |
-
-### Niagara Particle Systems
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/niagara/status` | GET | Get Niagara system status |
-| `/api/niagara/systems` | GET | List active Niagara systems in the world |
-| `/api/niagara/system-info` | POST | Get detailed info about a Niagara system |
-| `/api/niagara/emitters` | POST | Get emitters for a Niagara component |
-| `/api/niagara/set-parameter` | POST | Set a Niagara parameter value |
-| `/api/niagara/get-parameters` | POST | Get all parameters for a Niagara component |
-| `/api/niagara/activate` | POST | Activate a Niagara system |
-| `/api/niagara/set-emitter-enable` | POST | Enable/disable a specific emitter |
-| `/api/niagara/reset` | POST | Reset a Niagara system |
-| `/api/niagara/stats` | GET | Get Niagara performance statistics |
-| `/api/niagara/debug-hud` | POST | Toggle Niagara debug HUD |
-
-### Pixel Streaming
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/pixelstreaming/status` | GET | Get Pixel Streaming status |
-| `/api/pixelstreaming/start` | POST | Start Pixel Streaming |
-| `/api/pixelstreaming/stop` | POST | Stop Pixel Streaming |
-| `/api/pixelstreaming/streamers` | GET | List active streamers |
-| `/api/pixelstreaming/codec` | GET | Get current codec settings |
-| `/api/pixelstreaming/set-codec` | POST | Set codec settings |
-| `/api/pixelstreaming/players` | GET | List connected players |
-
-### Level Sequences
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/list-sequences` | POST | List all LevelSequenceActors in loaded levels |
-| `/api/read-sequence` | POST | Read sequence tracks, audio cues, timing data |
-| `/api/remove-audio-tracks` | POST | Remove audio tracks from sequences (music cleanup) |
-
-#### list-sequences
-
-Lists all Level Sequence actors across all loaded levels with timing information.
-
-**Request:** `POST /api/list-sequences`
-```json
-{}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "count": 3,
-  "sequences": [
-    {
-      "actorName": "LevelSequenceActor_0",
-      "actorLabel": "LS_1_1",
-      "level": "SL_Trailer_Logic",
-      "sequenceName": "LS_1_1",
-      "sequencePath": "/Game/Sequences/Scene1/LS_1_1.LS_1_1",
-      "startTime": 0,
-      "endTime": 45.5,
-      "duration": 45.5,
-      "frameRate": 30,
-      "trackCount": 5
-    }
-  ]
-}
-```
-
-#### read-sequence
-
-Reads detailed track information from a Level Sequence including audio cues and bindings.
-
-**Request:** `POST /api/read-sequence`
-```json
-{
-  "sequencePath": "/Game/Sequences/Scene1/LS_1_1",
-  // OR
-  "actorName": "LS_1_1"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "sequenceName": "LS_1_1",
-  "duration": 45.5,
-  "frameRate": 30,
-  "masterTracks": [
-    {
-      "trackName": "Audio",
-      "trackClass": "MovieSceneAudioTrack",
-      "sections": [
-        {
-          "type": "Audio",
-          "startTime": 0,
-          "endTime": 12.5,
-          "soundName": "VO_Susan_Intro",
-          "soundPath": "/Game/Sounds/VO/VO_Susan_Intro",
-          "soundDuration": 12.5
-        }
-      ]
-    }
-  ],
-  "objectBindings": [
-    {
-      "name": "BP_HeatherChild",
-      "trackCount": 3
-    }
-  ]
-}
-```
-
-#### remove-audio-tracks
-
-Removes audio tracks from sequences. Useful for cleaning up music so it can be handled separately.
-
-**Request:** `POST /api/remove-audio-tracks`
-```json
-{
-  "sequencePath": "/Game/Sequences/Scene1/LS_1_1",
-  // OR remove from all sequences:
-  "all": true,
-  // Optional: only remove music, keep VO
-  "musicOnly": true
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "totalTracksRemoved": 15,
-  "sequencesModified": 8,
-  "modifiedSequences": [
-    {"name": "LS_1_1", "tracksRemoved": 2}
-  ],
-  "note": "Changes are in memory. Save modified sequences to persist."
-}
-```
-
-### Audio Analysis (External Service)
-
-A separate Python service provides audio transcription for subtitle generation.
-
-**Setup:**
-```bash
-cd AgenticMCP/Tools/AudioAnalysis
-pip install -r requirements.txt
-python transcribe.py --serve --port 9848
-```
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `http://localhost:9848/health` | GET | Service health check |
-| `http://localhost:9848/transcribe` | POST | Transcribe single audio file |
-| `http://localhost:9848/batch-transcribe` | POST | Transcribe multiple audio files |
-
-#### Transcribe Single File
-
-**Request:** `POST http://localhost:9848/transcribe`
-```json
-{
-  "audioPath": "C:/Project/Content/Sounds/VO/VO_Scene1.wav",
-  "model": "base",
-  "outputFormat": "ue_datatable",
-  "sequenceName": "LS_1_1"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "format": "ue_datatable",
-  "rows": [
-    {
-      "RowName": "Line_001",
-      "Time": 0.0,
-      "Duration": 3.5,
-      "Speaker": "",
-      "Text": "Welcome to Susan's home.",
-      "SequenceName": "LS_1_1"
-    }
-  ]
-}
-```
-
-#### Batch Transcribe (All VO Files)
-
-**Request:** `POST http://localhost:9848/batch-transcribe`
-```json
-{
-  "audioFiles": [
-    {"path": "C:/Project/Content/Sounds/VO/VO_1_1.wav", "sequenceName": "LS_1_1"},
-    {"path": "C:/Project/Content/Sounds/VO/VO_1_2.wav", "sequenceName": "LS_1_2"}
-  ],
-  "model": "base",
-  "outputFormat": "ue_datatable"
-}
-```
+## Tool Inventory (329 Tools)
+
+All live editor endpoints are at `http://localhost:9847/api/<endpoint>`. Tools are accessed via the MCP bridge at `/mcp/tool/{name}`.
+
+### Health and Lifecycle (4)
+
+| Tool | Description |
+|------|-------------|
+| `health` | Server status, asset counts |
+| `status` | MCP connection status |
+| `rescan` | Force asset registry refresh |
+| `waitReady` | Wait for assets/compile/render to complete |
+
+### Blueprint Read (10)
+
+| Tool | Description |
+|------|-------------|
+| `listBlueprints` | List Blueprints and Maps |
+| `getBlueprint` | Get Blueprint details (class, parent, variables, graphs) |
+| `getGraph` | Get graph nodes and connections |
+| `searchAssets` | Search assets by name |
+| `getReferences` | Find asset references |
+| `listClasses` | List UClasses |
+| `listFunctions` | List UFunctions on a class |
+| `listProperties` | List UProperties on a class |
+| `getPinInfo` | Get pin details |
+| `findNodes` | Find nodes in a graph by type or name |
+
+### Blueprint Mutation (14)
+
+| Tool | Description |
+|------|-------------|
+| `addNode` | Add a node to a graph |
+| `deleteNode` | Delete a node |
+| `connectPins` | Connect two pins |
+| `disconnectPin` | Break pin connections |
+| `setPinDefault` | Set pin default value |
+| `moveNode` | Move a node |
+| `refreshAllNodes` | Refresh all nodes |
+| `createBlueprint` | Create new Blueprint |
+| `createGraph` | Create function/macro graph |
+| `deleteGraph` | Delete a graph |
+| `addVariable` | Add a variable |
+| `removeVariable` | Remove a variable |
+| `compileBlueprint` | Compile and save |
+| `setNodeComment` | Set node comment |
+
+### Blueprint Event Graph (8)
+
+| Tool | Description |
+|------|-------------|
+| `bpCreateBlueprint` | Create a new Blueprint asset with parent class |
+| `bpAddVariable` | Add a typed variable (bool, int, float, string, vector, rotator, transform, object) |
+| `bpAddFunction` | Add a custom function graph |
+| `bpAddNode` | Add a node (CallFunction, CustomEvent, Branch, VariableGet, VariableSet) |
+| `bpConnectPins` | Wire two pins together by node ID and pin name |
+| `bpCompile` | Compile a Blueprint and return errors/warnings |
+| `bpGetGraph` | Introspect a Blueprint's event graph (all nodes, pins, connections) |
+| `bpDeleteNode` | Delete a node from a Blueprint graph |
+
+### Actor Management (10)
+
+| Tool | Description |
+|------|-------------|
+| `listActors` | List actors in world |
+| `getActor` | Get actor details |
+| `spawnActor` | Spawn a new actor |
+| `deleteActor` | Delete an actor |
+| `setActorProperty` | Set actor property |
+| `setActorTransform` | Set actor transform |
+| `actorDuplicate` | Duplicate an actor with offset |
+| `actorSetMobility` | Set actor mobility (Static, Stationary, Movable) |
+| `actorSetTags` | Set actor tags |
+| `actorSetLayer` | Assign actor to editor layer |
+
+### Component Management (7)
+
+| Tool | Description |
+|------|-------------|
+| `addComponent` | Add a component to an actor |
+| `componentList` | List all components on an actor |
+| `componentRemove` | Remove a component from an actor |
+| `componentSetProperty` | Set a property on a component |
+| `componentSetTransform` | Set relative transform on a component |
+| `componentSetVisibility` | Set component visibility |
+| `componentSetCollision` | Set component collision profile and responses |
+
+### Level Management (10)
+
+| Tool | Description |
+|------|-------------|
+| `listLevels` | List levels |
+| `loadLevel` | Load a sublevel |
+| `getLevelBlueprint` | Get level blueprint |
+| `streamingLevelVisibility` | Set visibility of a streaming sublevel |
+| `levelCreate` | Create a new map asset |
+| `levelSave` | Save the current level |
+| `levelAddSublevel` | Add a streaming sublevel |
+| `levelSetCurrentLevel` | Set the active persistent level |
+| `levelBuildLighting` | Build lighting for the level |
+| `levelBuildNavigation` | Build navigation mesh |
+
+### Sequencer (21)
+
+| Tool | Description |
+|------|-------------|
+| `listSequences` | List all LevelSequence assets |
+| `readSequence` | Read sequence tracks, audio cues, timing data |
+| `removeAudioTracks` | Remove audio tracks from sequences |
+| `sequencerCreate` | Create a new LevelSequence asset |
+| `sequencerGetTracks` | Full introspection: bindings, tracks, sections, channels, playback range |
+| `sequencerGetKeyframes` | Read back keyframe times and values from a track section |
+| `sequencerBindActor` | Bind an actor as possessable, returns GUID |
+| `sequencerAddSpawnable` | Add an actor as a spawnable binding |
+| `sequencerAddTrack` | Add track (Transform, Float, Bool, Visibility, SkeletalAnimation, CameraCut, Audio, Event) |
+| `sequencerAddSection` | Add a time-range section to a track |
+| `sequencerSetKeyframe` | Set keyframes (Transform 9-channel, Float, Bool/Visibility) with interpolation |
+| `sequencerDeleteSection` | Remove a section by index |
+| `sequencerDeleteTrack` | Delete a track by index |
+| `sequencerMoveSection` | Move a section to a new time range |
+| `sequencerDuplicateSection` | Duplicate a section with optional time offset |
+| `sequencerSetTrackMute` | Set mute/lock state on a track |
+| `sequencerAddCameraCut` | Add camera cut section with auto-binding |
+| `sequencerAddSubSequence` | Add a sub-sequence (shot) track |
+| `sequencerAddFade` | Add a fade track |
+| `sequencerSetAudioSection` | Assign a sound asset to an audio section |
+| `sequencerSetEventPayload` | Set event function binding on an event section |
+| `sequencerSetPlayRange` | Set playback start/end range |
+| `sequencerRender` | Queue render via Movie Render Pipeline (PNG/EXR/JPG, resolution, AA) |
+| `sequencerRenderStatus` | Check Movie Render Pipeline queue status |
+
+### Material System (15)
+
+| Tool | Description |
+|------|-------------|
+| `materialList` | List all material assets |
+| `materialGetInfo` | Get material details |
+| `materialGetGraph` | Get material graph nodes and connections |
+| `materialCreate` | Create a new material asset |
+| `materialListInstances` | List material instances |
+| `materialSetParam` | Set a material parameter |
+| `materialSetScalar` | Set a scalar parameter |
+| `materialSetVector` | Set a vector parameter |
+| `materialAddNode` | Add a material expression node |
+| `materialDeleteNode` | Delete a material expression node |
+| `materialConnectPins` | Connect material expression pins |
+| `materialDisconnectPin` | Disconnect a material expression pin |
+| `materialSetTextureParam` | Set a texture parameter on a material instance |
+| `materialCreateInstance` | Create a material instance from a parent material |
+| `materialAssignToActor` | Assign a material to an actor's mesh component |
+
+### Niagara Particle Systems (16)
+
+| Tool | Description |
+|------|-------------|
+| `niagaraGetStatus` | Get Niagara system status |
+| `niagaraListSystems` | List active Niagara systems in the world |
+| `niagaraGetSystemInfo` | Get detailed info about a Niagara system |
+| `niagaraGetEmitters` | Get emitters for a Niagara component |
+| `niagaraSetParameter` | Set a Niagara parameter value |
+| `niagaraGetParameters` | Get all parameters for a Niagara component |
+| `niagaraActivateSystem` | Activate a Niagara system |
+| `niagaraSetEmitterEnable` | Enable/disable a specific emitter |
+| `niagaraResetSystem` | Reset a Niagara system |
+| `niagaraGetStats` | Get Niagara performance statistics |
+| `niagaraDebugHUD` | Toggle Niagara debug HUD |
+| `niagaraCreateSystem` | Create a new Niagara system asset |
+| `niagaraAddEmitter` | Add an emitter to a Niagara system |
+| `niagaraRemoveEmitter` | Remove an emitter from a Niagara system |
+| `niagaraSetSystemProperty` | Set system properties (warmup, bounds, loop) |
+| `niagaraSpawnSystem` | Spawn a Niagara system at a world location |
+
+### Animation (15)
+
+| Tool | Description |
+|------|-------------|
+| `animBPList` | List all Animation Blueprints |
+| `animBPGetGraph` | Get AnimBP graph structure |
+| `animBPGetStates` | Get state machine states |
+| `animBPGetTransitions` | Get state machine transitions |
+| `animBPGetSlotGroups` | Get animation slot groups |
+| `animBPGetMontages` | Get animation montages |
+| `animBPGetBlendSpace` | Get blend space info |
+| `animBPGetStateMachine` | Full state machine introspection |
+| `animBPAddState` | Add a state to a state machine |
+| `animBPRemoveState` | Remove a state from a state machine |
+| `animBPAddTransition` | Add a transition between states |
+| `animBPSetTransitionRule` | Set transition rule expression |
+| `animBPSetStateAnimation` | Set the animation asset for a state |
+| `animBPAddBlendNode` | Add a blend node to a state machine |
+| `animBPListMontages` | List all animation montage assets |
+
+### AI / Behavior Trees (14)
+
+| Tool | Description |
+|------|-------------|
+| `aiListBehaviorTrees` | List all Behavior Tree assets |
+| `aiGetBehaviorTree` | Get Behavior Tree structure |
+| `aiListBlackboards` | List all Blackboard assets |
+| `aiGetBlackboard` | Get Blackboard keys and values |
+| `aiListControllers` | List AI controllers |
+| `aiGetEQSQueries` | Get EQS query definitions |
+| `btAddTask` | Add a task node to a Behavior Tree |
+| `btAddComposite` | Add a composite node (Selector, Sequence, SimpleParallel) |
+| `btRemoveNode` | Remove a node from a Behavior Tree |
+| `btAddDecorator` | Add a decorator to a BT node |
+| `btAddService` | Add a service to a BT node |
+| `btSetBlackboardValue` | Set a Blackboard key value |
+| `btWireNodes` | Wire a child node to a parent composite |
+| `btGetTree` | Full BT introspection (all nodes, decorators, services, connections) |
+
+### Audio System (14)
+
+| Tool | Description |
+|------|-------------|
+| `audioGetStatus` | Get audio system status |
+| `audioListActiveSounds` | List currently playing sounds |
+| `audioGetDeviceInfo` | Get audio device information |
+| `audioListSoundClasses` | List sound classes |
+| `audioSetVolume` | Set volume for a sound class |
+| `audioGetStats` | Get audio statistics |
+| `audioPlay` | Play a sound at location |
+| `audioStop` | Stop a playing sound |
+| `audioSetListener` | Set listener position/rotation |
+| `audioDebugVisualize` | Toggle audio debug visualization |
+| `audioCreateSoundCue` | Create a new Sound Cue asset |
+| `audioSetAttenuation` | Set attenuation settings on a sound |
+| `audioCreateAmbientSound` | Spawn an Ambient Sound actor |
+| `audioCreateAudioVolume` | Create an Audio Volume with reverb/attenuation |
+
+### PCG (Procedural Content Generation) (14)
+
+| Tool | Description |
+|------|-------------|
+| `pcgListGraphs` | List all PCG graph assets |
+| `pcgGetGraph` | Get PCG graph structure |
+| `pcgGetNodeSettings` | Get settings for a PCG node |
+| `pcgSetNodeSettings` | Set settings on a PCG node |
+| `pcgListComponents` | List PCG components in the world |
+| `pcgGetComponentInfo` | Get PCG component details |
+| `pcgGenerate` | Execute a PCG graph |
+| `pcgCleanup` | Clean up PCG-generated content |
+| `pcgGetDebugInfo` | Get PCG debug information |
+| `pcgExecuteGraph` | Execute a PCG graph with parameters |
+| `pcgCreateGraph` | Create a new PCG graph asset |
+| `pcgAddNode` | Add a node to a PCG graph |
+| `pcgRemoveNode` | Remove a node from a PCG graph |
+| `pcgConnectNodes` | Connect two PCG graph nodes |
+
+### Landscape and Foliage (14)
+
+| Tool | Description |
+|------|-------------|
+| `landscapeGetInfo` | Get landscape info (size, components, layers) |
+| `landscapeGetLayerInfo` | Get landscape paint layer details |
+| `landscapeSculpt` | Sculpt landscape heightmap (raise, lower, flatten, smooth) |
+| `landscapePaint` | Paint a landscape layer at a location |
+| `landscapeAddLayer` | Add a new paint layer to the landscape |
+| `landscapeRemoveLayer` | Remove a paint layer |
+| `landscapeImportHeightmap` | Import a heightmap from R16 file |
+| `landscapeExportHeightmap` | Export the landscape heightmap to R16 file |
+| `foliageGetInfo` | Get foliage info (types, instance counts) |
+| `foliageAdd` | Place foliage instances at locations |
+| `foliageRemove` | Remove foliage instances by radius |
+| `foliageSetDensity` | Adjust foliage density for a type |
+| `foliageGetTypes` | List all foliage types |
+| `foliageGetInstances` | Get foliage instance locations |
+
+### Skeletal Mesh (10)
+
+| Tool | Description |
+|------|-------------|
+| `skelMeshList` | List all skeletal mesh assets |
+| `skelMeshGetInfo` | Get skeletal mesh details |
+| `skelMeshGetBones` | Get bone hierarchy |
+| `skelMeshGetSockets` | Get socket list |
+| `skelMeshGetMorphTargets` | Get morph target list |
+| `skelMeshSetMorphTarget` | Set morph target weight on a component |
+| `skelMeshAddSocket` | Add a socket to a skeletal mesh |
+| `skelMeshRemoveSocket` | Remove a socket |
+| `skelMeshSetMaterial` | Set material on a skeletal mesh slot |
+| `skelMeshSetPhysicsAsset` | Assign a physics asset |
+
+### Physics (11)
+
+| Tool | Description |
+|------|-------------|
+| `physicsGetInfo` | Get physics body info for an actor |
+| `physicsGetConstraints` | List physics constraints |
+| `physicsGetCollisionProfile` | Get collision profile |
+| `physicsSimulate` | Start/stop physics simulation |
+| `physicsGetOverlaps` | Get overlapping actors |
+| `physicsAddConstraint` | Add a physics constraint (Fixed, Hinge, Prismatic, BallSocket) |
+| `physicsRemoveConstraint` | Remove a physics constraint |
+| `physicsSetMass` | Set mass override on a component |
+| `physicsSetDamping` | Set linear and angular damping |
+| `physicsSetGravity` | Enable/disable gravity on a component |
+| `physicsApplyImpulse` | Apply an impulse to a physics body |
+
+### UMG (Widget Blueprints) (10)
+
+| Tool | Description |
+|------|-------------|
+| `umgListWidgets` | List all Widget Blueprint assets |
+| `umgGetWidgetTree` | Get widget hierarchy tree |
+| `umgGetWidgetProperties` | Get widget properties |
+| `umgListHUDs` | List HUD classes |
+| `umgCreateWidget` | Create a new Widget Blueprint with root Canvas Panel |
+| `umgAddChild` | Add a child widget (TextBlock, Button, Image, ProgressBar, etc.) |
+| `umgRemoveChild` | Remove a widget by name |
+| `umgSetWidgetProperty` | Set widget property (text, visibility, color, opacity, font size, alignment) |
+| `umgBindEvent` | Bind a widget event to a function |
+| `umgGetWidgetChildren` | Get widget children with types and properties |
+
+### Lighting (3)
+
+| Tool | Description |
+|------|-------------|
+| `lightCreate` | Spawn a light actor (Point, Spot, Directional, Rect, Sky) |
+| `lightSetProperties` | Set light properties (intensity, color, temperature, shadows, cone angles, attenuation) |
+| `lightList` | List all light actors in the level |
+
+### Scene Hierarchy (10)
+
+| Tool | Description |
+|------|-------------|
+| `sceneSnapshot` | Get hierarchical scene tree with short refs |
+| `sceneGetHierarchy` | Get actor parent-child hierarchy |
+| `sceneSetParent` | Set actor parent (attachment) |
+| `sceneClearParent` | Clear actor parent |
+| `sceneGetComponents` | Get components for an actor |
+| `sceneGetTransformHierarchy` | Get transform chain |
+| `sceneCreateFolder` | Create an outliner folder |
+| `sceneDeleteFolder` | Delete an outliner folder |
+| `sceneSetActorLabel` | Rename an actor's display label |
+| `sceneHideActor` | Set actor editor visibility |
+
+### DataTable (5)
+
+| Tool | Description |
+|------|-------------|
+| `dataTableList` | List all DataTable assets |
+| `dataTableRead` | Read DataTable rows |
+| `dataTableAddRow` | Add a row to a DataTable |
+| `dataTableDeleteRow` | Delete a row from a DataTable |
+| `dataTableGetSchema` | Get DataTable row struct schema |
+
+### Visual Agent / Automation (13)
+
+| Tool | Description |
+|------|-------------|
+| `screenshot` | Capture viewport screenshot (base64 JPEG) |
+| `focusActor` | Move editor camera to focus on an actor |
+| `selectActor` | Select actor(s) in the editor |
+| `setViewport` | Set camera position and rotation |
+| `moveActor` | Move/transform an actor |
+| `getCamera` | Get current viewport camera position, rotation, FOV |
+| `listViewports` | List all editor viewports |
+| `getSelection` | Get currently selected actors with transforms |
+| `resolveRef` | Resolve a short ref to actor/component |
+| `drawDebug` | Draw debug shapes in viewport |
+| `clearDebug` | Clear debug drawings |
+| `renderCapture` | Capture a high-res render |
+| `outputLog` | Get recent output log entries |
+
+### XR / VR (10)
+
+| Tool | Description |
+|------|-------------|
+| `xrStatus` | Get XR/VR headset and runtime status |
+| `xrControllers` | Get controller tracking data and button states |
+| `xrGuardian` | Get guardian/play area boundary info |
+| `xrHandTracking` | Get hand tracking data |
+| `xrPassthrough` | Get passthrough mode status |
+| `xrRecenter` | Recenter XR tracking origin |
+| `xrSetDisplayFrequency` | Set HMD display refresh rate |
+| `xrSetGuardianVisibility` | Show/hide guardian boundary |
+| `xrSetPassthrough` | Enable/disable passthrough |
+| `xrSetPerformanceLevels` | Set CPU/GPU performance levels |
+
+### Pixel Streaming (7)
+
+| Tool | Description |
+|------|-------------|
+| `pixelStreamingGetStatus` | Get Pixel Streaming status |
+| `pixelStreamingStart` | Start Pixel Streaming |
+| `pixelStreamingStop` | Stop Pixel Streaming |
+| `pixelStreamingListStreamers` | List active streamers |
+| `pixelStreamingGetCodec` | Get current codec settings |
+| `pixelStreamingSetCodec` | Set codec settings |
+| `pixelStreamingListPlayers` | List connected players |
+
+### PIE Control (5)
+
+| Tool | Description |
+|------|-------------|
+| `startPIE` | Start PIE session (SelectedViewport, NewEditorWindow, VR, MobilePreview) |
+| `stopPIE` | Stop PIE session |
+| `pausePIE` | Pause/resume PIE |
+| `stepPIE` | Single-step paused PIE |
+| `getPIEState` | Get PIE state (isRunning, isPaused, timeSeconds) |
+
+### Console Commands (4)
+
+| Tool | Description |
+|------|-------------|
+| `executeConsole` | Execute a console command |
+| `getCVar` | Get a console variable value |
+| `setCVar` | Set a console variable value |
+| `simulateInput` | Simulate keyboard/mouse input |
+
+### Editor Settings (7)
+
+| Tool | Description |
+|------|-------------|
+| `settingsGetProject` | Get project settings |
+| `settingsGetEditor` | Get editor preferences |
+| `settingsGetRendering` | Get rendering settings |
+| `settingsGetPlugins` | Get plugin list |
+| `settingsSetProject` | Set project settings (name, company, description, version) |
+| `settingsSetEditor` | Set editor preferences (auto-save, etc.) |
+| `settingsSetRendering` | Set rendering settings (ray tracing, nanite, lumen, VSM) |
+
+### Asset Management (7)
+
+| Tool | Description |
+|------|-------------|
+| `assetImport` | Import an asset (FBX, texture, audio) |
+| `assetExport` | Export an asset |
+| `assetDuplicate` | Duplicate an asset |
+| `assetRename` | Rename an asset |
+| `assetDelete` | Delete an asset |
+| `assetMove` | Move an asset between content folders |
+| `openAsset` | Open an asset in the editor |
+
+### World Partition (3)
+
+| Tool | Description |
+|------|-------------|
+| `wpGetInfo` | Get World Partition info, streaming status, data layers |
+| `wpSetActorDataLayer` | Assign an actor to a data layer |
+| `wpSetActorRuntimeGrid` | Set runtime grid for an actor |
+
+### MetaHuman and Groom (4)
+
+| Tool | Description |
+|------|-------------|
+| `metahumanList` | List all MetaHuman assets |
+| `metahumanSpawn` | Spawn a MetaHuman actor |
+| `groomList` | List all groom assets |
+| `groomSetBinding` | Bind a groom and binding asset to an actor |
+
+### Python Bridge (2)
+
+| Tool | Description |
+|------|-------------|
+| `pythonExecFile` | Execute a Python file in the editor's Python environment |
+| `pythonExecString` | Execute inline Python code in the editor |
+
+### Story / Narrative (4)
+
+| Tool | Description |
+|------|-------------|
+| `storyState` | Get current story/narrative state |
+| `storyAdvance` | Advance to the next story beat |
+| `storyGoto` | Jump to a specific story beat or chapter |
+| `storyPlay` | Play/resume story playback |
+
+### Validation and Safety (6)
+
+| Tool | Description |
+|------|-------------|
+| `validateBlueprint` | Validate a Blueprint for errors |
+| `snapshotGraph` | Take graph snapshot for rollback |
+| `restoreGraph` | Restore from snapshot |
+| `beginTransaction` | Begin an undo transaction |
+| `endTransaction` | End an undo transaction |
+| `undo` | Undo the last transaction |
+
+### Packaging and Build (4)
+
+| Tool | Description |
+|------|-------------|
+| `buildCook` | Cook content for target platform |
+| `buildPackage` | Package the project |
+| `buildGetStatus` | Get build/cook status |
+| `buildGetLog` | Get build log output |
+
+### Source Control (2)
+
+| Tool | Description |
+|------|-------------|
+| `sourceControlGetStatus` | Get source control status for assets |
+| `sourceControlCheckout` | Check out assets for editing |
+
+### Miscellaneous (4)
+
+| Tool | Description |
+|------|-------------|
+| `diffBlueprint` | Diff two versions of a Blueprint |
+| `executePython` | Execute raw Python in the editor (legacy) |
+| `rescan` | Force asset registry refresh |
+| `saveAll` | Save all modified assets |
 
 ## Supported Node Types
 
-The `add-node` endpoint supports:
+The `addNode` endpoint supports:
 
 | nodeType | Required Fields | Description |
 |---|---|---|
@@ -615,17 +638,17 @@ The `add-node` endpoint supports:
 | `VariableGet` | `variableName` | Get variable |
 | `VariableSet` | `variableName` | Set variable |
 | `DynamicCast` | `castTarget` | Cast to class |
-| `Branch` | — | If/else |
-| `Sequence` | — | Execution sequence |
+| `Branch` | -- | If/else |
+| `Sequence` | -- | Execution sequence |
 | `MacroInstance` | `macroName`, optional `macroSource` | Generic macro (ForLoop, ForEachLoop, etc.) |
 | `SpawnActorFromClass` | optional `actorClass` | Spawn actor |
-| `Select` | — | Select node |
+| `Select` | -- | Select node |
 | `Comment` | optional `comment`, `width`, `height` | Comment box |
-| `Reroute` | — | Reroute/knot |
+| `Reroute` | -- | Reroute/knot |
 | `MultiGate` | optional `numOutputs` | Multi-output execution gate |
 | `Delay` | optional `duration` | Timed delay |
 | `SetTimer` | `functionName`, optional `time` | Timer by function name |
-| `LoadAsset` | — | Async asset loading |
+| `LoadAsset` | -- | Async asset loading |
 
 ## Offline Fallback Tools
 
@@ -643,9 +666,11 @@ When the editor is not running, these tools are available:
 ## Safety
 
 - **Snapshots**: Always take a snapshot before making destructive changes. Max 50 snapshots in memory, oldest pruned automatically.
+- **Transactions**: Wrap mutations in `beginTransaction` / `endTransaction` for undo support.
 - **Validation**: Always compile after mutations to catch errors.
 - **SEH Protection**: On Windows, compilation is wrapped in SEH handlers to prevent editor crashes.
-- **Game Thread**: All mutations run on the game thread via `AsyncTask(ENamedThreads::GameThread, ...)`.
+- **Game Thread**: All mutations run on the game thread via the RequestQueue architecture. HTTP requests are queued and processed during editor Tick.
+- **Error Handling**: Every handler returns structured JSON errors via `MakeErrorJson`. No silent failures.
 - **Dual-Path Resilience**: If the editor goes down, the fallback path keeps working.
 
 ## Testing
@@ -659,7 +684,7 @@ npm run test:coverage # Coverage report
 
 ## Compatibility
 
-- Unreal Engine 5.4 through 5.7+
+- Unreal Engine 5.6
 - Node.js 18+
 - Python 3.11+ (for offline fallback)
 - Works with: Claude Code, Claude Desktop, Cursor, Windsurf, Manus

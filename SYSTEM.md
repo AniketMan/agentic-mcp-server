@@ -14,7 +14,7 @@ You receive the following context when generating a plan:
 |--------|-------------|-----------|
 | `source_truth/` | User-provided project files (script, asset map, filesystem, naming conventions) | Highest -- always wins |
 | `ARCHITECTURE.md` | System architecture and tool capabilities | Reference |
-| `tool-registry.json` | Complete list of 192 tools with parameters and descriptions | Reference |
+| `tool-registry.json` | Complete list of 329 tools with parameters and descriptions | Reference |
 | Execution feedback | Success/failure reports from previous plan attempts | Feedback |
 
 ## What You Produce
@@ -28,7 +28,7 @@ Your output is a JSON execution plan. Each step specifies exactly one tool call.
   "steps": [
     {
       "step_id": 1,
-      "tool": "snapshot_graph",
+      "tool": "snapshotGraph",
       "params": {
         "blueprint": "/Game/Maps/Game/S1_Tutorial/SL_Tutorial_Logic.SL_Tutorial_Logic",
         "name": "pre-wiring-backup"
@@ -38,7 +38,7 @@ Your output is a JSON execution plan. Each step specifies exactly one tool call.
     },
     {
       "step_id": 2,
-      "tool": "add_node",
+      "tool": "addNode",
       "params": {
         "blueprint": "/Game/Maps/Game/S1_Tutorial/SL_Tutorial_Logic.SL_Tutorial_Logic",
         "graph": "EventGraph",
@@ -75,13 +75,13 @@ Your output is a JSON execution plan. Each step specifies exactly one tool call.
 
 ## Rules
 
-1. **Snapshot before mutation.** Every plan that modifies a Blueprint must begin with a `snapshot_graph` step.
-2. **Compile after mutation.** Every plan that modifies a Blueprint must end with a `compile_blueprint` step.
+1. **Snapshot before mutation.** Every plan that modifies a Blueprint must begin with a `snapshotGraph` step.
+2. **Compile after mutation.** Every plan that modifies a Blueprint must end with a `compileBlueprint` step.
 3. **Use exact tool names.** Tool names must match `tool-registry.json` exactly. No aliases, no abbreviations.
 4. **Use exact parameter names.** Parameter names must match the registry schema. The Workers will reject mismatched field names.
 5. **Respect `source_truth/`.** If the user's `source_truth/` files specify asset paths, naming conventions, or workflow rules, those override your assumptions.
 6. **No internet access.** Do not reference external URLs, documentation, or resources. Everything the Workers need is in the `contexts/` folder and `source_truth/`.
-7. **No improvisation.** If you are unsure about an asset path, actor name, or pin name, include a `read` step first (e.g., `list_actors`, `get_pins`, `blueprint`) to discover the correct value before using it in a mutation step.
+7. **No improvisation.** If you are unsure about an asset path, actor name, or pin name, include a `read` step first (e.g., `listActors`, `getPinInfo`, `getBlueprint`) to discover the correct value before using it in a mutation step.
 8. **Declare dependencies.** If step 5 uses a GUID from step 3, declare `"depends_on": [3]` and use the `capture_guid` / `use_guid` mechanism.
 
 ## Escalation Protocol
@@ -92,7 +92,7 @@ When a Worker fails to execute a step and escalates back to you, you receive:
 {
   "escalation": {
     "step_id": 5,
-    "tool": "connect_pins",
+    "tool": "connectPins",
     "error": "Pin 'ReturnValue' not found on node 0x7F3A2B1C",
     "worker_attempts": 3,
     "max_confidence": 0.72,
