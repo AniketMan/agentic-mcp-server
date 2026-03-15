@@ -613,6 +613,42 @@ private:
 	FString HandleSettingsSetRendering(const FString& Body);
 	FString HandleAssetMove(const FString& Body);
 
+	// --- Final gap handlers ---
+	FString HandleNiagaraCreateSystem(const FString& Body);
+	FString HandleNiagaraAddEmitter(const FString& Body);
+	FString HandleNiagaraRemoveEmitter(const FString& Body);
+	FString HandleNiagaraSetSystemProperty(const FString& Body);
+	FString HandleNiagaraSpawnSystem(const FString& Body);
+	FString HandleAudioCreateSoundCue(const FString& Body);
+	FString HandleAudioSetAttenuation(const FString& Body);
+	FString HandleAudioCreateAmbientSound(const FString& Body);
+	FString HandleAudioCreateAudioVolume(const FString& Body);
+	FString HandleLightCreate(const FString& Body);
+	FString HandleLightSetProperties(const FString& Body);
+	FString HandleLightList(const FString& Body);
+	FString HandleBPCreateBlueprint(const FString& Body);
+	FString HandleBPAddVariable(const FString& Body);
+	FString HandleBPAddFunction(const FString& Body);
+	FString HandleBPAddNode(const FString& Body);
+	FString HandleBPConnectPins(const FString& Body);
+	FString HandleBPCompile(const FString& Body);
+	FString HandleBPGetGraph(const FString& Body);
+	FString HandleBPDeleteNode(const FString& Body);
+	FString HandlePCGAddNode(const FString& Body);
+	FString HandlePCGRemoveNode(const FString& Body);
+	FString HandlePCGConnectNodes(const FString& Body);
+	FString HandlePCGCreateGraph(const FString& Body);
+	FString HandleWPGetInfo(const FString& Body);
+	FString HandleWPSetActorDataLayer(const FString& Body);
+	FString HandleWPSetActorRuntimeGrid(const FString& Body);
+	FString HandleMetaHumanList(const FString& Body);
+	FString HandleMetaHumanSpawn(const FString& Body);
+	FString HandleGroomList(const FString& Body);
+	FString HandleGroomSetBinding(const FString& Body);
+	FString HandlePythonExecFile(const FString& Body);
+	FString HandlePythonExecString(const FString& Body);
+
+
 
 	// ---- PIE (auto-generated declarations) ----
 

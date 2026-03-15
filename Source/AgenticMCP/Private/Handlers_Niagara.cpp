@@ -14,6 +14,8 @@
 #include "NiagaraEmitter.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraParameterStore.h"
+#include "NiagaraEmitterHandle.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPNiagara, Log, All);
 
@@ -764,4 +766,189 @@ FString FAgenticMCPServer::HandleNiagaraDebugHUD(const TMap<FString, FString>& P
 	Result->SetStringField(TEXT("mode"), Mode);
 
 	return JsonToString(Result);
+}
+
+// ============================================================================
+// NIAGARA MUTATION HANDLERS
+// ============================================================================
+
+// --- niagaraCreateSystem ---
+FString FAgenticMCPServer::HandleNiagaraCreateSystem(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString AssetPath = Json->GetStringField(TEXT("path"));
+	if (AssetPath.IsEmpty())
+		return MakeErrorJson(TEXT("Missing 'path'"));
+
+	FString PackageName = AssetPath;
+	FString AssetName = FPaths::GetBaseFilename(AssetPath);
+	UPackage* Package = CreatePackage(*PackageName);
+	if (!Package)
+		return MakeErrorJson(TEXT("Failed to create package"));
+
+	UNiagaraSystem* System = NewObject<UNiagaraSystem>(Package, FName(*AssetName), RF_Public | RF_Standalone);
+	if (!System)
+		return MakeErrorJson(TEXT("Failed to create Niagara system"));
+
+	Package->MarkPackageDirty();
+	FAssetRegistryModule::AssetCreated(System);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("path"), AssetPath);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- niagaraAddEmitter ---
+FString FAgenticMCPServer::HandleNiagaraAddEmitter(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SystemPath = Json->GetStringField(TEXT("systemPath"));
+	FString EmitterPath = Json->GetStringField(TEXT("emitterPath"));
+	if (SystemPath.IsEmpty() || EmitterPath.IsEmpty())
+		return MakeErrorJson(TEXT("Missing 'systemPath' or 'emitterPath'"));
+
+	UNiagaraSystem* System = LoadObject<UNiagaraSystem>(nullptr, *SystemPath);
+	if (!System)
+		return MakeErrorJson(FString::Printf(TEXT("System not found: %s"), *SystemPath));
+
+	UNiagaraEmitter* Emitter = LoadObject<UNiagaraEmitter>(nullptr, *EmitterPath);
+	if (!Emitter)
+		return MakeErrorJson(FString::Printf(TEXT("Emitter not found: %s"), *EmitterPath));
+
+	System->AddEmitterHandle(*Emitter, FName(*FPaths::GetBaseFilename(EmitterPath)));
+	System->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("emitter"), EmitterPath);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- niagaraRemoveEmitter ---
+FString FAgenticMCPServer::HandleNiagaraRemoveEmitter(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SystemPath = Json->GetStringField(TEXT("systemPath"));
+	int32 EmitterIndex = (int32)Json->GetNumberField(TEXT("emitterIndex"));
+
+	UNiagaraSystem* System = LoadObject<UNiagaraSystem>(nullptr, *SystemPath);
+	if (!System)
+		return MakeErrorJson(FString::Printf(TEXT("System not found: %s"), *SystemPath));
+
+	const TArray<FNiagaraEmitterHandle>& Handles = System->GetEmitterHandles();
+	if (EmitterIndex < 0 || EmitterIndex >= Handles.Num())
+		return MakeErrorJson(FString::Printf(TEXT("Emitter index %d out of range (0-%d)"), EmitterIndex, Handles.Num() - 1));
+
+	System->RemoveEmitterHandleByIndex(EmitterIndex);
+	System->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("removedIndex"), EmitterIndex);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- niagaraSetSystemProperty ---
+FString FAgenticMCPServer::HandleNiagaraSetSystemProperty(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SystemPath = Json->GetStringField(TEXT("systemPath"));
+	UNiagaraSystem* System = LoadObject<UNiagaraSystem>(nullptr, *SystemPath);
+	if (!System)
+		return MakeErrorJson(FString::Printf(TEXT("System not found: %s"), *SystemPath));
+
+	int32 Changed = 0;
+	bool BoolVal;
+	double NumVal;
+
+	if (Json->TryGetBoolField(TEXT("warmupEnabled"), BoolVal))
+	{
+		System->SetWarmupTime(BoolVal ? 1.0f : 0.0f);
+		Changed++;
+	}
+	if (Json->TryGetNumberField(TEXT("warmupTime"), NumVal))
+	{
+		System->SetWarmupTime((float)NumVal);
+		Changed++;
+	}
+	if (Json->TryGetNumberField(TEXT("warmupTickCount"), NumVal))
+	{
+		System->SetWarmupTickCount((int32)NumVal);
+		Changed++;
+	}
+	if (Json->TryGetBoolField(TEXT("fixedBounds"), BoolVal))
+	{
+		System->bFixedBounds = BoolVal;
+		Changed++;
+	}
+
+	System->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- niagaraSpawnSystem ---
+FString FAgenticMCPServer::HandleNiagaraSpawnSystem(const FString& Body)
+{
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SystemPath = Json->GetStringField(TEXT("systemPath"));
+	UNiagaraSystem* System = LoadObject<UNiagaraSystem>(nullptr, *SystemPath);
+	if (!System)
+		return MakeErrorJson(FString::Printf(TEXT("System not found: %s"), *SystemPath));
+
+	FVector Location = FVector::ZeroVector;
+	const TArray<TSharedPtr<FJsonValue>>* LocArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("location"), LocArray) && LocArray->Num() >= 3)
+		Location = FVector((*LocArray)[0]->AsNumber(), (*LocArray)[1]->AsNumber(), (*LocArray)[2]->AsNumber());
+
+	FRotator Rotation = FRotator::ZeroRotator;
+	const TArray<TSharedPtr<FJsonValue>>* RotArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("rotation"), RotArray) && RotArray->Num() >= 3)
+		Rotation = FRotator((*RotArray)[0]->AsNumber(), (*RotArray)[1]->AsNumber(), (*RotArray)[2]->AsNumber());
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world"));
+
+	UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, System, Location, Rotation);
+	if (!NiagaraComp)
+		return MakeErrorJson(TEXT("Failed to spawn Niagara system"));
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("component"), NiagaraComp->GetName());
+	Result->SetStringField(TEXT("owner"), NiagaraComp->GetOwner() ? NiagaraComp->GetOwner()->GetName() : TEXT("none"));
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
 }

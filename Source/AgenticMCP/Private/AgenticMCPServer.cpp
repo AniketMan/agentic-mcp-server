@@ -1948,6 +1948,42 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("settingsSetRendering"), [this](const FString& Body) { return HandleSettingsSetRendering(Body); });
 	HandlerMap.Add(TEXT("assetMove"), [this](const FString& Body) { return HandleAssetMove(Body); });
 
+	// --- Final gap routes ---
+	HandlerMap.Add(TEXT("niagaraCreateSystem"), [this](const FString& Body) { return HandleNiagaraCreateSystem(Body); });
+	HandlerMap.Add(TEXT("niagaraAddEmitter"), [this](const FString& Body) { return HandleNiagaraAddEmitter(Body); });
+	HandlerMap.Add(TEXT("niagaraRemoveEmitter"), [this](const FString& Body) { return HandleNiagaraRemoveEmitter(Body); });
+	HandlerMap.Add(TEXT("niagaraSetSystemProperty"), [this](const FString& Body) { return HandleNiagaraSetSystemProperty(Body); });
+	HandlerMap.Add(TEXT("niagaraSpawnSystem"), [this](const FString& Body) { return HandleNiagaraSpawnSystem(Body); });
+	HandlerMap.Add(TEXT("audioCreateSoundCue"), [this](const FString& Body) { return HandleAudioCreateSoundCue(Body); });
+	HandlerMap.Add(TEXT("audioSetAttenuation"), [this](const FString& Body) { return HandleAudioSetAttenuation(Body); });
+	HandlerMap.Add(TEXT("audioCreateAmbientSound"), [this](const FString& Body) { return HandleAudioCreateAmbientSound(Body); });
+	HandlerMap.Add(TEXT("audioCreateAudioVolume"), [this](const FString& Body) { return HandleAudioCreateAudioVolume(Body); });
+	HandlerMap.Add(TEXT("lightCreate"), [this](const FString& Body) { return HandleLightCreate(Body); });
+	HandlerMap.Add(TEXT("lightSetProperties"), [this](const FString& Body) { return HandleLightSetProperties(Body); });
+	HandlerMap.Add(TEXT("lightList"), [this](const FString& Body) { return HandleLightList(Body); });
+	HandlerMap.Add(TEXT("bpCreateBlueprint"), [this](const FString& Body) { return HandleBPCreateBlueprint(Body); });
+	HandlerMap.Add(TEXT("bpAddVariable"), [this](const FString& Body) { return HandleBPAddVariable(Body); });
+	HandlerMap.Add(TEXT("bpAddFunction"), [this](const FString& Body) { return HandleBPAddFunction(Body); });
+	HandlerMap.Add(TEXT("bpAddNode"), [this](const FString& Body) { return HandleBPAddNode(Body); });
+	HandlerMap.Add(TEXT("bpConnectPins"), [this](const FString& Body) { return HandleBPConnectPins(Body); });
+	HandlerMap.Add(TEXT("bpCompile"), [this](const FString& Body) { return HandleBPCompile(Body); });
+	HandlerMap.Add(TEXT("bpGetGraph"), [this](const FString& Body) { return HandleBPGetGraph(Body); });
+	HandlerMap.Add(TEXT("bpDeleteNode"), [this](const FString& Body) { return HandleBPDeleteNode(Body); });
+	HandlerMap.Add(TEXT("pcgAddNode"), [this](const FString& Body) { return HandlePCGAddNode(Body); });
+	HandlerMap.Add(TEXT("pcgRemoveNode"), [this](const FString& Body) { return HandlePCGRemoveNode(Body); });
+	HandlerMap.Add(TEXT("pcgConnectNodes"), [this](const FString& Body) { return HandlePCGConnectNodes(Body); });
+	HandlerMap.Add(TEXT("pcgCreateGraph"), [this](const FString& Body) { return HandlePCGCreateGraph(Body); });
+	HandlerMap.Add(TEXT("wpGetInfo"), [this](const FString& Body) { return HandleWPGetInfo(Body); });
+	HandlerMap.Add(TEXT("wpSetActorDataLayer"), [this](const FString& Body) { return HandleWPSetActorDataLayer(Body); });
+	HandlerMap.Add(TEXT("wpSetActorRuntimeGrid"), [this](const FString& Body) { return HandleWPSetActorRuntimeGrid(Body); });
+	HandlerMap.Add(TEXT("metahumanList"), [this](const FString& Body) { return HandleMetaHumanList(Body); });
+	HandlerMap.Add(TEXT("metahumanSpawn"), [this](const FString& Body) { return HandleMetaHumanSpawn(Body); });
+	HandlerMap.Add(TEXT("groomList"), [this](const FString& Body) { return HandleGroomList(Body); });
+	HandlerMap.Add(TEXT("groomSetBinding"), [this](const FString& Body) { return HandleGroomSetBinding(Body); });
+	HandlerMap.Add(TEXT("pythonExecFile"), [this](const FString& Body) { return HandlePythonExecFile(Body); });
+	HandlerMap.Add(TEXT("pythonExecString"), [this](const FString& Body) { return HandlePythonExecString(Body); });
+
+
 	{
 		return HandleGetGraph(Body);
 	});

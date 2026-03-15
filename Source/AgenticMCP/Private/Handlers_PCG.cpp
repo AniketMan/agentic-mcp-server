@@ -669,3 +669,159 @@ FString FAgenticMCPServer::HandlePCGSetNodeSettings(const FString& Body)
 	return JsonToString(Result);
 #endif
 }
+
+// ============================================================================
+// PCG MUTATION HANDLERS
+// ============================================================================
+
+// --- pcgAddNode ---
+FString FAgenticMCPServer::HandlePCGAddNode(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString GraphPath = Json->GetStringField(TEXT("graphPath"));
+	FString NodeClass = Json->GetStringField(TEXT("nodeClass"));
+
+	if (GraphPath.IsEmpty() || NodeClass.IsEmpty())
+		return MakeErrorJson(TEXT("Missing 'graphPath' or 'nodeClass'"));
+
+	UPCGGraph* Graph = LoadObject<UPCGGraph>(nullptr, *GraphPath);
+	if (!Graph)
+		return MakeErrorJson(FString::Printf(TEXT("PCG Graph not found: %s"), *GraphPath));
+
+	UClass* SettingsClass = FindObject<UClass>(ANY_PACKAGE, *NodeClass);
+	if (!SettingsClass)
+		return MakeErrorJson(FString::Printf(TEXT("Node class not found: %s"), *NodeClass));
+
+	UPCGSettings* Settings = NewObject<UPCGSettings>(Graph, SettingsClass);
+	if (!Settings)
+		return MakeErrorJson(TEXT("Failed to create node settings"));
+
+	UPCGNode* NewNode = Graph->AddNode(Settings);
+	if (!NewNode)
+		return MakeErrorJson(TEXT("Failed to add node to graph"));
+
+	double PosX = 0, PosY = 0;
+	Json->TryGetNumberField(TEXT("posX"), PosX);
+	Json->TryGetNumberField(TEXT("posY"), PosY);
+	NewNode->PositionX = (int32)PosX;
+	NewNode->PositionY = (int32)PosY;
+
+	Graph->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("nodeId"), NewNode->GetName());
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- pcgRemoveNode ---
+FString FAgenticMCPServer::HandlePCGRemoveNode(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString GraphPath = Json->GetStringField(TEXT("graphPath"));
+	FString NodeName = Json->GetStringField(TEXT("nodeName"));
+
+	UPCGGraph* Graph = LoadObject<UPCGGraph>(nullptr, *GraphPath);
+	if (!Graph)
+		return MakeErrorJson(FString::Printf(TEXT("PCG Graph not found: %s"), *GraphPath));
+
+	for (UPCGNode* Node : Graph->GetNodes())
+	{
+		if (Node && Node->GetName() == NodeName)
+		{
+			Graph->RemoveNode(Node);
+			Graph->MarkPackageDirty();
+
+			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+			Result->SetStringField(TEXT("status"), TEXT("ok"));
+			Result->SetStringField(TEXT("removed"), NodeName);
+			FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+			FJsonSerializer::Serialize(Result, W); return Out;
+		}
+	}
+
+	return MakeErrorJson(FString::Printf(TEXT("Node not found: %s"), *NodeName));
+}
+
+// --- pcgConnectNodes ---
+FString FAgenticMCPServer::HandlePCGConnectNodes(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString GraphPath = Json->GetStringField(TEXT("graphPath"));
+	FString SourceNode = Json->GetStringField(TEXT("sourceNode"));
+	FString TargetNode = Json->GetStringField(TEXT("targetNode"));
+	FString SourcePin = Json->GetStringField(TEXT("sourcePin"));
+	FString TargetPin = Json->GetStringField(TEXT("targetPin"));
+
+	UPCGGraph* Graph = LoadObject<UPCGGraph>(nullptr, *GraphPath);
+	if (!Graph)
+		return MakeErrorJson(FString::Printf(TEXT("PCG Graph not found: %s"), *GraphPath));
+
+	UPCGNode* SrcNode = nullptr;
+	UPCGNode* TgtNode = nullptr;
+	for (UPCGNode* Node : Graph->GetNodes())
+	{
+		if (Node->GetName() == SourceNode) SrcNode = Node;
+		if (Node->GetName() == TargetNode) TgtNode = Node;
+	}
+
+	if (!SrcNode)
+		return MakeErrorJson(FString::Printf(TEXT("Source node not found: %s"), *SourceNode));
+	if (!TgtNode)
+		return MakeErrorJson(FString::Printf(TEXT("Target node not found: %s"), *TargetNode));
+
+	bool bConnected = Graph->AddEdge(SrcNode, FName(*SourcePin), TgtNode, FName(*TargetPin));
+	if (!bConnected)
+		return MakeErrorJson(TEXT("Failed to connect nodes"));
+
+	Graph->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- pcgCreateGraph ---
+FString FAgenticMCPServer::HandlePCGCreateGraph(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString Path = Json->GetStringField(TEXT("path"));
+	if (Path.IsEmpty())
+		return MakeErrorJson(TEXT("Missing 'path'"));
+
+	FString AssetName = FPaths::GetBaseFilename(Path);
+	UPackage* Package = CreatePackage(*Path);
+	if (!Package)
+		return MakeErrorJson(TEXT("Failed to create package"));
+
+	UPCGGraph* Graph = NewObject<UPCGGraph>(Package, FName(*AssetName), RF_Public | RF_Standalone);
+	if (!Graph)
+		return MakeErrorJson(TEXT("Failed to create PCG graph"));
+
+	Package->MarkPackageDirty();
+	FAssetRegistryModule::AssetCreated(Graph);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("path"), Path);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}

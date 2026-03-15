@@ -106,6 +106,9 @@ FString FAgenticMCPServer::HandlePixelStreamingStop(const TMap<FString, FString>
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingListStreamers(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> StreamersArray;
 
@@ -219,6 +222,9 @@ FString FAgenticMCPServer::HandlePixelStreamingSetCodec(const TMap<FString, FStr
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingListPlayers(const TMap<FString, FString>& Params, const FString& Body)
 {
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> PlayersArray;
 

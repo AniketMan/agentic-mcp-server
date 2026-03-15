@@ -13,6 +13,10 @@
 #include "Engine/World.h"
 #include "Editor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundCue.h"
+#include "Sound/AmbientSound.h"
+#include "Sound/AudioVolume.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPAudio, Log, All);
 
@@ -432,4 +436,198 @@ FString FAgenticMCPServer::HandleAudioDebugVisualize(const TMap<FString, FString
 	Result->SetBoolField(TEXT("success"), true);
 	Result->SetBoolField(TEXT("enabled"), bEnable);
 	return JsonToString(Result);
+}
+
+// ============================================================================
+// AUDIO MUTATION HANDLERS
+// ============================================================================
+
+// --- audioCreateSoundCue ---
+FString FAgenticMCPServer::HandleAudioCreateSoundCue(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString Path = Json->GetStringField(TEXT("path"));
+	if (Path.IsEmpty())
+		return MakeErrorJson(TEXT("Missing 'path'"));
+
+	FString AssetName = FPaths::GetBaseFilename(Path);
+	UPackage* Package = CreatePackage(*Path);
+	if (!Package)
+		return MakeErrorJson(TEXT("Failed to create package"));
+
+	USoundCue* Cue = NewObject<USoundCue>(Package, FName(*AssetName), RF_Public | RF_Standalone);
+	if (!Cue)
+		return MakeErrorJson(TEXT("Failed to create SoundCue"));
+
+	Package->MarkPackageDirty();
+	FAssetRegistryModule::AssetCreated(Cue);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("path"), Path);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- audioSetAttenuation ---
+FString FAgenticMCPServer::HandleAudioSetAttenuation(const FString& Body)
+{
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString ActorName = Json->GetStringField(TEXT("actorName"));
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world"));
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel() == ActorName || It->GetName() == ActorName)
+		{ FoundActor = *It; break; }
+	}
+	if (!FoundActor)
+		return MakeErrorJson(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+
+	UAudioComponent* AudioComp = FoundActor->FindComponentByClass<UAudioComponent>();
+	if (!AudioComp)
+		return MakeErrorJson(TEXT("Actor has no AudioComponent"));
+
+	int32 Changed = 0;
+	double NumVal;
+	bool BoolVal;
+
+	if (Json->TryGetNumberField(TEXT("innerRadius"), NumVal))
+	{
+		AudioComp->AttenuationOverrides.FalloffDistance = (float)NumVal;
+		Changed++;
+	}
+	if (Json->TryGetNumberField(TEXT("falloffDistance"), NumVal))
+	{
+		AudioComp->AttenuationOverrides.FalloffDistance = (float)NumVal;
+		Changed++;
+	}
+	if (Json->TryGetBoolField(TEXT("overrideAttenuation"), BoolVal))
+	{
+		AudioComp->bOverrideAttenuation = BoolVal;
+		Changed++;
+	}
+	if (Json->TryGetNumberField(TEXT("volumeMultiplier"), NumVal))
+	{
+		AudioComp->SetVolumeMultiplier((float)NumVal);
+		Changed++;
+	}
+	if (Json->TryGetNumberField(TEXT("pitchMultiplier"), NumVal))
+	{
+		AudioComp->SetPitchMultiplier((float)NumVal);
+		Changed++;
+	}
+
+	FoundActor->MarkPackageDirty();
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- audioCreateAmbientSound ---
+FString FAgenticMCPServer::HandleAudioCreateAmbientSound(const FString& Body)
+{
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString SoundPath = Json->GetStringField(TEXT("soundPath"));
+	USoundBase* Sound = LoadObject<USoundBase>(nullptr, *SoundPath);
+	if (!Sound)
+		return MakeErrorJson(FString::Printf(TEXT("Sound not found: %s"), *SoundPath));
+
+	FVector Location = FVector::ZeroVector;
+	const TArray<TSharedPtr<FJsonValue>>* LocArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("location"), LocArray) && LocArray->Num() >= 3)
+		Location = FVector((*LocArray)[0]->AsNumber(), (*LocArray)[1]->AsNumber(), (*LocArray)[2]->AsNumber());
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world"));
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AAmbientSound* AmbientActor = World->SpawnActor<AAmbientSound>(Location, FRotator::ZeroRotator, SpawnParams);
+	if (!AmbientActor)
+		return MakeErrorJson(TEXT("Failed to spawn AmbientSound actor"));
+
+	UAudioComponent* AudioComp = AmbientActor->GetAudioComponent();
+	if (AudioComp)
+	{
+		AudioComp->SetSound(Sound);
+		bool bAutoActivate = true;
+		Json->TryGetBoolField(TEXT("autoActivate"), bAutoActivate);
+		AudioComp->bAutoActivate = bAutoActivate;
+	}
+
+	FString Label;
+	if (Json->TryGetStringField(TEXT("label"), Label) && !Label.IsEmpty())
+		AmbientActor->SetActorLabel(Label);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("actor"), AmbientActor->GetName());
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
+}
+
+// --- audioCreateAudioVolume ---
+FString FAgenticMCPServer::HandleAudioCreateAudioVolume(const FString& Body)
+{
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
+	TSharedPtr<FJsonObject> Json;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
+		return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FVector Location = FVector::ZeroVector;
+	const TArray<TSharedPtr<FJsonValue>>* LocArray = nullptr;
+	if (Json->TryGetArrayField(TEXT("location"), LocArray) && LocArray->Num() >= 3)
+		Location = FVector((*LocArray)[0]->AsNumber(), (*LocArray)[1]->AsNumber(), (*LocArray)[2]->AsNumber());
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+	if (!World)
+		return MakeErrorJson(TEXT("No editor world"));
+
+	FActorSpawnParameters SpawnParams;
+	AAudioVolume* Volume = World->SpawnActor<AAudioVolume>(Location, FRotator::ZeroRotator, SpawnParams);
+	if (!Volume)
+		return MakeErrorJson(TEXT("Failed to spawn AudioVolume"));
+
+	double Priority = 0;
+	Json->TryGetNumberField(TEXT("priority"), Priority);
+	Volume->SetPriority((float)Priority);
+
+	FString Label;
+	if (Json->TryGetStringField(TEXT("label"), Label) && !Label.IsEmpty())
+		Volume->SetActorLabel(Label);
+
+	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	Result->SetStringField(TEXT("actor"), Volume->GetName());
+	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
+	FJsonSerializer::Serialize(Result, W); return Out;
 }

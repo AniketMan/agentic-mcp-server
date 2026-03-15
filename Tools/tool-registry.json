@@ -6668,6 +6668,764 @@
           "required": true
         }
       ]
+    },
+    {
+      "name": "niagaraCreateSystem",
+      "description": "Create a new Niagara particle system asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path for the new system",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "niagaraAddEmitter",
+      "description": "Add an emitter to a Niagara system",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "System asset path",
+          "required": true
+        },
+        {
+          "name": "emitterPath",
+          "type": "string",
+          "description": "Emitter asset path to add",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "niagaraRemoveEmitter",
+      "description": "Remove an emitter from a Niagara system by index",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "System asset path",
+          "required": true
+        },
+        {
+          "name": "emitterIndex",
+          "type": "number",
+          "description": "Index of emitter to remove",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "niagaraSetSystemProperty",
+      "description": "Set Niagara system properties (warmup, bounds)",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "System asset path",
+          "required": true
+        },
+        {
+          "name": "warmupEnabled",
+          "type": "boolean",
+          "description": "Enable warmup",
+          "required": false
+        },
+        {
+          "name": "warmupTime",
+          "type": "number",
+          "description": "Warmup time in seconds",
+          "required": false
+        },
+        {
+          "name": "warmupTickCount",
+          "type": "number",
+          "description": "Number of warmup ticks",
+          "required": false
+        },
+        {
+          "name": "fixedBounds",
+          "type": "boolean",
+          "description": "Use fixed bounds",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "niagaraSpawnSystem",
+      "description": "Spawn a Niagara system at a world location",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "System asset path",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x,y,z]",
+          "required": false
+        },
+        {
+          "name": "rotation",
+          "type": "array",
+          "description": "Rotation [pitch,yaw,roll]",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "audioCreateSoundCue",
+      "description": "Create a new SoundCue asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path for the SoundCue",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "audioSetAttenuation",
+      "description": "Set audio attenuation properties on an actor's AudioComponent",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "innerRadius",
+          "type": "number",
+          "description": "Inner attenuation radius",
+          "required": false
+        },
+        {
+          "name": "falloffDistance",
+          "type": "number",
+          "description": "Falloff distance",
+          "required": false
+        },
+        {
+          "name": "overrideAttenuation",
+          "type": "boolean",
+          "description": "Override attenuation settings",
+          "required": false
+        },
+        {
+          "name": "volumeMultiplier",
+          "type": "number",
+          "description": "Volume multiplier",
+          "required": false
+        },
+        {
+          "name": "pitchMultiplier",
+          "type": "number",
+          "description": "Pitch multiplier",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "audioCreateAmbientSound",
+      "description": "Spawn an AmbientSound actor with a sound asset",
+      "parameters": [
+        {
+          "name": "soundPath",
+          "type": "string",
+          "description": "Asset path of the sound",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x,y,z]",
+          "required": false
+        },
+        {
+          "name": "autoActivate",
+          "type": "boolean",
+          "description": "Auto-play on begin",
+          "required": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Actor label",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "audioCreateAudioVolume",
+      "description": "Spawn an AudioVolume actor for spatial audio zones",
+      "parameters": [
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x,y,z]",
+          "required": false
+        },
+        {
+          "name": "priority",
+          "type": "number",
+          "description": "Volume priority",
+          "required": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Actor label",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "lightCreate",
+      "description": "Create a light actor (point, spot, directional, rect, sky)",
+      "parameters": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Light type: point, spot, directional, rect, sky",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x,y,z]",
+          "required": false
+        },
+        {
+          "name": "rotation",
+          "type": "array",
+          "description": "Rotation [pitch,yaw,roll]",
+          "required": false
+        },
+        {
+          "name": "intensity",
+          "type": "number",
+          "description": "Light intensity",
+          "required": false
+        },
+        {
+          "name": "color",
+          "type": "array",
+          "description": "Light color [r,g,b] 0-1",
+          "required": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Actor label",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "lightSetProperties",
+      "description": "Set light properties (intensity, color, temperature, shadows, attenuation, cone angles)",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Light actor name or label",
+          "required": true
+        },
+        {
+          "name": "intensity",
+          "type": "number",
+          "description": "Light intensity",
+          "required": false
+        },
+        {
+          "name": "color",
+          "type": "array",
+          "description": "Color [r,g,b] 0-1",
+          "required": false
+        },
+        {
+          "name": "temperature",
+          "type": "number",
+          "description": "Color temperature in Kelvin",
+          "required": false
+        },
+        {
+          "name": "castShadows",
+          "type": "boolean",
+          "description": "Enable shadow casting",
+          "required": false
+        },
+        {
+          "name": "attenuationRadius",
+          "type": "number",
+          "description": "Attenuation radius (point/spot)",
+          "required": false
+        },
+        {
+          "name": "innerConeAngle",
+          "type": "number",
+          "description": "Inner cone angle (spot only)",
+          "required": false
+        },
+        {
+          "name": "outerConeAngle",
+          "type": "number",
+          "description": "Outer cone angle (spot only)",
+          "required": false
+        },
+        {
+          "name": "sourceWidth",
+          "type": "number",
+          "description": "Source width (rect only)",
+          "required": false
+        },
+        {
+          "name": "sourceHeight",
+          "type": "number",
+          "description": "Source height (rect only)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "lightList",
+      "description": "List all light actors in the current level with properties",
+      "parameters": []
+    },
+    {
+      "name": "bpCreateBlueprint",
+      "description": "Create a new Blueprint asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path",
+          "required": true
+        },
+        {
+          "name": "parentClass",
+          "type": "string",
+          "description": "Parent class name (default: Actor)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "bpAddVariable",
+      "description": "Add a member variable to a Blueprint",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "variableName",
+          "type": "string",
+          "description": "Variable name",
+          "required": true
+        },
+        {
+          "name": "variableType",
+          "type": "string",
+          "description": "Type: bool, int, float, string, vector, rotator, transform, object",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "bpAddFunction",
+      "description": "Add a new function graph to a Blueprint",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "functionName",
+          "type": "string",
+          "description": "Function name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "bpAddNode",
+      "description": "Add a node to a Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "nodeType",
+          "type": "string",
+          "description": "CallFunction, CustomEvent, Branch, VariableGet, VariableSet",
+          "required": true
+        },
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "Graph name (default: event graph)",
+          "required": false
+        },
+        {
+          "name": "functionName",
+          "type": "string",
+          "description": "For CallFunction: function to call",
+          "required": false
+        },
+        {
+          "name": "eventName",
+          "type": "string",
+          "description": "For CustomEvent: event name",
+          "required": false
+        },
+        {
+          "name": "variableName",
+          "type": "string",
+          "description": "For VariableGet/Set: variable name",
+          "required": false
+        },
+        {
+          "name": "posX",
+          "type": "number",
+          "description": "Node X position",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "number",
+          "description": "Node Y position",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "bpConnectPins",
+      "description": "Connect two pins between Blueprint nodes",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "sourceNodeId",
+          "type": "string",
+          "description": "Source node GUID",
+          "required": true
+        },
+        {
+          "name": "sourcePinName",
+          "type": "string",
+          "description": "Source pin name",
+          "required": true
+        },
+        {
+          "name": "targetNodeId",
+          "type": "string",
+          "description": "Target node GUID",
+          "required": true
+        },
+        {
+          "name": "targetPinName",
+          "type": "string",
+          "description": "Target pin name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "bpCompile",
+      "description": "Compile a Blueprint and report errors",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "bpGetGraph",
+      "description": "Get all nodes, pins, and connections in a Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "graphName",
+          "type": "string",
+          "description": "Specific graph name (optional, returns all if omitted)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "bpDeleteNode",
+      "description": "Delete a node from a Blueprint graph by GUID",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Node GUID to delete",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "pcgAddNode",
+      "description": "Add a node to a PCG graph",
+      "parameters": [
+        {
+          "name": "graphPath",
+          "type": "string",
+          "description": "PCG graph asset path",
+          "required": true
+        },
+        {
+          "name": "nodeClass",
+          "type": "string",
+          "description": "Node settings class name",
+          "required": true
+        },
+        {
+          "name": "posX",
+          "type": "number",
+          "description": "Node X position",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "number",
+          "description": "Node Y position",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "pcgRemoveNode",
+      "description": "Remove a node from a PCG graph",
+      "parameters": [
+        {
+          "name": "graphPath",
+          "type": "string",
+          "description": "PCG graph asset path",
+          "required": true
+        },
+        {
+          "name": "nodeName",
+          "type": "string",
+          "description": "Node name to remove",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "pcgConnectNodes",
+      "description": "Connect two nodes in a PCG graph",
+      "parameters": [
+        {
+          "name": "graphPath",
+          "type": "string",
+          "description": "PCG graph asset path",
+          "required": true
+        },
+        {
+          "name": "sourceNode",
+          "type": "string",
+          "description": "Source node name",
+          "required": true
+        },
+        {
+          "name": "sourcePin",
+          "type": "string",
+          "description": "Source pin name",
+          "required": true
+        },
+        {
+          "name": "targetNode",
+          "type": "string",
+          "description": "Target node name",
+          "required": true
+        },
+        {
+          "name": "targetPin",
+          "type": "string",
+          "description": "Target pin name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "pcgCreateGraph",
+      "description": "Create a new PCG graph asset",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path for the graph",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "wpGetInfo",
+      "description": "Get World Partition info, streaming status, and data layers",
+      "parameters": []
+    },
+    {
+      "name": "wpSetActorDataLayer",
+      "description": "Assign an actor to a data layer",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "dataLayer",
+          "type": "string",
+          "description": "Data layer name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "wpSetActorRuntimeGrid",
+      "description": "Set the runtime grid for an actor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "runtimeGrid",
+          "type": "string",
+          "description": "Runtime grid name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "metahumanList",
+      "description": "List all MetaHuman Blueprint assets in the project",
+      "parameters": []
+    },
+    {
+      "name": "metahumanSpawn",
+      "description": "Spawn a MetaHuman actor from a Blueprint",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "MetaHuman Blueprint asset path",
+          "required": true
+        },
+        {
+          "name": "location",
+          "type": "array",
+          "description": "World location [x,y,z]",
+          "required": false
+        },
+        {
+          "name": "rotation",
+          "type": "array",
+          "description": "Rotation [pitch,yaw,roll]",
+          "required": false
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Actor label",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "groomList",
+      "description": "List all Groom (hair) assets in the project",
+      "parameters": []
+    },
+    {
+      "name": "groomSetBinding",
+      "description": "Set groom asset and binding on an actor's GroomComponent",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "groomPath",
+          "type": "string",
+          "description": "Groom asset path",
+          "required": true
+        },
+        {
+          "name": "bindingPath",
+          "type": "string",
+          "description": "Groom binding asset path",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "pythonExecFile",
+      "description": "Execute a Python script file in the Unreal Python environment",
+      "parameters": [
+        {
+          "name": "filePath",
+          "type": "string",
+          "description": "Absolute path to the Python script",
+          "required": true
+        },
+        {
+          "name": "args",
+          "type": "array",
+          "description": "Command line arguments",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "pythonExecString",
+      "description": "Execute a Python code string in the Unreal Python environment",
+      "parameters": [
+        {
+          "name": "code",
+          "type": "string",
+          "description": "Python code to execute",
+          "required": true
+        }
+      ]
     }
   ]
 }

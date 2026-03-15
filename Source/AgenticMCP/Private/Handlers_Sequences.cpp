@@ -114,6 +114,9 @@ FString FAgenticMCPServer::HandleListSequences(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleReadSequence(const FString& Body)
 {
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
     TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
 
     // Parse JSON body
@@ -300,6 +303,9 @@ FString FAgenticMCPServer::HandleReadSequence(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleRemoveAudioTracks(const FString& Body)
 {
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
     TSharedRef<FJsonObject> Response = MakeShared<FJsonObject>();
 
     // Parse JSON body
