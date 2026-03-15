@@ -11,3 +11,7 @@ Saved/
 .quantized_cache/
 reference/ue5_api/en-US/
 *.tgz
+
+# Local inference models and binaries (downloaded by models/setup-models.bat)
+models/bin/
+models/*.gguf

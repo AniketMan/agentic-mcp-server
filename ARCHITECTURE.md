@@ -32,7 +32,7 @@ The AgenticMCP system operates on a philosophy of **Inference-Gated Determinism*
 |                   Layer 3: The Workers                            |
 |                   (Local Inference Executors)                     |
 |                                                                   |
-| Small local models (e.g., Qwen2.5 7B) running via llama.cpp.      |
+| Small local models (Llama 3.1 8B + Llama 3.2 3B) via llama.cpp.  |
 | Context: API Docs + source_truth + tool registry.                 |
 | Action: Run inference to determine exact JSON payload.            |
 | Gate: If confidence >= 95%, execute. Else, escalate.              |

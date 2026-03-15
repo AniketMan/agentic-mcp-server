@@ -4,8 +4,12 @@
  * Uses a small local model via llama.cpp HTTP server to validate
  * the semantic correctness of plan steps against UE API docs.
  * 
- * The LLM server must be running at LLAMA_CPP_URL (default: http://localhost:8080).
- * Recommended model: Qwen2.5-Coder-7B-Q4_K_M.gguf (~4.5GB VRAM)
+ * Three llama.cpp servers must be running (see models/start-all.bat):
+ *   - Validator:  port 8080  (Llama 3.2 3B Instruct Q4_K_M)
+ *   - Worker:     port 8081  (Llama 3.1 8B Instruct Q4_K_M)
+ *   - QA Auditor: port 8082  (Llama 3.2 3B Instruct Q4_K_M)
+ *
+ * System prompts are injected at server startup from models/instructions/*.md
  */
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
@@ -13,7 +17,13 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const LLAMA_CPP_URL = process.env.LLAMA_CPP_URL || 'http://localhost:8080';
+// Three inference endpoints -- one per role
+const VALIDATOR_URL  = process.env.LLAMA_VALIDATOR_URL  || 'http://localhost:8080';
+const WORKER_URL     = process.env.LLAMA_WORKER_URL     || 'http://localhost:8081';
+const QA_AUDITOR_URL = process.env.LLAMA_QA_AUDITOR_URL || 'http://localhost:8082';
+
+// Legacy fallback: if LLAMA_CPP_URL is set, use it for all roles
+const LLAMA_CPP_URL = process.env.LLAMA_CPP_URL || null;
 const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD || '0.95');
 const MAX_RETRIES = parseInt(process.env.MAX_WORKER_RETRIES || '3', 10);
 
@@ -80,11 +90,27 @@ function loadContextForTool(toolName, toolDef) {
 }
 
 /**
- * Check if the llama.cpp server is running.
+ * Get the URL for a specific role.
+ * Falls back to LLAMA_CPP_URL if set (single-server mode).
+ */
+function getUrlForRole(role = 'worker') {
+  if (LLAMA_CPP_URL) return LLAMA_CPP_URL;
+  switch (role) {
+    case 'validator':  return VALIDATOR_URL;
+    case 'qa':         return QA_AUDITOR_URL;
+    case 'worker':
+    default:           return WORKER_URL;
+  }
+}
+
+/**
+ * Check if at least the Worker llama.cpp server is running.
+ * The Worker is the minimum required for plan execution.
  */
 async function isLLMAvailable() {
   try {
-    const resp = await fetch(`${LLAMA_CPP_URL}/health`, { signal: AbortSignal.timeout(2000) });
+    const url = getUrlForRole('worker');
+    const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) });
     return resp.ok;
   } catch {
     return false;
@@ -116,7 +142,8 @@ Respond with ONLY valid JSON. No explanation. No markdown.
 Format: {"toolName": "${step.tool}", "payload": {...}}`;
 
   try {
-    const resp = await fetch(`${LLAMA_CPP_URL}/completion`, {
+    const url = getUrlForRole('worker');
+    const resp = await fetch(`${url}/completion`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -247,6 +274,10 @@ export {
   runWorkerInference,
   executeWithConfidenceGate,
   loadContextForTool,
+  getUrlForRole,
   CONFIDENCE_THRESHOLD,
   MAX_RETRIES,
+  VALIDATOR_URL,
+  WORKER_URL,
+  QA_AUDITOR_URL,
 };
