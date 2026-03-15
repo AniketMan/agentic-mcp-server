@@ -4040,6 +4040,1475 @@
       "annotations": {
         "readOnlyHint": true
       }
+    },
+    {
+      "name": "sequencerDeleteTrack",
+      "description": "Delete a track from a level sequence binding by track index.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the track to delete (0-based)",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "sequencerGetKeyframes",
+      "description": "Read back all keyframe times and values from a track section. Returns channel data for transform (9 channels), float, or bool tracks.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the track (0-based)",
+          "required": true
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section (0-based, default 0)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerAddSpawnable",
+      "description": "Add a spawnable actor to a level sequence from a Blueprint class. Returns the spawnable binding GUID.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Full asset path to the Blueprint class to spawn",
+          "required": true
+        },
+        {
+          "name": "spawnableName",
+          "type": "string",
+          "description": "Display name for the spawnable (optional)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerMoveSection",
+      "description": "Move a section to a new time range (start/end frames).",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the track (0-based)",
+          "required": true
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section (0-based)",
+          "required": true
+        },
+        {
+          "name": "newStartFrame",
+          "type": "number",
+          "description": "New start frame (display frames)",
+          "required": true
+        },
+        {
+          "name": "newEndFrame",
+          "type": "number",
+          "description": "New end frame (display frames)",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerDuplicateSection",
+      "description": "Duplicate a section within the same track, optionally at a new time offset.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the track (0-based)",
+          "required": true
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section to duplicate (0-based)",
+          "required": true
+        },
+        {
+          "name": "offsetFrames",
+          "type": "number",
+          "description": "Frame offset for the duplicated section (default: section length)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerSetTrackMute",
+      "description": "Set mute or lock state on a track.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the track (0-based)",
+          "required": true
+        },
+        {
+          "name": "muted",
+          "type": "boolean",
+          "description": "Whether the track should be muted",
+          "required": false
+        },
+        {
+          "name": "locked",
+          "type": "boolean",
+          "description": "Whether the track should be locked",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerAddSubSequence",
+      "description": "Add a sub-sequence (shot) track referencing another level sequence.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the parent level sequence",
+          "required": true
+        },
+        {
+          "name": "subSequenceName",
+          "type": "string",
+          "description": "Name of the sub-sequence to reference",
+          "required": true
+        },
+        {
+          "name": "startFrame",
+          "type": "number",
+          "description": "Start frame for the sub-sequence section",
+          "required": true
+        },
+        {
+          "name": "endFrame",
+          "type": "number",
+          "description": "End frame for the sub-sequence section",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerAddFade",
+      "description": "Add a fade track with a fade-in and/or fade-out section.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "fadeInEnd",
+          "type": "number",
+          "description": "Frame where fade-in completes (0 = no fade-in)",
+          "required": false
+        },
+        {
+          "name": "fadeOutStart",
+          "type": "number",
+          "description": "Frame where fade-out begins",
+          "required": false
+        },
+        {
+          "name": "fadeOutEnd",
+          "type": "number",
+          "description": "Frame where fade-out completes",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerSetAudioSection",
+      "description": "Assign a sound asset to an audio track section.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the audio track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the audio track (0-based)",
+          "required": true
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section (0-based, default 0)",
+          "required": false
+        },
+        {
+          "name": "soundAssetPath",
+          "type": "string",
+          "description": "Full asset path to the SoundWave or SoundCue",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerSetEventPayload",
+      "description": "Set the event function binding on an event track section.",
+      "parameters": [
+        {
+          "name": "sequenceName",
+          "type": "string",
+          "description": "Name of the level sequence",
+          "required": true
+        },
+        {
+          "name": "bindingGuid",
+          "type": "string",
+          "description": "GUID of the binding that owns the event track",
+          "required": true
+        },
+        {
+          "name": "trackIndex",
+          "type": "number",
+          "description": "Index of the event track (0-based)",
+          "required": true
+        },
+        {
+          "name": "sectionIndex",
+          "type": "number",
+          "description": "Index of the section (0-based, default 0)",
+          "required": false
+        },
+        {
+          "name": "functionName",
+          "type": "string",
+          "description": "Name of the function to call on the bound actor",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "sequencerRenderStatus",
+      "description": "Check the status of the Movie Render Pipeline queue (pending, rendering, complete).",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialAddNode",
+      "description": "Add a material expression node to a material graph. Supports TextureSample, Multiply, Add, Lerp, Constant, VectorParameter, ScalarParameter, and custom expression class paths.",
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Name of the material asset",
+          "required": true
+        },
+        {
+          "name": "nodeType",
+          "type": "string",
+          "description": "Expression type: TextureSample, Multiply, Add, Lerp, Constant, VectorParameter, ScalarParameter, or class path",
+          "required": true
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "Parameter name (for parameter nodes)",
+          "required": false
+        },
+        {
+          "name": "posX",
+          "type": "number",
+          "description": "Node X position in graph",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "number",
+          "description": "Node Y position in graph",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialDeleteNode",
+      "description": "Delete a material expression node from a material graph by index.",
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Name of the material asset",
+          "required": true
+        },
+        {
+          "name": "nodeIndex",
+          "type": "number",
+          "description": "Index of the expression to delete (0-based)",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "materialConnectPins",
+      "description": "Connect two material expression pins (output of one node to input of another or to a material property).",
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Name of the material asset",
+          "required": true
+        },
+        {
+          "name": "sourceNodeIndex",
+          "type": "number",
+          "description": "Index of the source expression node",
+          "required": true
+        },
+        {
+          "name": "sourceOutputIndex",
+          "type": "number",
+          "description": "Output pin index on source node (default 0)",
+          "required": false
+        },
+        {
+          "name": "targetNodeIndex",
+          "type": "number",
+          "description": "Index of the target expression node (-1 for material output)",
+          "required": true
+        },
+        {
+          "name": "targetInputIndex",
+          "type": "number",
+          "description": "Input pin index on target node (default 0)",
+          "required": false
+        },
+        {
+          "name": "materialProperty",
+          "type": "string",
+          "description": "Material property name if targeting material output (BaseColor, Metallic, Roughness, Normal, EmissiveColor, Opacity, etc.)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialDisconnectPin",
+      "description": "Disconnect a material expression input pin.",
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Name of the material asset",
+          "required": true
+        },
+        {
+          "name": "nodeIndex",
+          "type": "number",
+          "description": "Index of the expression node (-1 for material output)",
+          "required": true
+        },
+        {
+          "name": "inputIndex",
+          "type": "number",
+          "description": "Input pin index to disconnect (default 0)",
+          "required": false
+        },
+        {
+          "name": "materialProperty",
+          "type": "string",
+          "description": "Material property name if disconnecting from material output",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialSetTextureParam",
+      "description": "Set the texture on a TextureSample or TextureParameter expression node.",
+      "parameters": [
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Name of the material asset",
+          "required": true
+        },
+        {
+          "name": "nodeIndex",
+          "type": "number",
+          "description": "Index of the texture expression node",
+          "required": true
+        },
+        {
+          "name": "texturePath",
+          "type": "string",
+          "description": "Full asset path to the texture",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialCreateInstance",
+      "description": "Create a material instance from a parent material with optional scalar/vector parameter overrides.",
+      "parameters": [
+        {
+          "name": "parentMaterialName",
+          "type": "string",
+          "description": "Name of the parent material",
+          "required": true
+        },
+        {
+          "name": "instanceName",
+          "type": "string",
+          "description": "Name for the new material instance",
+          "required": true
+        },
+        {
+          "name": "savePath",
+          "type": "string",
+          "description": "Package path to save (default: same folder as parent)",
+          "required": false
+        },
+        {
+          "name": "scalarParams",
+          "type": "object",
+          "description": "Key-value pairs of scalar parameter overrides",
+          "required": false
+        },
+        {
+          "name": "vectorParams",
+          "type": "object",
+          "description": "Key-value pairs of vector parameter overrides (RGBA arrays)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "materialAssignToActor",
+      "description": "Assign a material or material instance to an actor's mesh component at a specific slot index.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the target actor",
+          "required": true
+        },
+        {
+          "name": "materialName",
+          "type": "string",
+          "description": "Name of the material or material instance to assign",
+          "required": true
+        },
+        {
+          "name": "slotIndex",
+          "type": "number",
+          "description": "Material slot index (default 0)",
+          "required": false
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Specific mesh component name (default: first mesh component)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "umgCreateWidget",
+      "description": "Create a new Widget Blueprint asset with a root Canvas Panel.",
+      "parameters": [
+        {
+          "name": "widgetName",
+          "type": "string",
+          "description": "Name for the new widget blueprint",
+          "required": true
+        },
+        {
+          "name": "savePath",
+          "type": "string",
+          "description": "Package path to save (default: /Game/UI)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "umgAddChild",
+      "description": "Add a child widget to a panel in a Widget Blueprint. Supports TextBlock, Button, Image, ProgressBar, Slider, CheckBox, EditableText, VerticalBox, HorizontalBox, CanvasPanel, ScrollBox, Border, Spacer.",
+      "parameters": [
+        {
+          "name": "widgetBlueprintName",
+          "type": "string",
+          "description": "Name of the widget blueprint",
+          "required": true
+        },
+        {
+          "name": "parentWidgetName",
+          "type": "string",
+          "description": "Name of the parent panel widget (default: root)",
+          "required": false
+        },
+        {
+          "name": "childType",
+          "type": "string",
+          "description": "Widget type to add",
+          "required": true
+        },
+        {
+          "name": "childName",
+          "type": "string",
+          "description": "Name for the new child widget",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "description": "Initial text content (for TextBlock, Button)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "umgRemoveChild",
+      "description": "Remove a widget from a Widget Blueprint by name.",
+      "parameters": [
+        {
+          "name": "widgetBlueprintName",
+          "type": "string",
+          "description": "Name of the widget blueprint",
+          "required": true
+        },
+        {
+          "name": "widgetName",
+          "type": "string",
+          "description": "Name of the widget to remove",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "umgSetWidgetProperty",
+      "description": "Set a property on a widget (text, visibility, color, opacity, font size, alignment, etc.).",
+      "parameters": [
+        {
+          "name": "widgetBlueprintName",
+          "type": "string",
+          "description": "Name of the widget blueprint",
+          "required": true
+        },
+        {
+          "name": "widgetName",
+          "type": "string",
+          "description": "Name of the target widget",
+          "required": true
+        },
+        {
+          "name": "propertyName",
+          "type": "string",
+          "description": "Property to set (text, visibility, colorAndOpacity, fontSize, justification, etc.)",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Value to set (string, number, or JSON depending on property)",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "umgBindEvent",
+      "description": "Bind a widget event (OnClicked, OnHovered, OnValueChanged, etc.) to a function in the widget blueprint.",
+      "parameters": [
+        {
+          "name": "widgetBlueprintName",
+          "type": "string",
+          "description": "Name of the widget blueprint",
+          "required": true
+        },
+        {
+          "name": "widgetName",
+          "type": "string",
+          "description": "Name of the widget with the event",
+          "required": true
+        },
+        {
+          "name": "eventName",
+          "type": "string",
+          "description": "Event to bind (OnClicked, OnHovered, OnUnhovered, OnPressed, OnReleased, OnValueChanged)",
+          "required": true
+        },
+        {
+          "name": "functionName",
+          "type": "string",
+          "description": "Function name to bind to",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "umgGetWidgetChildren",
+      "description": "Get the widget hierarchy tree of a Widget Blueprint, including all children, types, and properties.",
+      "parameters": [
+        {
+          "name": "widgetBlueprintName",
+          "type": "string",
+          "description": "Name of the widget blueprint",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPAddState",
+      "description": "Add a new state to an Animation Blueprint state machine.",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        },
+        {
+          "name": "stateName",
+          "type": "string",
+          "description": "Name for the new state",
+          "required": true
+        },
+        {
+          "name": "posX",
+          "type": "number",
+          "description": "X position in graph",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "number",
+          "description": "Y position in graph",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPRemoveState",
+      "description": "Remove a state from an Animation Blueprint state machine. Breaks all connected transitions.",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        },
+        {
+          "name": "stateName",
+          "type": "string",
+          "description": "Name of the state to remove",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "animBPAddTransition",
+      "description": "Add a transition rule between two states in an Animation Blueprint state machine.",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        },
+        {
+          "name": "fromState",
+          "type": "string",
+          "description": "Name of the source state",
+          "required": true
+        },
+        {
+          "name": "toState",
+          "type": "string",
+          "description": "Name of the target state",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPSetTransitionRule",
+      "description": "Set the condition type on a transition rule (automatic, bool variable, or time remaining).",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        },
+        {
+          "name": "fromState",
+          "type": "string",
+          "description": "Name of the source state",
+          "required": true
+        },
+        {
+          "name": "toState",
+          "type": "string",
+          "description": "Name of the target state",
+          "required": true
+        },
+        {
+          "name": "conditionType",
+          "type": "string",
+          "description": "Condition type: automatic, bool, timeRemaining",
+          "required": true
+        },
+        {
+          "name": "boolVariableName",
+          "type": "string",
+          "description": "Bool variable name (required for bool condition type)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPSetStateAnimation",
+      "description": "Assign an animation sequence to a state. Creates a SequencePlayer node and wires it to the state result.",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        },
+        {
+          "name": "stateName",
+          "type": "string",
+          "description": "Name of the target state",
+          "required": true
+        },
+        {
+          "name": "animationAssetPath",
+          "type": "string",
+          "description": "Full asset path to the animation sequence",
+          "required": true
+        },
+        {
+          "name": "looping",
+          "type": "boolean",
+          "description": "Whether the animation should loop (default: true)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPGetStateMachine",
+      "description": "Get the full state machine graph including all states, transitions, and assigned animations.",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "animBPAddBlendNode",
+      "description": "Add a blend space player to a state. Creates a BlendSpacePlayer node and wires it to the state result.",
+      "parameters": [
+        {
+          "name": "animBlueprintName",
+          "type": "string",
+          "description": "Name of the animation blueprint",
+          "required": true
+        },
+        {
+          "name": "stateMachineName",
+          "type": "string",
+          "description": "Name of the state machine (uses first found if empty)",
+          "required": false
+        },
+        {
+          "name": "stateName",
+          "type": "string",
+          "description": "Name of the target state",
+          "required": true
+        },
+        {
+          "name": "blendSpacePath",
+          "type": "string",
+          "description": "Full asset path to the blend space",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btAddTask",
+      "description": "Add a task node to a behavior tree. Built-in types: Wait, MoveTo, PlayAnimation, RunBehavior. Also accepts custom class paths.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        },
+        {
+          "name": "taskType",
+          "type": "string",
+          "description": "Task type: Wait, MoveTo, PlayAnimation, RunBehavior, or full class path",
+          "required": true
+        },
+        {
+          "name": "posX",
+          "type": "number",
+          "description": "X position in graph",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "number",
+          "description": "Y position in graph",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btAddComposite",
+      "description": "Add a composite node to a behavior tree. Types: Selector, Sequence, SimpleParallel.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        },
+        {
+          "name": "compositeType",
+          "type": "string",
+          "description": "Composite type: Selector, Sequence, SimpleParallel",
+          "required": true
+        },
+        {
+          "name": "posX",
+          "type": "number",
+          "description": "X position in graph",
+          "required": false
+        },
+        {
+          "name": "posY",
+          "type": "number",
+          "description": "Y position in graph",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btRemoveNode",
+      "description": "Remove a node from a behavior tree by name. Cannot remove root node.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        },
+        {
+          "name": "nodeName",
+          "type": "string",
+          "description": "Name of the node to remove",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "btAddDecorator",
+      "description": "Add a decorator to a behavior tree node. Built-in: Blackboard, Cooldown, TimeLimit, Loop. Also accepts custom class paths.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        },
+        {
+          "name": "targetNodeName",
+          "type": "string",
+          "description": "Name of the node to attach the decorator to",
+          "required": true
+        },
+        {
+          "name": "decoratorType",
+          "type": "string",
+          "description": "Decorator type: Blackboard, Cooldown, TimeLimit, Loop, or class path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btAddService",
+      "description": "Add a service to a behavior tree composite node. Built-in: DefaultFocus, RunEQS. Also accepts custom class paths.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        },
+        {
+          "name": "targetNodeName",
+          "type": "string",
+          "description": "Name of the composite node to attach the service to",
+          "required": true
+        },
+        {
+          "name": "serviceType",
+          "type": "string",
+          "description": "Service type: DefaultFocus, RunEQS, or class path",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btSetBlackboardValue",
+      "description": "Add a key to a Blackboard data asset. Supported types: Bool, Float, Int, String, Object, Vector, Rotator, Enum, Class.",
+      "parameters": [
+        {
+          "name": "blackboardName",
+          "type": "string",
+          "description": "Name of the blackboard data asset",
+          "required": true
+        },
+        {
+          "name": "keyName",
+          "type": "string",
+          "description": "Name of the key to add",
+          "required": true
+        },
+        {
+          "name": "keyType",
+          "type": "string",
+          "description": "Key type: Bool, Float, Int, String, Object, Vector, Rotator, Enum, Class",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btWireNodes",
+      "description": "Connect a parent composite node's output to a child node's input in a behavior tree.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        },
+        {
+          "name": "parentNodeName",
+          "type": "string",
+          "description": "Name of the parent composite node",
+          "required": true
+        },
+        {
+          "name": "childNodeName",
+          "type": "string",
+          "description": "Name of the child node to connect",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "btGetTree",
+      "description": "Get the full behavior tree graph including all nodes, connections, decorators, services, and blackboard assignment.",
+      "parameters": [
+        {
+          "name": "behaviorTreeName",
+          "type": "string",
+          "description": "Name of the behavior tree asset",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "componentList",
+      "description": "List all components on an actor with their class, transform, visibility, collision, and mesh info.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "componentRemove",
+      "description": "Remove a component from an actor by name. Cannot remove root component.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Name of the component to remove",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "componentSetProperty",
+      "description": "Set a generic property on a component using the UE property system (FProperty). Works with any exposed UPROPERTY.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Name of the component",
+          "required": true
+        },
+        {
+          "name": "propertyName",
+          "type": "string",
+          "description": "Name of the property to set",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Value to set (string representation)",
+          "required": true
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "componentSetTransform",
+      "description": "Set the relative transform (location, rotation, scale) on a scene component. Only specified fields are changed; others keep current values.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Name of the scene component",
+          "required": true
+        },
+        {
+          "name": "lx",
+          "type": "number",
+          "description": "Relative location X",
+          "required": false
+        },
+        {
+          "name": "ly",
+          "type": "number",
+          "description": "Relative location Y",
+          "required": false
+        },
+        {
+          "name": "lz",
+          "type": "number",
+          "description": "Relative location Z",
+          "required": false
+        },
+        {
+          "name": "rx",
+          "type": "number",
+          "description": "Relative rotation Roll",
+          "required": false
+        },
+        {
+          "name": "ry",
+          "type": "number",
+          "description": "Relative rotation Pitch",
+          "required": false
+        },
+        {
+          "name": "rz",
+          "type": "number",
+          "description": "Relative rotation Yaw",
+          "required": false
+        },
+        {
+          "name": "sx",
+          "type": "number",
+          "description": "Relative scale X",
+          "required": false
+        },
+        {
+          "name": "sy",
+          "type": "number",
+          "description": "Relative scale Y",
+          "required": false
+        },
+        {
+          "name": "sz",
+          "type": "number",
+          "description": "Relative scale Z",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "componentSetVisibility",
+      "description": "Set visibility on a scene component with optional propagation to children.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Name of the scene component",
+          "required": true
+        },
+        {
+          "name": "visible",
+          "type": "boolean",
+          "description": "Whether the component should be visible",
+          "required": true
+        },
+        {
+          "name": "propagateToChildren",
+          "type": "boolean",
+          "description": "Whether to propagate to child components (default: true)",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "componentSetCollision",
+      "description": "Set collision profile, physics simulation, and overlap event generation on a primitive component.",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Name of the actor",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Name of the primitive component",
+          "required": true
+        },
+        {
+          "name": "collisionProfile",
+          "type": "string",
+          "description": "Collision profile name (BlockAll, OverlapAll, NoCollision, etc.)",
+          "required": false
+        },
+        {
+          "name": "simulatePhysics",
+          "type": "boolean",
+          "description": "Whether to simulate physics",
+          "required": false
+        },
+        {
+          "name": "generateOverlapEvents",
+          "type": "boolean",
+          "description": "Whether to generate overlap events",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
     }
   ]
 }
