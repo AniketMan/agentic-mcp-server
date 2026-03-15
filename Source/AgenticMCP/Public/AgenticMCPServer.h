@@ -322,6 +322,15 @@ private:
 	FString HandleAnimBPGetSlotGroups(const FString& Body);
 	FString HandleAnimBPGetMontages(const FString& Body);
 
+	// ---- Animation Blueprint Mutation Handlers (Handlers_AnimBP_Mutation.cpp) ----
+	FString HandleAnimBPAddState(const FString& Body);
+	FString HandleAnimBPRemoveState(const FString& Body);
+	FString HandleAnimBPAddTransition(const FString& Body);
+	FString HandleAnimBPSetTransitionRule(const FString& Body);
+	FString HandleAnimBPSetStateAnimation(const FString& Body);
+	FString HandleAnimBPGetStateMachine(const FString& Body);
+	FString HandleAnimBPAddBlendNode(const FString& Body);
+
 	// ---- Scene Hierarchy Handlers (Handlers_SceneHierarchy.cpp) ----
 	FString HandleSceneGetHierarchy(const FString& Body);
 	FString HandleSceneSetActorFolder(const FString& Body);
@@ -340,6 +349,17 @@ private:
 	FString HandleSequencerGetTracks(const FString& Body);
 	FString HandleSequencerSetPlayRange(const FString& Body);
 	FString HandleSequencerRender(const FString& Body);
+	FString HandleSequencerDeleteTrack(const FString& Body);
+	FString HandleSequencerGetKeyframes(const FString& Body);
+	FString HandleSequencerAddSpawnable(const FString& Body);
+	FString HandleSequencerMoveSection(const FString& Body);
+	FString HandleSequencerDuplicateSection(const FString& Body);
+	FString HandleSequencerSetTrackMute(const FString& Body);
+	FString HandleSequencerAddSubSequence(const FString& Body);
+	FString HandleSequencerAddFade(const FString& Body);
+	FString HandleSequencerSetAudioSection(const FString& Body);
+	FString HandleSequencerSetEventPayload(const FString& Body);
+	FString HandleSequencerRenderStatus(const FString& Body);
 
 	// ---- Landscape / Foliage Handlers (Handlers_Landscape.cpp) ----
 	FString HandleLandscapeList(const FString& Body);
@@ -363,11 +383,30 @@ private:
 	FString HandleAIListControllers(const FString& Body);
 	FString HandleAIGetEQSQueries(const FString& Body);
 
+	// ---- AI / Behavior Tree Mutation Handlers (Handlers_AI_Mutation.cpp) ----
+	FString HandleBTAddTask(const FString& Body);
+	FString HandleBTAddComposite(const FString& Body);
+	FString HandleBTRemoveNode(const FString& Body);
+	FString HandleBTAddDecorator(const FString& Body);
+	FString HandleBTAddService(const FString& Body);
+	FString HandleBTSetBlackboardValue(const FString& Body);
+	FString HandleBTWireNodes(const FString& Body);
+	FString HandleBTGetTree(const FString& Body);
+
 	// ---- Material Editing Handlers (Handlers_MaterialEdit.cpp) ----
 	FString HandleMaterialList(const FString& Body);
 	FString HandleMaterialGetInfo(const FString& Body);
 	FString HandleMaterialCreate(const FString& Body);
 	FString HandleMaterialListInstances(const FString& Body);
+
+	// ---- Material Graph Mutation Handlers (Handlers_MaterialGraphEdit.cpp) ----
+	FString HandleMaterialAddNode(const FString& Body);
+	FString HandleMaterialDeleteNode(const FString& Body);
+	FString HandleMaterialConnectPins(const FString& Body);
+	FString HandleMaterialDisconnectPin(const FString& Body);
+	FString HandleMaterialSetTextureParam(const FString& Body);
+	FString HandleMaterialCreateInstance(const FString& Body);
+	FString HandleMaterialAssignToActor(const FString& Body);
 
 	// ---- Asset Import / Management Handlers (Handlers_AssetImport.cpp) ----
 	FString HandleAssetImport(const FString& Body);
@@ -389,6 +428,14 @@ private:
 	FString HandleUMGGetWidgetProperties(const FString& Body);
 	FString HandleUMGListHUDs(const FString& Body);
 
+	// ---- UMG Widget Mutation Handlers (Handlers_UMG_Mutation.cpp) ----
+	FString HandleUMGCreateWidget(const FString& Body);
+	FString HandleUMGAddChild(const FString& Body);
+	FString HandleUMGRemoveChild(const FString& Body);
+	FString HandleUMGSetWidgetProperty(const FString& Body);
+	FString HandleUMGBindEvent(const FString& Body);
+	FString HandleUMGGetWidgetChildren(const FString& Body);
+
 	// ---- Skeletal Mesh Handlers (Handlers_SkeletalMesh.cpp) ----
 	FString HandleSkelMeshList(const FString& Body);
 	FString HandleSkelMeshGetInfo(const FString& Body);
@@ -401,6 +448,14 @@ private:
 	FString HandleBuildLighting(const FString& Body);
 	FString HandleSourceControlGetStatus(const FString& Body);
 	FString HandleSourceControlCheckout(const FString& Body);
+
+	// ---- Component Manipulation Handlers (Handlers_ComponentEdit.cpp) ----
+	FString HandleComponentList(const FString& Body);
+	FString HandleComponentRemove(const FString& Body);
+	FString HandleComponentSetProperty(const FString& Body);
+	FString HandleComponentSetTransform(const FString& Body);
+	FString HandleComponentSetVisibility(const FString& Body);
+	FString HandleComponentSetCollision(const FString& Body);
 
 	// ---- Python Execution with Output Capture (Handlers_PythonFix.cpp) ----
 	FString HandleExecutePythonCapture(const FString& Body);
