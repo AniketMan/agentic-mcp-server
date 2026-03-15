@@ -1,7 +1,7 @@
 # System Prompt / Instructions for Claude: Building the Universal Adaptive Quantizer
 
 **Context:**
-I am building a local, GPU-accelerated pipeline where all data (3D models, images, video, audio, and text documentation) is stored as sparse, quantized float16/int16 binary files. This allows me to use my 2TB+ NVMe drive as an "infinite context window" for a small local LLM (like Qwen 7B) running on an RTX 5080, bypassing the need for massive cloud models.
+I am building a local, GPU-accelerated pipeline where all data (3D models, images, video, audio, and text documentation) is stored as sparse, quantized float16/int16 binary files. This allows me to use my 2TB+ NVMe drive as an "infinite context window" for a small local LLM (Llama 3.1 8B) running on an RTX 5080, bypassing the need for massive cloud models.
 
 **Your Task:**
 Write a Python application called `universal_adaptive_quantizer.py`. This tool must ingest various file formats, extract their raw numerical data, adaptively quantize it (dynamically choosing float16, int16, or int8 based on the data's complexity and semantic role), apply sparse indexing (skipping default/zero values), and write the result to a custom binary format with a schema header. It must also include a retrieval engine for text embeddings.
@@ -39,7 +39,7 @@ For text documents, the script must also build a local vector index.
 *   Provide a function `retrieve_context(query_string, top_k=5)` that embeds a query, searches the index, and returns the relevant text chunks.
 
 **5. LLM Wrapper (Optional but recommended)**
-Provide a simple wrapper function that takes the output of `retrieve_context`, formats it into a prompt, and sends it to a local Ollama endpoint (e.g., `http://localhost:11434/api/generate` using the `qwen2.5-coder:7b` model).
+Provide a simple wrapper function that takes the output of `retrieve_context`, formats it into a prompt, and sends it to a local llama.cpp endpoint (e.g., `http://localhost:8081/completion` using the Llama 3.1 8B Instruct Q4_K_M model).
 
 ### Code Style Guidelines
 *   Write robust, efficient Python 3.11+ code.

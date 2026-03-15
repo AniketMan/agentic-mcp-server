@@ -240,7 +240,7 @@ When building tools within this quantized ecosystem, massive cloud-based LLMs (l
 
 **The Setup:**
 *   **Hardware:** NVIDIA RTX 5080 or 4080 (16GB VRAM).
-*   **Model:** Qwen 2.5 Coder 7B or 14B (quantized to Q4 or Q5).
+*   **Model:** Llama 3.1 8B Instruct (quantized to Q4_K_M) or Llama 3.2 3B Instruct (Q4_K_M).
 *   **VRAM Cost:** ~4.5GB to ~9GB, leaving ample room for project data.
 
 **Why a 7B Model Competes with Claude:**
@@ -285,7 +285,7 @@ Your NVMe drive reads at 7GB/s (PCIe 5.0). Loading a relevant 50KB chunk of quan
 **The Math:**
 On an RTX 5080 with 16GB of VRAM:
 *   **Current approach:** 16GB holds one medium-sized model and nothing else.
-*   **Quantized approach:** A 5GB local LLM (e.g., Qwen 7B) sits in VRAM. 11GB remains free for rendering, simulation, or other creative work. The entire knowledge base (terabytes of data) sits on the NVMe, feeding specific chunks to the model on demand.
+*   **Quantized approach:** A 5GB local LLM (e.g., Llama 3.1 8B) sits in VRAM. 11GB remains free for rendering, simulation, or other creative work. The entire knowledge base (terabytes of data) sits on the NVMe, feeding specific chunks to the model on demand.
 
 You effectively possess a 2TB to 4TB "context window" operating at NVMe speeds, processed by a lightweight, specialized decoder model. This scales infinitely: adding another 2TB NVMe doubles your knowledge base without requiring a single additional megabyte of VRAM.
 

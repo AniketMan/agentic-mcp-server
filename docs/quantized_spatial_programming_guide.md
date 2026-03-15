@@ -73,7 +73,7 @@ When applying adaptive quantized data to automated inference tasks (e.g., wiring
 
 #### The Two Confidence Signals
 1.  **Retrieval Confidence (The Data):** The cosine similarity score (0.0 to 1.0) returned by the FAISS vector index when retrieving the quantized manifest chunks. This measures how relevant and complete the retrieved data is.
-2.  **Generation Confidence (The Model):** The token log probabilities returned by the local LLM (e.g., Ollama serving Qwen) during inference. This measures how certain the model is about the specific code or tool call it is generating.
+2.  **Generation Confidence (The Model):** The token log probabilities returned by the local LLM (e.g., llama.cpp serving Llama 3.1 8B) during inference. This measures how certain the model is about the specific code or tool call it is generating.
 
 #### The Threshold Configuration
 You must configure acceptable confidence thresholds based on the destructive potential or complexity of the task. High thresholds optimize for precision; low thresholds optimize for speed.
