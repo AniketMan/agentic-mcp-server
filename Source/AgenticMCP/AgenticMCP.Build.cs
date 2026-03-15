@@ -58,9 +58,11 @@ public class AgenticMCP : ModuleRules
 			"SourceControl",      // Source control integration
 			"AIModule",           // AI controllers, behavior tree runtime
 			"GameplayTasks",      // Gameplay task system (used by AI)
+			"BehaviorTreeEditor",  // Behavior Tree editor APIs (node graph editing)
 			"ToolMenus",          // Editor tool menus and settings access
 			"DeveloperSettings",  // UDeveloperSettings access
 			"MaterialEditor",     // Material editor APIs
+			"MovieRenderPipelineCore", // Movie Render Pipeline (sequencer render)
 			"PropertyEditor",     // Property editing for settings
 			"EditorStyle",        // Editor style for widget inspection
 			"OculusXRHMD",        // Meta XR HMD APIs
