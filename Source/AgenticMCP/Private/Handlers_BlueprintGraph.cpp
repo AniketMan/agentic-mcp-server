@@ -127,7 +127,11 @@ FString FAgenticMCPServer::HandleBPAddFunction(const FString& Body)
 	if (!NewGraph)
 		return MakeErrorJson(TEXT("Failed to create function graph"));
 
-	FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false, nullptr);
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+	FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false, static_cast<UFunction*>(nullptr));
+#else
+	FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false);
+#endif
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();

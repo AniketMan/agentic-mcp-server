@@ -101,7 +101,7 @@ FString FAgenticMCPServer::HandleVCamCreate(const FString& Body)
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     FTransform SpawnTransform(Rotation, Location);
-    ACameraActor* Cam = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), &SpawnTransform, Params);
+    ACameraActor* Cam = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), SpawnTransform, Params);
     if (!Cam)
     {
         return MakeErrorJson(TEXT("Failed to spawn camera actor"));

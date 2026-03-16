@@ -62,15 +62,15 @@ FString FAgenticMCPServer::HandleLightCreate(const FString& Body)
 	AActor* LightActor = nullptr;
 
 	if (Type == TEXT("point"))
-		LightActor = World->SpawnActor<APointLight>(APointLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<APointLight>(APointLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("spot"))
-		LightActor = World->SpawnActor<ASpotLight>(ASpotLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ASpotLight>(ASpotLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("directional"))
-		LightActor = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("rect"))
-		LightActor = World->SpawnActor<ARectLight>(ARectLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ARectLight>(ARectLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("sky"))
-		LightActor = World->SpawnActor<ASkyLight>(ASkyLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ASkyLight>(ASkyLight::StaticClass(), SpawnTransform, SpawnParams);
 	else
 		return MakeErrorJson(TEXT("Invalid type. Use: point, spot, directional, rect, sky"));
 

@@ -112,7 +112,7 @@ FString FAgenticMCPServer::HandleComposureCreateElement(const FString& Body)
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     FTransform SpawnTransform(FRotator::ZeroRotator, Location);
-    AActor* NewActor = World->SpawnActor<AActor>(ElementClass, &SpawnTransform, Params);
+    AActor* NewActor = World->SpawnActor<AActor>(ElementClass, SpawnTransform, Params);
     if (!NewActor)
     {
         return MakeErrorJson(TEXT("Failed to spawn Composure element"));
