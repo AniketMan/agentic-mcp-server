@@ -114,7 +114,7 @@ async function discoverServers() {
   return _discoveryPromise;
 }
 
-const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD || '0.95');
+const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD || '0.80');
 const MAX_RETRIES = parseInt(process.env.MAX_WORKER_RETRIES || '3', 10);
 
 // Load instruction MDs for each role (injected as system prompt per-request)
