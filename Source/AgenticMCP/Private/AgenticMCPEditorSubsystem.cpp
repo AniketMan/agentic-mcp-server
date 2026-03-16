@@ -5,8 +5,49 @@
 
 #include "AgenticMCPEditorSubsystem.h"
 #include "AgenticMCPServer.h"
-#include "Misc/FeedbackContext.h"
-#include "Misc/ScopedSlowTask.h"
+
+// FIX: FScopedSlowTask REMOVED entirely.
+// The destructor of FScopedSlowTask calls FText::Rebuild() which crashes
+// with EXCEPTION_ACCESS_VIOLATION (null at offset 0xa8) after level blueprint
+// mutations (addNode on LevelScriptBlueprint). The mutation invalidates the
+// FText internals during ProcessOneRequest(), and when the FScopedSlowTask
+// destructor runs at the closing brace, it dereferences the now-null FText.
+//
+// The root FScopedSlowTask was originally added to provide a parent scope
+// for child FSlowTasks created by engine subsystems (Blueprint compile,
+// level load, asset streaming). Without it, those child tasks also crash.
+//
+// NEW APPROACH: Wrap each ProcessOneRequest() call in a Windows SEH guard.
+// If a child FSlowTask crashes, we catch it and continue processing the
+// next request instead of taking down the editor. No parent FSlowTask needed.
+
+#if PLATFORM_WINDOWS
+#include "Windows/AllowWindowsPlatformTypes.h"
+
+static bool ProcessOneRequestSEH(FAgenticMCPServer* Server)
+{
+	__try
+	{
+		return Server->ProcessOneRequest();
+	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("AgenticMCP: SEH exception caught in ProcessOneRequest() (code 0x%08X). ")
+			TEXT("This typically occurs after level blueprint mutations. The request was skipped."),
+			GetExceptionCode());
+		return true; // Return true to continue processing (there may be more requests)
+	}
+}
+
+#include "Windows/HideWindowsPlatformTypes.h"
+#else
+// Non-Windows: no SEH, just call directly
+static bool ProcessOneRequestSEH(FAgenticMCPServer* Server)
+{
+	return Server->ProcessOneRequest();
+}
+#endif
 
 void UAgenticMCPEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -51,30 +92,13 @@ void UAgenticMCPEditorSubsystem::Tick(float DeltaTime)
 {
 	if (Server)
 	{
-		// FIX: Create a root FScopedSlowTask scope for ALL MCP operations.
-		// Without this, any engine code that internally creates an FSlowTask
-		// (Blueprint compilation, level loading, asset streaming) will crash
-		// with EXCEPTION_ACCESS_VIOLATION in FText::Rebuild() because the
-		// FSlowTask system expects a valid parent FText scope, which doesn't
-		// exist when called from Tick() context.
-		//
-		// This single scope covers ALL handlers dispatched during this tick.
-		// Child FSlowTasks created by engine subsystems inherit this scope
-		// and get a valid FText instead of hitting null.
-		//
-		// FIX 2: Use FText::FromString instead of NSLOCTEXT to avoid
-		// FText::Rebuild() crash. NSLOCTEXT holds a reference to the
-		// localization table which can be invalidated during
-		// ProcessOneRequest() (Blueprint compile, level load, asset stream).
-		// FText::FromString owns its string data directly -- no dangling ref.
-		static const FText MCPStatusText = FText::FromString(TEXT("AgenticMCP Processing..."));
-		FScopedSlowTask RootSlowTask(0.0f, MCPStatusText);
-
 		// Process up to 4 requests per tick to improve throughput
-		// while keeping frame time impact minimal
+		// while keeping frame time impact minimal.
+		// Each call is SEH-guarded so a crash in one request
+		// does not take down the editor or block subsequent requests.
 		for (int32 i = 0; i < 4; ++i)
 		{
-			if (!Server->ProcessOneRequest())
+			if (!ProcessOneRequestSEH(Server.Get()))
 			{
 				break; // No more pending requests
 			}
