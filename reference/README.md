@@ -1,6 +1,6 @@
 # Reference Material
 
-This directory contains reference material that Claude Code reads directly from the filesystem for inference. No MCP overhead -- Claude loads what it needs on demand.
+This directory contains reference material that the local Worker model reads from the filesystem for inference. No MCP overhead -- the Worker loads what it needs on demand.
 
 ## Directory Structure
 
@@ -16,6 +16,7 @@ reference/
                                         # Every asset path in the project. Characters,
                                         # Blueprints, Sequences (52), Maps (7), Props,
                                         # Interactables, Audio, VFX, Materials, Textures.
+    LevelSequence_Master_Reference.md  # All Level Sequences with verification checklists.
   game_design/
     SOHGameDesign.webp                  # Full interaction flowchart (8 scenes, color-coded)
                                         # GAZE=green, TRIGGER=red/pink, NAVIGATION=blue
@@ -34,17 +35,17 @@ reference/
 
 ## UE5 Engine Documentation
 
-The full UE5 API docs (C++, Blueprint, DocSource) ship with the engine and are NOT duplicated here. Claude reads them directly from the engine install at the relative path:
+The full UE5 API docs (C++, Blueprint, DocSource) ship with the engine and are NOT duplicated here. The Worker references them directly from the engine install path:
 
 ```
-Engine\Documentation\Builds
+C:\UE56\Engine\Documentation\Builds
 ```
 
-This contains the complete C++ API reference, Blueprint API reference, and DocSource. When you need to look up a UE5 class, function, or node, read the HTML directly from that path. No indexes, no shortcuts -- read the actual docs.
+This contains the complete C++ API reference, Blueprint API reference, and DocSource. When looking up a UE5 class, function, or node, read the HTML directly from that path.
 
-## How Claude Uses This
+## How the Worker Uses This
 
-1. **Script is source truth**: Every Blueprint graph, level sequence, and interaction traces back to `script_v2_ocvr.md`. The script is the input. The output is code, Blueprint graphs, and MCP calls that implement it.
+1. **Script is source truth**: Every Blueprint graph, level sequence, and interaction traces back to `script_v2_ocvr.md`. The script is the input. The output is tool calls that implement it.
 
 2. **Roadmap is the technical plan**: `OC_VR_Implementation_Roadmap.md` maps every script beat to exact assets, components, triggers, and VO timing. It includes pseudocode for every `[makeTempBP]` that needs to be created. Follow it.
 
@@ -56,12 +57,20 @@ This contains the complete C++ API reference, Blueprint API reference, and DocSo
 
 6. **Target.cs for build config**: Confirms the project uses `UnrealGame` module with `BuildEnvironment.Shared`.
 
+## User Context
+
+The `user_context/` folder contains user-provided documentation and persistent chat logs.
+
+- **User-provided docs** are read-only law. The system never modifies them.
+- **Chat logs** are auto-saved by the TUI after each session, providing persistent memory across sessions.
+- The more context in this folder, the fewer read-only queries the Worker needs before executing mutations.
+
 ## Confidence Gate + Project State Validator
 
 The MCP server enforces a two-layer defense on all mutation operations:
 
 **Layer 1 -- Confidence Gate** (`Tools/confidence-gate.js`):
-Claude can read and plan freely, but execution is blocked when inference confidence is below 0.7.
+The Worker can read freely, but execution is blocked when inference confidence is below 0.7.
 
 | Signal | Weight | Description |
 |--------|--------|-------------|
@@ -71,6 +80,6 @@ Claude can read and plan freely, but execution is blocked when inference confide
 | Script-aligned | +0.1 | Operation traces back to a scene in the script |
 
 **Layer 2 -- Project State Validator** (`Tools/project-state-validator.js`):
-Every mutation is cross-validated against the live UE5 project state. The validator makes read-only calls to the editor to verify that what Claude claims exists actually exists. 20 mutation tools covered, 29 total validation checks.
+Every mutation is cross-validated against the live UE5 project state. The validator makes read-only calls to the editor to verify that referenced assets actually exist. 20 mutation tools covered, 29 total validation checks.
 
-When blocked, Claude receives: what it claimed vs what actually exists, the exact read-only tool to call, and the relevant engine doc path at `Engine\Documentation\Builds`.
+When blocked, the Worker receives: what it claimed vs what actually exists, the exact read-only tool to call, and the relevant engine doc path at `Engine\Documentation\Builds`.

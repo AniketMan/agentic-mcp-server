@@ -16,23 +16,33 @@ Additionally:
 - **Validation Endpoint** -- Pre-compilation error checking with detailed diagnostics.
 - **Auto-Discovery** -- The MCP bridge dynamically discovers tools from the C++ plugin. No hardcoded tool lists.
 - **Context Injection** -- Optionally injects UE5 API documentation into tool responses so the AI agent has reference material.
-- **Async Task Queue** -- Long-running operations (compilation, batch edits) run asynchronously with progress reporting.
-- **Inference-Gated Determinism** -- Three-layer architecture (Planner, Gatekeeper, Workers) ensures safe, predictable execution. See `ARCHITECTURE.md`.
+- **Native Tool Calling** -- Local Llama model uses structured tool calling (not free-form JSON) for reliable tool selection and parameter filling.
+- **Direct Inference** -- No external planner. A single local model handles request interpretation, tool selection, and multi-step execution. See `ARCHITECTURE.md`.
 
 ## Architecture
 
 ```
-AI Agent (Claude, Cursor, Manus, etc.)
+User Request (natural language)
     |
-    | MCP Protocol (stdio)
+    | execute_request MCP tool
     |
-Node.js MCP Bridge
-    |                   |
-    | HTTP              | Python subprocess
-    | (editor running)  | (editor closed)
-    |                   |
-C++ Plugin          Binary Injector
-(in-editor)         (offline .umap)
+Request Handler (request-handler.js)
+    |
+    | /v1/chat/completions with native tools
+    |
+Local Llama (llama.cpp, port 8081)
+    |
+    | structured tool_calls
+    |
+Validation Stack (rule engine, confidence gate, project state, idempotency)
+    |
+    | validated tool call
+    |
+C++ Plugin (UE 5.6, port 9847)     or     Binary Injector (offline .umap)
+    |
+    | result feeds back to Llama for next step
+    |
+Loop until request_complete
 ```
 
 ## Installation
@@ -73,9 +83,9 @@ npm install
 
 ### 3. Configure Your MCP Client
 
-#### Claude Code / Claude Desktop
+#### Any MCP Client
 
-Add to your MCP config (`claude_desktop_config.json` or project `.mcp.json`):
+Add to your MCP config (e.g., `.mcp.json`):
 
 ```json
 {
@@ -673,6 +683,24 @@ When the editor is not running, these tools are available:
 - **Error Handling**: Every handler returns structured JSON errors via `MakeErrorJson`. No silent failures.
 - **Dual-Path Resilience**: If the editor goes down, the fallback path keeps working.
 
+## TUI Dashboard
+
+A unified terminal interface that replaces multiple command prompts:
+
+```bash
+cd AgenticMCP/Tools
+node console/tui.js
+```
+
+Three panels:
+- **Status** -- UE connection, Worker connection, current request, confidence scores
+- **Execution Log** -- Real-time feed of tool calls, results, errors, retries
+- **Chat** -- Type natural language requests, see responses
+
+Chat history is automatically saved to `user_context/chat_logs/` for persistent memory across sessions.
+
+Commands: `/status`, `/clear`, `/help`, `/quit`
+
 ## Testing
 
 ```bash
@@ -687,7 +715,7 @@ npm run test:coverage # Coverage report
 - Unreal Engine 5.6
 - Node.js 18+
 - Python 3.11+ (for offline fallback)
-- Works with: Claude Code, Claude Desktop, Cursor, Windsurf, Manus
+- Works with: Cursor, Windsurf, Manus, or any MCP-compatible client
 
 ## Credits
 

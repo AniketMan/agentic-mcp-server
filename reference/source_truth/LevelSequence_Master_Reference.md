@@ -1,7 +1,7 @@
 # LEVEL SEQUENCE MASTER REFERENCE
 
 ## HOW TO USE THIS REFERENCE
-For EVERY Level Sequence listed below, Claude MUST:
+For EVERY Level Sequence listed below, the Worker MUST:
 1. Verify the LS asset exists via `list_sequences` or Content Browser
 2. Verify ALL listed actors are spawned and visible BEFORE the LS plays
 3. Verify the trigger condition is wired in the Level Blueprint
@@ -452,7 +452,7 @@ No named Level Sequences. All logic is event-driven (markers, gaze, grip, trigge
 
 ## TOTAL: 56 Level Sequences across 9 scenes (Scene 00 has none)
 
-## VERIFICATION CHECKLIST FOR CLAUDE
+## VERIFICATION CHECKLIST
 For EACH Level Sequence above:
 - [ ] Asset exists in Content Browser (call `list_sequences` or check CB dump)
 - [ ] All listed actors are spawned BEFORE the LS trigger fires

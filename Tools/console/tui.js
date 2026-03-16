@@ -1,331 +1,358 @@
+#!/usr/bin/env node
 /**
- * AgenticMCP Terminal Console UI
+ * AgenticMCP TUI Dashboard
  * 
- * Lightweight TUI that monitors plan execution and renders
- * inline screenshots via Kitty graphics protocol, sixel, or ASCII fallback.
+ * Unified terminal interface for the MCP server.
+ * Three panels: Status (top-left), Execution Log (right), Chat (bottom-left).
+ * Persistent chat history saved to user_context/chat_logs/.
  * 
- * Zero dependencies. Pure Node.js.
+ * Usage: node Tools/console/tui.js
  * 
- * Usage: node tui.js [--plan plan.json]
+ * Commands:
+ *   /status  - Refresh connection status
+ *   /clear   - Clear execution log
+ *   /help    - Show help
+ *   /quit    - Exit
+ *   (anything else) - Send as natural language request to Worker
  */
 
-import { readFileSync, existsSync, createReadStream } from 'fs';
-import { basename } from 'path';
-import { createInterface } from 'readline';
+const blessed = require('blessed');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
 
-// ============================================================
-// Terminal capability detection
-// ============================================================
+// ─── Paths ───────────────────────────────────────────────────────────────────
+const ROOT = path.resolve(__dirname, '..', '..');
+const CHAT_LOG_DIR = path.join(ROOT, 'user_context', 'chat_logs');
+const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8081';
+const UE_URL = process.env.UNREAL_MCP_URL || 'http://localhost:9847';
 
-function detectTerminalCapabilities() {
-  const term = process.env.TERM || '';
-  const termProgram = process.env.TERM_PROGRAM || '';
-  const kittyPid = process.env.KITTY_PID || '';
-  const wezterm = process.env.WEZTERM_EXECUTABLE || '';
-
-  if (kittyPid || termProgram === 'kitty') {
-    return 'kitty';
-  }
-  if (termProgram === 'iTerm.app' || termProgram === 'iTerm2') {
-    return 'iterm2';
-  }
-  if (wezterm || termProgram === 'WezTerm') {
-    return 'kitty'; // WezTerm supports Kitty graphics protocol
-  }
-  // Check for sixel support via TERM
-  if (term.includes('xterm') || term.includes('mlterm') || term.includes('foot')) {
-    return 'sixel';
-  }
-  // Windows Terminal supports sixel since 2023
-  if (process.env.WT_SESSION) {
-    return 'sixel';
-  }
-  return 'ascii';
+// Ensure chat log directory exists
+if (!fs.existsSync(CHAT_LOG_DIR)) {
+  fs.mkdirSync(CHAT_LOG_DIR, { recursive: true });
 }
 
-// ============================================================
-// Image rendering
-// ============================================================
+// ─── Session State ───────────────────────────────────────────────────────────
+const sessionId = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const chatLogPath = path.join(CHAT_LOG_DIR, `session_${sessionId}.md`);
+const state = {
+  ueConnected: false,
+  workerConnected: false,
+  lastToolCall: 'None',
+  lastConfidence: '-',
+  totalCalls: 0,
+  totalErrors: 0,
+  requestActive: false,
+  currentIteration: 0,
+};
 
-/**
- * Render an image inline in the terminal using the best available protocol.
- */
-function renderImage(imagePath, protocol) {
-  if (!existsSync(imagePath)) {
-    log('WARN', `Screenshot file not found: ${imagePath}`);
+// ─── Blessed Screen ──────────────────────────────────────────────────────────
+const screen = blessed.screen({
+  smartCSR: true,
+  title: 'AgenticMCP Dashboard',
+  fullUnicode: true,
+});
+
+// ─── Status Panel (top-left, compact) ────────────────────────────────────────
+const statusBox = blessed.box({
+  parent: screen,
+  top: 0,
+  left: 0,
+  width: '40%',
+  height: '35%',
+  label: ' Status ',
+  border: { type: 'line' },
+  style: {
+    border: { fg: 'cyan' },
+    label: { fg: 'cyan', bold: true },
+  },
+  tags: true,
+  padding: { left: 1, right: 1 },
+});
+
+// ─── Chat Panel (bottom-left) ────────────────────────────────────────────────
+const chatBox = blessed.log({
+  parent: screen,
+  top: '35%',
+  left: 0,
+  width: '40%',
+  height: '65%-3',
+  label: ' Chat ',
+  border: { type: 'line' },
+  style: {
+    border: { fg: 'green' },
+    label: { fg: 'green', bold: true },
+  },
+  tags: true,
+  scrollable: true,
+  alwaysScroll: true,
+  scrollbar: { style: { bg: 'green' } },
+  mouse: true,
+  padding: { left: 1, right: 1 },
+});
+
+// ─── Execution Log (right side, full height minus input) ─────────────────────
+const logBox = blessed.log({
+  parent: screen,
+  top: 0,
+  left: '40%',
+  width: '60%',
+  height: '100%-3',
+  label: ' Execution Log ',
+  border: { type: 'line' },
+  style: {
+    border: { fg: 'yellow' },
+    label: { fg: 'yellow', bold: true },
+  },
+  tags: true,
+  scrollable: true,
+  alwaysScroll: true,
+  scrollbar: { style: { bg: 'yellow' } },
+  mouse: true,
+  padding: { left: 1, right: 1 },
+});
+
+// ─── Input Bar (bottom, full width) ──────────────────────────────────────────
+const inputBar = blessed.textbox({
+  parent: screen,
+  bottom: 0,
+  left: 0,
+  width: '100%',
+  height: 3,
+  label: ' > Type a request (or /help) ',
+  border: { type: 'line' },
+  style: {
+    border: { fg: 'white' },
+    label: { fg: 'white', bold: true },
+    focus: { border: { fg: 'green' } },
+  },
+  inputOnFocus: true,
+  mouse: true,
+  keys: true,
+});
+
+// ─── Status Rendering ────────────────────────────────────────────────────────
+function renderStatus() {
+  const ue = state.ueConnected
+    ? '{green-fg}CONNECTED{/green-fg}'
+    : '{red-fg}DISCONNECTED{/red-fg}';
+  const worker = state.workerConnected
+    ? '{green-fg}CONNECTED{/green-fg}'
+    : '{red-fg}DISCONNECTED{/red-fg}';
+  const req = state.requestActive
+    ? `{yellow-fg}RUNNING{/yellow-fg} (step ${state.currentIteration})`
+    : '{white-fg}IDLE{/white-fg}';
+
+  statusBox.setContent(
+    `{bold}UE 5.6:{/bold}      ${ue}\n` +
+    `{bold}Worker:{/bold}      ${worker}\n` +
+    `{bold}Request:{/bold}     ${req}\n` +
+    `\n` +
+    `{bold}Last Tool:{/bold}   ${state.lastToolCall}\n` +
+    `{bold}Confidence:{/bold}  ${state.lastConfidence}\n` +
+    `{bold}Calls:{/bold}       ${state.totalCalls}  {bold}Errors:{/bold} ${state.totalErrors}\n` +
+    `\n` +
+    `{bold}Session:{/bold}     ${sessionId}`
+  );
+  screen.render();
+}
+
+// ─── Logging Helpers ─────────────────────────────────────────────────────────
+function logExec(msg) {
+  const ts = new Date().toLocaleTimeString('en-US', { hour12: false });
+  logBox.log(`{gray-fg}[${ts}]{/gray-fg} ${msg}`);
+}
+
+function logChat(role, msg) {
+  const color = role === 'You' ? 'cyan' : 'green';
+  chatBox.log(`{${color}-fg}{bold}${role}:{/bold}{/${color}-fg} ${msg}`);
+}
+
+// ─── Persistent Chat Log ─────────────────────────────────────────────────────
+function appendChatLog(role, content) {
+  const ts = new Date().toISOString();
+  const entry = `### [${ts}] ${role}\n${content}\n\n`;
+  fs.appendFileSync(chatLogPath, entry);
+}
+
+function initChatLog() {
+  const header =
+    `# AgenticMCP Chat Session\n\n` +
+    `**Session ID:** ${sessionId}\n` +
+    `**Started:** ${new Date().toISOString()}\n` +
+    `**UE URL:** ${UE_URL}\n` +
+    `**Worker URL:** ${WORKER_URL}\n\n---\n\n`;
+  fs.writeFileSync(chatLogPath, header);
+}
+
+// ─── Health Checks ───────────────────────────────────────────────────────────
+function checkHealth(url, callback) {
+  const req = http.get(url, { timeout: 3000 }, (res) => {
+    callback(res.statusCode >= 200 && res.statusCode < 500);
+  });
+  req.on('error', () => callback(false));
+  req.on('timeout', () => { req.destroy(); callback(false); });
+}
+
+function pollHealth() {
+  checkHealth(`${UE_URL}/api/status`, (ok) => {
+    state.ueConnected = ok;
+    renderStatus();
+  });
+  checkHealth(`${WORKER_URL}/health`, (ok) => {
+    state.workerConnected = ok;
+    renderStatus();
+  });
+}
+
+// ─── Request Execution ───────────────────────────────────────────────────────
+async function executeRequest(userMessage) {
+  if (state.requestActive) {
+    logExec('{red-fg}Request already in progress. Wait for it to finish.{/red-fg}');
     return;
   }
 
-  const imageData = readFileSync(imagePath);
-  const b64 = imageData.toString('base64');
+  state.requestActive = true;
+  state.currentIteration = 0;
+  renderStatus();
 
-  switch (protocol) {
-    case 'kitty':
-      renderKitty(b64);
-      break;
-    case 'iterm2':
-      renderITerm2(b64, imagePath);
-      break;
-    case 'sixel':
-      renderSixelFallback(imagePath);
-      break;
-    default:
-      renderASCII(imagePath);
-      break;
-  }
-}
+  logChat('You', userMessage);
+  appendChatLog('User', userMessage);
+  logExec('{cyan-fg}--- New Request ---{/cyan-fg}');
 
-function renderKitty(b64) {
-  // Kitty graphics protocol: transmit image in chunks of 4096 bytes
-  const chunkSize = 4096;
-  const chunks = [];
-  for (let i = 0; i < b64.length; i += chunkSize) {
-    chunks.push(b64.slice(i, i + chunkSize));
-  }
-
-  for (let i = 0; i < chunks.length; i++) {
-    const isLast = i === chunks.length - 1;
-    const m = isLast ? 0 : 1; // m=1 means more chunks follow
-    if (i === 0) {
-      // First chunk: include format and action
-      process.stdout.write(`\x1b_Gf=100,a=T,m=${m};${chunks[i]}\x1b\\`);
-    } else {
-      process.stdout.write(`\x1b_Gm=${m};${chunks[i]}\x1b\\`);
-    }
-  }
-  process.stdout.write('\n');
-}
-
-function renderITerm2(b64, imagePath) {
-  const name = Buffer.from(basename(imagePath)).toString('base64');
-  process.stdout.write(`\x1b]1337;File=name=${name};inline=1;size=${b64.length}:${b64}\x07\n`);
-}
-
-function renderSixelFallback(imagePath) {
-  // Sixel requires converting the image to sixel format.
-  // Without ImageMagick, we fall back to ASCII.
-  // If convert/magick is available, use it.
-  const { execSync } = require('child_process');
   try {
-    // Try using img2sixel (from libsixel) or convert
-    const result = execSync(`img2sixel -w 640 "${imagePath}" 2>/dev/null || convert "${imagePath}" -resize 640x sixel:- 2>/dev/null`, {
-      timeout: 5000,
-      encoding: 'buffer',
-    });
-    process.stdout.write(result);
-    process.stdout.write('\n');
-  } catch {
-    // Fall back to ASCII
-    renderASCII(imagePath);
-  }
-}
-
-function renderASCII(imagePath) {
-  // Minimal ASCII representation -- just show the file path with a frame
-  const name = basename(imagePath);
-  const width = Math.min(process.stdout.columns || 60, 60);
-  const border = '+' + '-'.repeat(width - 2) + '+';
-  const padded = (text) => {
-    const pad = width - 4 - text.length;
-    return '| ' + text + ' '.repeat(Math.max(0, pad)) + ' |';
-  };
-
-  process.stdout.write('\n');
-  process.stdout.write(border + '\n');
-  process.stdout.write(padded('[VIEWPORT CAPTURE]') + '\n');
-  process.stdout.write(padded('') + '\n');
-  process.stdout.write(padded(name.slice(0, width - 6)) + '\n');
-  process.stdout.write(padded('') + '\n');
-  process.stdout.write(padded('Open: ' + imagePath.slice(0, width - 12)) + '\n');
-  process.stdout.write(border + '\n');
-  process.stdout.write('\n');
-}
-
-// ============================================================
-// Logging
-// ============================================================
-
-function timestamp() {
-  const d = new Date();
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
-}
-
-const COLORS = {
-  reset: '\x1b[0m',
-  dim: '\x1b[2m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  red: '\x1b[31m',
-  cyan: '\x1b[36m',
-  white: '\x1b[37m',
-  bold: '\x1b[1m',
-};
-
-function log(level, message) {
-  const ts = `${COLORS.dim}[${timestamp()}]${COLORS.reset}`;
-  switch (level) {
-    case 'OK':
-      process.stdout.write(`${ts} ${COLORS.green}[OK]${COLORS.reset} ${message}\n`);
-      break;
-    case 'WARN':
-      process.stdout.write(`${ts} ${COLORS.yellow}[!!]${COLORS.reset} ${message}\n`);
-      break;
-    case 'ERR':
-      process.stdout.write(`${ts} ${COLORS.red}[ERR]${COLORS.reset} ${message}\n`);
-      break;
-    case 'INFO':
-      process.stdout.write(`${ts} ${COLORS.cyan}[--]${COLORS.reset} ${message}\n`);
-      break;
-    case 'STEP':
-      process.stdout.write(`${ts} ${COLORS.bold}${COLORS.white}${message}${COLORS.reset}\n`);
-      break;
-    default:
-      process.stdout.write(`${ts} ${message}\n`);
-      break;
-  }
-}
-
-function logConfidence(stepId, total, tool, confidence, status) {
-  const pct = (confidence * 100).toFixed(1);
-  const bar = confidence >= 0.95 ? COLORS.green : confidence >= 0.80 ? COLORS.yellow : COLORS.red;
-  const icon = status === 'completed' ? `${COLORS.green}OK${COLORS.reset}` :
-               status === 'escalated' ? `${COLORS.yellow}!!${COLORS.reset}` :
-               `${COLORS.red}XX${COLORS.reset}`;
-  process.stdout.write(
-    `${COLORS.dim}[${timestamp()}]${COLORS.reset} Step ${stepId}/${total}: ${tool} ${bar}(${pct}%)${COLORS.reset} ${icon}\n`
-  );
-}
-
-// ============================================================
-// Console input handler
-// ============================================================
-
-function startInputLoop(callbacks) {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: `${COLORS.dim}>${COLORS.reset} `,
-  });
-
-  rl.on('line', (line) => {
-    const cmd = line.trim().toLowerCase();
-
-    if (cmd === 'pause') {
-      log('INFO', 'Execution paused. Type "resume" to continue.');
-      if (callbacks.onPause) callbacks.onPause();
-    } else if (cmd === 'resume') {
-      log('INFO', 'Execution resumed.');
-      if (callbacks.onResume) callbacks.onResume();
-    } else if (cmd === 'abort') {
-      log('WARN', 'Aborting current plan execution.');
-      if (callbacks.onAbort) callbacks.onAbort();
-    } else if (cmd === 'status') {
-      if (callbacks.onStatus) callbacks.onStatus();
-    } else if (cmd === 'screenshot') {
-      log('INFO', 'Requesting viewport capture...');
-      if (callbacks.onScreenshot) callbacks.onScreenshot();
-    } else if (cmd === 'help') {
-      log('INFO', 'Commands: pause | resume | abort | status | screenshot | help');
-    } else if (line.trim().length > 0) {
-      // User message injection -- pass to the worker context
-      log('INFO', `User note injected: "${line.trim()}"`);
-      if (callbacks.onUserMessage) callbacks.onUserMessage(line.trim());
+    // Dynamic import of request-handler (it may use ES modules or CommonJS)
+    let handleRequest;
+    try {
+      const handler = require('../request-handler');
+      handleRequest = handler.handleRequest || handler.default;
+    } catch (requireErr) {
+      logExec(`{red-fg}Cannot load request-handler: ${requireErr.message}{/red-fg}`);
+      logExec('{yellow-fg}Falling back to direct UE proxy mode.{/yellow-fg}');
+      state.requestActive = false;
+      renderStatus();
+      return;
     }
 
-    rl.prompt();
-  });
+    const result = await handleRequest(userMessage, {
+      // Callback: before each tool call
+      onToolCall: (toolName, params) => {
+        state.lastToolCall = toolName;
+        state.totalCalls++;
+        state.currentIteration++;
+        const paramStr = JSON.stringify(params || {});
+        const preview = paramStr.length > 80 ? paramStr.slice(0, 77) + '...' : paramStr;
+        logExec(`{yellow-fg}CALL{/yellow-fg}  ${toolName}(${preview})`);
+        renderStatus();
+      },
+      // Callback: after each successful tool result
+      onToolResult: (toolName, result, confidence) => {
+        state.lastConfidence = confidence ? `${(confidence * 100).toFixed(0)}%` : '-';
+        const preview = typeof result === 'string'
+          ? result.slice(0, 100)
+          : JSON.stringify(result || '').slice(0, 100);
+        logExec(`{green-fg}  OK{/green-fg}  ${toolName} -> ${preview}`);
+        renderStatus();
+      },
+      // Callback: on tool error
+      onToolError: (toolName, error) => {
+        state.totalErrors++;
+        logExec(`{red-fg}  ERR{/red-fg} ${toolName} -> ${error}`);
+        renderStatus();
+      },
+      // Callback: on retry
+      onRetry: (toolName, attempt, reason) => {
+        logExec(`{yellow-fg}  RETRY{/yellow-fg} ${toolName} #${attempt}: ${reason}`);
+      },
+      // Callback: on completion
+      onComplete: (summary) => {
+        logExec(`{green-fg}--- Complete ---{/green-fg}`);
+      },
+    });
 
-  rl.prompt();
-  return rl;
-}
+    const summary = (result && result.summary) || 'Done.';
+    logChat('Worker', summary);
+    appendChatLog('Worker', summary);
 
-// ============================================================
-// Main console runner
-// ============================================================
-
-async function runConsole(plan, executePlanFn) {
-  const protocol = detectTerminalCapabilities();
-  const totalSteps = plan.steps.length;
-
-  // Header
-  process.stdout.write('\n');
-  process.stdout.write(`${COLORS.bold}  AgenticMCP Console${COLORS.reset}\n`);
-  process.stdout.write(`${COLORS.dim}${'='.repeat(50)}${COLORS.reset}\n`);
-  log('INFO', `Terminal: ${protocol} graphics`);
-  log('INFO', `Plan: ${plan.plan_id} (${totalSteps} steps)`);
-  process.stdout.write('\n');
-
-  let paused = false;
-  let aborted = false;
-
-  // Execution callbacks
-  const execOptions = {
-    onStepStart: (step) => {
-      log('STEP', `Step ${step.step_id}/${totalSteps}: ${step.tool}`);
-    },
-    onStepComplete: (step, result) => {
-      logConfidence(step.step_id, totalSteps, step.tool, result.confidence || 1.0, 'completed');
-    },
-    onStepFail: (step, result) => {
-      logConfidence(step.step_id, totalSteps, step.tool, result.confidence || 0, 'failed');
-      log('ERR', `  Error: ${result.error}`);
-    },
-    onEscalation: (esc) => {
-      log('WARN', `  Escalating to Planner: ${esc.error || esc.reason}`);
-      if (esc.max_confidence) {
-        log('WARN', `  Best confidence: ${(esc.max_confidence * 100).toFixed(1)}%`);
-      }
-    },
-    onScreenshot: (imagePath) => {
-      log('OK', `  Screenshot: ${imagePath}`);
-      renderImage(imagePath, protocol);
-    },
-  };
-
-  // Start input loop
-  const inputCallbacks = {
-    onPause: () => { paused = true; },
-    onResume: () => { paused = false; },
-    onAbort: () => { aborted = true; },
-    onStatus: () => {
-      log('INFO', `Plan: ${plan.plan_id} | Paused: ${paused} | Aborted: ${aborted}`);
-    },
-    onScreenshot: async () => {
-      // Force a screenshot via the plugin
-      try {
-        const resp = await fetch(`${process.env.UNREAL_MCP_URL || 'http://localhost:9847'}/mcp/tool/screenshot`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        });
-        const data = await resp.json();
-        if (data.path) renderImage(data.path, protocol);
-      } catch (e) {
-        log('ERR', `Screenshot failed: ${e.message}`);
-      }
-    },
-    onUserMessage: (msg) => {
-      // Store for next worker context injection
-      execOptions._userNote = msg;
-    },
-  };
-
-  const rl = startInputLoop(inputCallbacks);
-
-  // Execute
-  const report = await executePlanFn(plan, execOptions);
-
-  // Summary
-  process.stdout.write('\n');
-  process.stdout.write(`${COLORS.dim}${'='.repeat(50)}${COLORS.reset}\n`);
-  log('INFO', `Plan ${report.status}: ${report.completed} completed, ${report.failed} failed, ${report.skipped} skipped`);
-  if (report.escalations.length > 0) {
-    log('WARN', `${report.escalations.length} escalation(s) sent to Planner`);
+  } catch (err) {
+    const errMsg = err.message || String(err);
+    logExec(`{red-fg}FATAL{/red-fg} ${errMsg}`);
+    logChat('Worker', `Error: ${errMsg}`);
+    appendChatLog('Worker', `Error: ${errMsg}`);
+    state.totalErrors++;
   }
-  process.stdout.write('\n');
 
-  rl.close();
-  return report;
+  state.requestActive = false;
+  state.currentIteration = 0;
+  renderStatus();
 }
 
-export { runConsole, renderImage, detectTerminalCapabilities, log, logConfidence };
+// ─── Input Handling ──────────────────────────────────────────────────────────
+inputBar.on('submit', (value) => {
+  const text = (value || '').trim();
+  inputBar.clearValue();
+  inputBar.focus();
+  screen.render();
+
+  if (!text) return;
+
+  // Commands
+  if (text === '/quit' || text === '/exit') {
+    appendChatLog('System', 'Session ended by user.');
+    process.exit(0);
+  }
+  if (text === '/status') {
+    pollHealth();
+    logExec('{cyan-fg}Refreshing status...{/cyan-fg}');
+    return;
+  }
+  if (text === '/clear') {
+    logBox.setContent('');
+    screen.render();
+    return;
+  }
+  if (text === '/help') {
+    chatBox.log('{white-fg}{bold}Commands:{/bold}{/white-fg}');
+    chatBox.log('  /status  - Refresh connection status');
+    chatBox.log('  /clear   - Clear execution log');
+    chatBox.log('  /help    - Show this help');
+    chatBox.log('  /quit    - Exit');
+    chatBox.log('');
+    chatBox.log('Anything else is sent as a request to the Worker.');
+    screen.render();
+    return;
+  }
+
+  // Everything else is a request
+  executeRequest(text);
+});
+
+// ─── Key Bindings ────────────────────────────────────────────────────────────
+screen.key(['escape', 'C-c'], () => {
+  appendChatLog('System', 'Session ended.');
+  process.exit(0);
+});
+
+screen.key(['tab'], () => {
+  inputBar.focus();
+  screen.render();
+});
+
+// ─── Startup ─────────────────────────────────────────────────────────────────
+initChatLog();
+renderStatus();
+pollHealth();
+setInterval(pollHealth, 10000);
+
+inputBar.focus();
+screen.render();
+
+logExec('{cyan-fg}AgenticMCP Dashboard v3.0{/cyan-fg}');
+logExec('Direct inference. No planner. Native tool calling.');
+logExec(`Chat log: user_context/chat_logs/session_${sessionId}.md`);
+logExec('');
+
+chatBox.log('{green-fg}Ready. Type a request below.{/green-fg}');
+chatBox.log('{gray-fg}Chat history saves automatically.{/gray-fg}');
+
+screen.render();

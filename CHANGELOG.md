@@ -2,6 +2,76 @@
 
 All notable changes to AgenticMCP are documented in this file.
 
+## [3.0.0] - 2026-03-16
+
+### Summary
+
+Complete architectural overhaul. Removed Claude as the planner. All inference is now local via Llama with native tool calling. Added Meta hzdb MCP integration for device debugging, documentation search, Perfetto trace analysis, and 3D asset search. Added a unified TUI dashboard with persistent chat logging.
+
+### Architecture Changes
+
+- **Removed Claude planner entirely.** No external LLM dependency. All inference runs locally on Llama via llama.cpp.
+- **Removed** `launch_plan`, `check_job_status`, `resolve_escalation` MCP tools (were Claude-only)
+- **Removed** `async-runner.js` and `escalation.js` modules
+- **Removed** `CLAUDE.md` from repository
+- **Replaced free-form JSON parsing with native tool calling.** The Worker receives all 390+ UE tools as OpenAI-compatible function definitions. The model outputs structured `tool_calls` responses. No regex extraction. No JSON parsing heuristics.
+- **Added `request-handler.js`** — new core module. Handles the full inference loop: request in -> native tool_calls -> validation stack -> execution -> result feedback -> loop until done.
+- **Added `execute_request` MCP tool** — single entry point. Natural language in, validated tool execution out.
+
+### Meta hzdb Integration
+
+- **Added 9 Meta hzdb tools** as a second tool source alongside UE editor tools:
+  - `hzdb_search_doc` — Search Meta Horizon OS documentation
+  - `hzdb_fetch_doc` — Fetch full doc page content (LLM-optimized format)
+  - `hzdb_device_logcat` — Retrieve Android logcat from connected Quest
+  - `hzdb_screenshot` — Capture screenshot from Quest device
+  - `hzdb_perfetto_context` — Initialize Perfetto trace analysis
+  - `hzdb_load_trace` — Load Perfetto trace for analysis
+  - `hzdb_trace_sql` — Run SQL queries on loaded traces
+  - `hzdb_gpu_counters` — Get GPU metric counters for frame ranges
+  - `hzdb_asset_search` — Search Meta's 3D asset library
+- hzdb tools execute via CLI subprocess (`npx @meta-quest/hzdb`)
+- Worker auto-routes: `hzdb_` prefixed tools go to CLI, all others go to UE C++ plugin
+- Configurable via `HZDB_ENABLED`, `HZDB_COMMAND`, `HZDB_ARGS` env vars
+
+### TUI Dashboard
+
+- **Added `Tools/console/tui.js`** — unified terminal dashboard using blessed
+- Three-panel layout: Status (models, UE connection, last tool call), Execution Log (real-time), Chat Input
+- Replaces the need for multiple terminal windows
+- **Persistent chat logging** — every session saves to `user_context/chat_logs/session_{timestamp}.md`
+- Worker loads previous chat logs as context for cross-session memory
+- Keyboard shortcuts: Ctrl+C quit, Ctrl+L clear log, Tab cycle panels
+
+### Updated
+
+- `worker.md` — rewritten for native tool calling mode with Meta hzdb tools and prompting best practices
+- `ARCHITECTURE.md` — rewritten to reflect plannerless architecture
+- `SYSTEM.md` — updated to remove all Claude references
+- `WORKER_INSTRUCTIONS.md` — updated to remove planner/Claude references
+- `README.md` — updated architecture section, removed Claude config, added TUI section
+- `models/README.md` — updated for single Worker model (no separate Planner)
+- `reference/README.md` — removed Claude references
+- `user_context/README.md` — removed Claude references
+- `plan/README.md` — removed Claude references
+- `validator.md` — removed Claude reference
+- `LevelSequence_Master_Reference.md` — removed Claude checklist references
+- `start-all.bat` — updated to reference `start-worker.bat`
+
+### Flow Comparison
+
+**Before (v2.0):**
+```
+Claude (external) -> JSON plan -> Gatekeeper -> Llama Worker -> UE Plugin
+```
+
+**After (v3.0):**
+```
+User -> execute_request -> Llama Worker (native tool calling) -> Validation Stack -> UE Plugin / hzdb CLI
+```
+
+---
+
 ## [2.0.0] - 2025-03-15
 
 ### Summary

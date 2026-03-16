@@ -1,120 +1,190 @@
-# AgenticMCP Architecture: Inference-Gated Determinism
+# AgenticMCP Architecture: Direct Inference with Native Tool Calling
 
 ## Overview
 
-The AgenticMCP system operates on a philosophy of **Inference-Gated Determinism**. Generative AI models (like Claude) are never allowed to execute tools directly against the Unreal Engine. Instead, a strict three-layer hierarchy separates planning, validation, and execution. This ensures that massive UE5 projects are modified safely, predictably, and without hallucination.
+AgenticMCP uses **Direct Inference** to route natural language requests to Unreal Engine tool calls. A single local Llama model receives the request, selects the correct tool from 390 available functions using native tool calling, and executes it through a deterministic validation stack. No external LLM. No planner. No intermediary. The model runs locally on your GPU via llama.cpp.
 
-## The Three-Layer System
+## System Architecture
 
 ```text
 +-------------------------------------------------------------------+
-|                   Layer 1: The Planner (Claude)                   |
+|                   User Request (Natural Language)                  |
 |                                                                   |
-| Reads project roadmap, scripts, and high-level requirements.      |
-| Generates a structured JSON execution plan.                       |
-| ZERO direct access to the engine or plugin tools.                 |
+| "Add a grab component to the phone actor"                         |
 +-------------------------------------------------------------------+
                               |
-                     JSON Execution Plan
-                              |
+                              v
 +-------------------------------------------------------------------+
-|                   Layer 2: The Gatekeeper                         |
-|                   (Node.js Bridge + Local LLM)                    |
+|                   Layer 1: Request Handler                        |
+|                   (request-handler.js)                            |
 |                                                                   |
-| 1. Deterministic Rule Engine: Validates params, workflow order.   |
-| 2. Local LLM Validator: Checks semantic validity against docs.    |
-| Rejects bad steps back to Planner. Dispatches good steps.         |
+| Builds conversation with system prompt + context + tool defs.     |
+| Sends to local Llama via /v1/chat/completions with native tools.  |
+| Receives structured tool_calls. Loops until request_complete.     |
 +-------------------------------------------------------------------+
                               |
-                     Approved Tool Calls
+                     Native tool_calls
                               |
 +-------------------------------------------------------------------+
-|                   Layer 3: The Workers                            |
-|                   (Local Inference Executors)                     |
+|                   Layer 2: Validation Stack                       |
+|                   (Deterministic, No LLM)                         |
 |                                                                   |
-| Small local models (Llama 3.1 8B + Llama 3.2 3B) via llama.cpp.  |
-| Context: API Docs + source_truth + tool registry.                 |
-| Action: Run inference to determine exact JSON payload.            |
-| Gate: If confidence >= 95%, execute. Else, escalate.              |
+| 1. Confidence Scorer: Structural integrity of the tool call.      |
+| 2. Rule Engine: Params match registry, workflow rules enforced.   |
+| 3. Project State Validator: Cross-checks against live editor.     |
+| 4. Idempotency Guard: Skips if action already done.               |
 +-------------------------------------------------------------------+
                               |
-                     HTTP (port 9847)
+                     Validated tool call
                               |
 +-------------------------------------------------------------------+
-|                   Layer 4: C++ Plugin                             |
-|                   (Unreal Engine 5.6)                             |
+|                   Layer 3: C++ Plugin                             |
+|                   (Unreal Engine 5.6, port 9847)                  |
 |                                                                   |
-| Runs headless via -RenderOffScreen.                               |
-| Processes requests on the game thread.                            |
+| Executes the tool call on the game thread.                        |
 | Returns deterministic success/error with real engine data.        |
++-------------------------------------------------------------------+
+                              |
+                     Execution result
+                              |
++-------------------------------------------------------------------+
+|                   Feedback Loop                                   |
+|                                                                   |
+| Result is sent back to the Llama model as a tool_result message.  |
+| Model decides: call another tool, or call request_complete.       |
+| Loop continues until done or max iterations (10) reached.         |
 +-------------------------------------------------------------------+
 ```
 
-### Layer 1: The Planner (Frontier Model)
-The Planner is the strategic brain. It reads the project roadmap, script, and high-level requirements to understand the goal. It has **zero direct access to the engine or the plugin**. 
+## Layer 1: Request Handler
 
-The Planner's only output is a structured JSON plan—a sequence of required tool calls, their intended parameters, and the expected outcome of each step. If a plan fails during execution, the Planner receives a structured error report and must generate a revised plan. It cannot "improvise" or "try things out" live in the engine.
+The Request Handler is the entry point. It receives a natural language request from the user and manages the full inference-execution loop.
 
-### Layer 2: The Gatekeeper (Validation Layer)
-The Gatekeeper sits in the JS bridge layer and intercepts the Planner's JSON plan. It consists of two sub-layers:
+**How it works:**
 
-1. **Deterministic Rule Engine:** A zero-latency, model-free validation layer that checks the plan against the tool registry. It ensures parameter names match exactly, required fields are present, and workflow rules (e.g., snapshot before mutation) are followed.
-2. **Local LLM Validator:** A small, fast local model running via `llama.cpp`. It checks the semantic validity of the plan against the Unreal Engine API documentation and the project's `source_truth` files. 
+1. Loads system prompt from `models/instructions/worker.md`
+2. Loads context: source truth, user context, engine docs hints
+3. Converts all 390 tools from `tool-registry.json` into OpenAI-compatible function definitions
+4. Sends the conversation to the local Llama server at `/v1/chat/completions` with `tools` parameter
+5. The model responds with `tool_calls` (native structured output, not free-form JSON)
+6. Each tool call is validated and executed
+7. Results feed back as `tool` role messages for the next iteration
+8. When the model calls `request_complete`, the loop ends
 
-If the Gatekeeper rejects a step, the plan is bounced back to the Planner with a specific error. If approved, the Gatekeeper dispatches the steps to the Workers.
+**Native Tool Calling** means the model's output is structurally guaranteed to be valid JSON with the correct function name and argument format. No regex extraction. No JSON parsing heuristics. The model's tokenizer enforces the schema.
 
-### Layer 3: The Workers (Local Executors)
-The Workers are the **experts on the project**. They are the only entities with direct access to the live Unreal Engine instance. They can query the Content Browser, inspect actors, read Blueprint graphs, and verify every action in real time. The Planner has documents; the Workers have reality.
+## Layer 2: Validation Stack
 
-When a Worker receives a step, it loads a context window containing:
-- **The live engine state** (highest priority -- the Worker can query anything)
-- The user's `user_context/` files (user's word is law)
-- The exact tool registry schema for the required tool
-- The relevant Unreal Engine API documentation (from the `contexts/` folder)
-- The step instructions from the Planner's plan (lowest priority -- a guide, not gospel)
+Every tool call passes through four deterministic checks before execution. No LLM is involved in validation.
 
-**The Execute-Verify-Fix Loop:**
-Workers do not fire-and-forget. Every action is verified against the live engine state. If a tool call fails, the Worker self-corrects: it queries the engine for more context, adjusts its approach, and retries. Workers track whether each retry is improving the situation. They only escalate to the Planner when 3+ consecutive attempts show no improvement.
+### Confidence Scorer
 
-**Workers correct the Planner's mistakes autonomously.** If the plan says an asset doesn't exist but the Worker can find it in the Content Browser, the Worker uses it. If the plan has the wrong pin name, the Worker calls `get_pins` and uses the real name. The Worker logs all corrections so the Planner knows what changed.
+Scores the structural integrity of each tool call on a 0-1 scale:
+- Does the function name exist in the registry?
+- Do the arguments parse as valid JSON?
+- Are there placeholder values (UNKNOWN, TODO)?
+- Does the call have at least one argument?
 
-**The 95% Confidence Gate:**
-- If confidence is **>= 95%**, the Worker executes the call.
-- If confidence is **< 95%**, the Worker queries the engine for more data (which typically raises confidence to 97%+).
-- If confidence remains **< 95%** after 5 retries with no improvement, the Worker escalates with a detailed report of everything it tried.
+Calls below the confidence threshold (default 80%) are rejected and the error is fed back to the model for self-correction.
 
-Workers have no internet access. They do not generate creative content. But within their domain -- the live engine and the project docs -- they are fully autonomous.
+### Rule Engine (`rule-engine.js`)
 
-## Documentation Hierarchy
+Zero-latency, model-free validation:
+- Tool exists in registry
+- Required parameters are present
+- Parameter types match (string, number, boolean)
+- No unknown parameters
+- Workflow rules enforced (snapshot before mutation, compile after mutation)
+- Dependency ordering respected
+- GUID references resolved from prior steps
 
-The documentation that drives this system is structured to prioritize user control and deterministic execution.
+### Project State Validator
 
-### 1. The Live Engine (Ground Truth)
-The live Unreal Engine instance is the ultimate source of truth. If a Worker can query the Content Browser, inspect an actor, or read a Blueprint graph, that data supersedes everything else. The engine is real; documents are approximations.
+Cross-checks the tool call against the live editor state:
+- Does the target Blueprint/Actor/Asset actually exist?
+- Are the pin names valid?
+- Is the level loaded?
 
-### 2. `user_context/` (User Files -- Read Only)
-This folder contains project-specific files provided by the user, such as the screenplay, roadmap, asset dumps, or specific rules. **The user's files are never modified by Claude or the Workers.** They are read-only law. If a Worker detects a conflict between the Planner's instructions and a file in `user_context/`, the user's file always wins.
+Uses read-only tools to query the engine before allowing mutations.
 
-### 3. `plan/` (Planner Output)
-This folder contains the Planner's JSON execution plan and any project config it generated. Workers treat this as a guide, not an authority. If the plan contradicts the engine state or the user's files, the Workers correct it autonomously. 
+### Idempotency Guard
 
-### 4. `contexts/` (Domain Knowledge)
-This folder contains detailed technical documentation for specific Unreal Engine subsystems (e.g., Blueprints, PCG, Animation, Sequencer). Workers load these files on-demand based on the tool they are about to execute. This ensures the Worker's context window is filled only with highly relevant, accurate API information.
+Prevents duplicate operations:
+- If the exact same tool call with the same parameters was already executed successfully, skip it
+- Tracks execution history per session
 
-### 5. `SYSTEM.md` & `WORKER_INSTRUCTIONS.md`
-These files define the operational rules for the system. `SYSTEM.md` defines the overall architecture and plan formatting for the Planner. `WORKER_INSTRUCTIONS.md` defines the strict execution loop, confidence gating, and escalation protocols for the local models.
+## Layer 3: C++ Plugin
 
-## Engine Integration: Headless Agent Mode
+The plugin runs inside UE 5.6 (Oculus fork, `oculus-5.6.1-release`). It exposes 390 HTTP endpoints at `http://localhost:9847/api/<endpoint>`. Each endpoint maps to a specific editor operation.
 
-When the AgenticMCP plugin is initialized for automated workflows, it launches Unreal Engine using the `-RenderOffScreen` argument. 
+The plugin processes all requests on the game thread to avoid concurrency issues with the UEdGraph API. Responses include real engine data (node GUIDs, pin names, asset paths, compilation errors) that feed back into the inference loop.
 
-This mode runs the full engine, including the complete GPU rendering pipeline, but without creating an OS window. This provides several critical advantages:
-- The agent can execute PIE sessions, render Level Sequences, and capture high-resolution viewport screenshots.
-- The user's workflow is not interrupted by a visible editor window stealing focus.
-- VRAM usage is optimized by rendering to offscreen buffers instead of a display swapchain.
+## Context System
 
-### The Terminal Console UI
+The Worker model's context window is populated with project-specific information at inference time.
 
-While the engine runs headless, the user monitors the system via a lightweight Terminal UI (TUI). This console tails the execution log, showing every plan step, the Gatekeeper's validation status, and the Worker's confidence scores.
+### Context Priority (highest to lowest)
 
-Crucially, the console supports inline image rendering via the Kitty graphics protocol (with sixel fallback). When a Worker executes a `screenshot` tool, the resulting image is rendered directly in the terminal log. This allows the user to visually verify the agent's progress without needing a separate image viewer or editor window. The user can also interrupt execution or inject new instructions via the console prompt.
+1. **Tool results** from previous calls in the current session
+2. **Source truth** (`reference/source_truth/`) -- project-specific asset paths, Blueprint names, level names, scene mappings
+3. **Tool definitions** -- the 390 function definitions with exact parameter names, types, and descriptions
+4. **User context** (`reference/user_context/`) -- additional documentation provided by the user (Meta dev docs, scripts, roadmaps)
+5. **Engine documentation** -- UE docs available at `C:\UE56\Engine\Documentation\`
+6. **Tool-specific context** (`Tools/contexts/`) -- detailed API docs loaded on-demand based on which tool is being called
+
+### Source Truth
+
+The `reference/source_truth/` folder contains machine-readable project state:
+- Asset paths and Blueprint names
+- Level names and scene order
+- Data table schemas
+- Filesystem structure
+
+The more complete this folder is, the fewer read-only queries the model needs to make before executing mutations.
+
+### User Context
+
+The `reference/user_context/` folder contains user-provided documentation:
+- Meta developer docs
+- Project roadmaps and scripts
+- Custom rules or constraints
+
+These files are **read-only** and are never modified by the system. User context takes priority over model inference when there is a conflict.
+
+## Self-Correction
+
+When a tool call fails, the error message is sent back to the model as a `tool` role message. The model reads the error, adjusts its approach, and tries again. This loop continues for up to 10 iterations (configurable via `MAX_REQUEST_ITERATIONS`).
+
+Common self-correction patterns:
+- Wrong asset path -> model calls `search` or `listActors` to find the correct path -> retries
+- Wrong pin name -> model calls `getPinInfo` to get the real pin names -> retries
+- Missing snapshot -> model calls `snapshotGraph` first -> retries the mutation
+
+## Local Inference
+
+All inference runs locally via llama.cpp. No external API calls. No cloud dependencies.
+
+### Model Configuration
+
+| Role | Model | Port | VRAM |
+|------|-------|------|------|
+| Worker | Llama 3.1 8B (Q4_K_M) | 8081 | ~5 GB |
+| Validator | Llama 3.2 3B (Q4_K_M) | 8080 | ~2 GB |
+| QA Auditor | Llama 3.2 3B (Q4_K_M) | 8082 | ~2 GB |
+| Spatial | Cosmos Reason2 2B | 8083 | ~2 GB |
+
+The Worker is the primary model. Validator, QA Auditor, and Spatial Reasoner are optional auxiliary models for additional verification.
+
+### llama.cpp Requirements
+
+The Worker server must be started with `--jinja` flag to enable native tool calling:
+
+```bash
+llama-server -m models/llama-3.1-8b-q4_k_m.gguf --port 8081 -ngl 99 --jinja
+```
+
+The `--jinja` flag enables the chat template to process the `tools` parameter in chat completion requests and produce structured `tool_calls` in responses.
+
+## Offline Fallback
+
+When the UE editor is not running, the system falls back to a Python binary injector that reads and modifies `.umap` files directly. This supports a subset of read operations (level data, actor inspection) and Blueprint paste text generation. The fallback is enabled via `AGENTIC_FALLBACK_ENABLED=true`.
