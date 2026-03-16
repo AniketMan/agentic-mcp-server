@@ -20,7 +20,8 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "ActorFolder.h"
-#include "ActorFolders.h"
+#include "EditorActorFolders.h"
+#include "Folder.h"
 
 static UWorld* GetEditorWorld_Scene()
 {
@@ -270,7 +271,8 @@ FString FAgenticMCPServer::HandleSceneCreateFolder(const FString& Body)
 		return MakeErrorJson(TEXT("No editor world"));
 	}
 
-	FActorFolders::Get().CreateFolder(*World, FFolder(FName(*FolderPath)));
+	FFolder::FRootObject RootObject(World->PersistentLevel);
+	FActorFolders::Get().CreateFolder(*World, FFolder(RootObject, FName(*FolderPath)));
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetStringField(TEXT("status"), TEXT("ok"));
@@ -309,7 +311,8 @@ FString FAgenticMCPServer::HandleSceneDeleteFolder(const FString& Body)
 		return MakeErrorJson(TEXT("No editor world"));
 	}
 
-	FActorFolders::Get().DeleteFolder(*World, FFolder(FName(*FolderPath)));
+	FFolder::FRootObject RootObject(World->PersistentLevel);
+	FActorFolders::Get().DeleteFolder(*World, FFolder(RootObject, FName(*FolderPath)));
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetStringField(TEXT("status"), TEXT("ok"));
