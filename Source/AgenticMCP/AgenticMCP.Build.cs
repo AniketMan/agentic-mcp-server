@@ -1,6 +1,18 @@
 // AgenticMCP.Build.cs
 // Module build rules for the AgenticMCP editor plugin.
 // This plugin is Editor-only -- it will NOT be included in packaged builds.
+//
+// ARCHITECTURE:
+// Optional plugin modules (Niagara, OculusXR, ControlRig, Composure, etc.)
+// are conditionally added as dependencies only if they exist in the engine.
+// This prevents DLL load failures when optional plugins are not enabled.
+//
+// Modules with direct header includes (Niagara, OculusXR) use preprocessor
+// defines (WITH_NIAGARA, WITH_OCULUSXR) so their handler code compiles to
+// stubs when the plugin is absent.
+//
+// All other optional modules use only FModuleManager::IsModuleLoaded() and
+// FindFirstObject() at runtime, so they have no compile-time type dependency.
 
 using UnrealBuildTool;
 
@@ -10,98 +22,152 @@ public class AgenticMCP : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		// Allow missing modules at link time -- optional subsystems (Niagara,
-		// OculusXR, PCG, etc.) may not be present in every project.
 		bPrecompile = false;
 
 		// UE 5.6: Disable warnings-as-errors for this module
-		// C4459 (declaration hides global) triggers due to InterchangeCore headers
 		bWarningsAsErrors = false;
 		bEnableUndefinedIdentifierWarnings = false;
 		UnsafeTypeCastWarningLevel = WarningLevel.Off;
 
-		// ---- Public dependencies (headers exposed to other modules) ----
+		// ---- Public dependencies (always available in editor builds) ----
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"UnrealEd",           // Editor APIs, FBlueprintEditorUtils
-			"BlueprintGraph",     // K2Node types, UEdGraphSchema_K2
-			"Json",               // TJsonWriter, FJsonObject
-			"JsonUtilities",      // FJsonObjectConverter
-			"HTTPServer",         // FHttpServerModule, IHttpRouter
-			"Sockets",            // Socket subsystem for port check
-			"Networking"          // Networking primitives
+			"UnrealEd",
+			"BlueprintGraph",
+			"Json",
+			"JsonUtilities",
+			"HTTPServer",
+			"Sockets",
+			"Networking"
 		});
 
-		// ---- Private dependencies (implementation only) ----
+		// ---- Core private dependencies (always available in editor builds) ----
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"AssetRegistry",      // Asset scanning and lookup
-			"AssetTools",         // Asset creation, rename, duplicate, import
-			"Kismet",             // Blueprint editor utilities
-			"KismetCompiler",     // Blueprint compilation
-			"EditorSubsystem",    // UEditorSubsystem base class
-			"LevelEditor",        // Level management APIs
-			"Landscape", "NavigationSystem",          // Landscape actor support
-			"Foliage",            // Foliage editing APIs
-			"RHI",                // Render hardware interface (for nullrhi commandlet)
-			"ImageWrapper",       // PNG/JPEG compression for screenshots
-			"GraphEditor",        // Graph editor for K2Node types
-			"RenderCore",         // FlushRenderingCommands
-			"LevelSequence",      // Level Sequence reading/editing
-			"MovieScene",         // MovieScene tracks and sections
-			"MovieSceneTracks",   // Audio, Animation tracks
-			"Niagara",            // Niagara particle system APIs
-			"InputCore",          // EKeys, FKey for input simulation
-			"Slate",              // FSlateApplication for input
-			"SlateCore",          // Slate core types
-			"PhysicsCore",        // Physics body instance, constraints
-			"AnimGraph",          // Animation Blueprint graph nodes
-			"AnimGraphRuntime",   // Animation state machine runtime
-			"UMG",                // UMG Widget Blueprint support
-			"UMGEditor",          // UMG Widget Blueprint editor support
-			"SourceControl",      // Source control integration
-			"AIModule",           // AI controllers, behavior tree runtime
-			"GameplayTasks",      // Gameplay task system (used by AI)
-			// "BehaviorTreeEditor",  // UE 5.6: Removed - AIGraph.h no longer available
-			"ToolMenus",          // Editor tool menus and settings access
-			"DeveloperSettings",  // UDeveloperSettings access
-			"EngineSettings",     // UGameMapsSettings, UGeneralProjectSettings
-			"Projects",           // IPluginManager for plugin info
-			"MaterialEditor",     // Material editor APIs
-			"MovieRenderPipelineCore", // Movie Render Pipeline (sequencer render)
-			"PropertyEditor",     // Property editing for settings
-			"OculusXRHMD",        // Meta XR HMD APIs
-			"OculusXRInput",      // Meta XR Input/Hand tracking APIs
-			"ControlRig",         // Control Rig editing APIs
-			"RigVM",              // Rig VM for Control Rig execution
-			"GeometryCollectionEngine", // Chaos Geometry Collection
-			"ChaosSolverEngine",  // Chaos destruction solver
-			"FieldSystemEngine",  // Chaos field system (radial/vector fields)
-			"EnhancedInput",      // Enhanced Input system
-			"LiveLinkInterface",  // Live Link base interfaces
-			"LiveLink",           // Live Link runtime
-			"MediaAssets",        // Media Player, Media Source, Media Texture
-			"MovieRenderPipelineRenderPasses", // MRG render passes
-			"ClothingSystemRuntimeInterface", // Cloth simulation interfaces
-			"GameplayAbilities",  // Gameplay Ability System
-			"GameplayTags",       // Gameplay Tags (used by GAS)
-			"MassEntity",         // Mass Entity framework
-			"InterchangeCore",    // Interchange pipeline core
-			"InterchangeEngine",  // Interchange pipeline engine
-			"VCamCore",           // Virtual Camera core
-			"VariantManagerContent", // Variant Manager content types
-			"Composure",          // Composure compositing
-			"Water"               // Water system
+			"AssetRegistry",
+			"AssetTools",
+			"Kismet",
+			"KismetCompiler",
+			"EditorSubsystem",
+			"LevelEditor",
+			"Landscape",
+			"NavigationSystem",
+			"Foliage",
+			"RHI",
+			"ImageWrapper",
+			"GraphEditor",
+			"RenderCore",
+			"LevelSequence",
+			"MovieScene",
+			"MovieSceneTracks",
+			"InputCore",
+			"Slate",
+			"SlateCore",
+			"PhysicsCore",
+			"AnimGraph",
+			"AnimGraphRuntime",
+			"UMG",
+			"SourceControl",
+			"AIModule",
+			"GameplayTasks",
+			"GameplayTags",
+			"ToolMenus",
+			"DeveloperSettings",
+			"EngineSettings",
+			"Projects",
+			"MaterialEditor",
+			"PropertyEditor"
 		});
 
-		// ---- Conditionally available modules ----
-		// PCG may not be available in all engine builds
-		if (Target.bBuildEditor)
+		// ---- Niagara: direct type usage (UNiagaraComponent, etc.) ----
+		// Requires preprocessor guard WITH_NIAGARA in Handlers_Niagara.cpp
+		AddOptionalModule("Niagara", "WITH_NIAGARA");
+
+		// ---- OculusXR / Meta XR: direct type usage (UOculusXRFunctionLibrary) ----
+		// Requires preprocessor guard WITH_OCULUSXR in Handlers_MetaXR*.cpp
+		if (IsModuleAvailable("OculusXRHMD"))
 		{
-			PrivateDependencyModuleNames.Add("PCG");
+			PrivateDependencyModuleNames.Add("OculusXRHMD");
+			AddOptionalModule("OculusXRInput", null);
+			PublicDefinitions.Add("WITH_OCULUSXR=1");
+		}
+		else
+		{
+			PublicDefinitions.Add("WITH_OCULUSXR=0");
+		}
+
+		// ---- Optional modules: no direct includes, runtime-only usage ----
+		// These handlers use only FModuleManager::IsModuleLoaded() and
+		// FindFirstObject<UClass>() -- zero compile-time type dependency.
+		// If the module doesn't exist, the handler gracefully returns an error.
+		string[] OptionalModules = new string[]
+		{
+			"ControlRig",
+			"RigVM",
+			"Composure",
+			"Water",
+			"VCamCore",
+			"LiveLink",
+			"LiveLinkInterface",
+			"GameplayAbilities",
+			"MassEntity",
+			"InterchangeCore",
+			"InterchangeEngine",
+			"MovieRenderPipelineCore",
+			"MovieRenderPipelineRenderPasses",
+			"VariantManagerContent",
+			"GeometryCollectionEngine",
+			"ChaosSolverEngine",
+			"FieldSystemEngine",
+			"EnhancedInput",
+			"MediaAssets",
+			"ClothingSystemRuntimeInterface",
+			"PCG"
+		};
+
+		foreach (string Mod in OptionalModules)
+		{
+			if (IsModuleAvailable(Mod))
+			{
+				PrivateDependencyModuleNames.Add(Mod);
+			}
+		}
+	}
+
+	/// <summary>
+	/// Check if a module exists in the engine/project by looking up its directory.
+	/// Returns true if the module's Build.cs can be found.
+	/// </summary>
+	private bool IsModuleAvailable(string ModuleName)
+	{
+		string Dir = GetModuleDirectory(ModuleName);
+		return !string.IsNullOrEmpty(Dir);
+	}
+
+	/// <summary>
+	/// Add an optional module dependency with a preprocessor define.
+	/// If the module exists, adds it as a dependency and defines WITH_X=1.
+	/// If not, defines WITH_X=0 so handler code compiles to stubs.
+	/// </summary>
+	private void AddOptionalModule(string ModuleName, string DefineName)
+	{
+		if (IsModuleAvailable(ModuleName))
+		{
+			PrivateDependencyModuleNames.Add(ModuleName);
+			if (DefineName != null)
+			{
+				PublicDefinitions.Add(DefineName + "=1");
+			}
+		}
+		else
+		{
+			if (DefineName != null)
+			{
+				PublicDefinitions.Add(DefineName + "=0");
+			}
 		}
 	}
 }

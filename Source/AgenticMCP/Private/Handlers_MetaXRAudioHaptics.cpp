@@ -3,10 +3,13 @@
 // Exposes Touch Pro haptic feedback and OculusXR spatial audio APIs
 // UE 5.6 target. Requires OculusXR plugins enabled.
 
+#include "AgenticMCPServer.h"
+
+#if WITH_OCULUSXR
+
 // UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
 #pragma warning(push)
 #pragma warning(disable: 4459)
-#include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
@@ -321,3 +324,23 @@ FString FAgenticMCPServer::HandleXRConfigureAudioAttenuation(const TMap<FString,
 
     return JsonToString(OutJson);
 }
+
+
+#pragma warning(pop)
+
+#else // !WITH_OCULUSXR -- stub implementations
+
+#define XR_AH_STUB(FuncName) \
+FString FAgenticMCPServer::FuncName(const TMap<FString, FString>& Params, const FString& Body) \
+{ return MakeErrorJson(TEXT("OculusXR/MetaXR plugin is not available. Enable the Meta XR plugin.")); }
+
+XR_AH_STUB(HandleXRPlayHapticEffect)
+XR_AH_STUB(HandleXRStopHapticEffect)
+XR_AH_STUB(HandleXRGetHapticCapabilities)
+XR_AH_STUB(HandleXRSetSpatialAudioEnabled)
+XR_AH_STUB(HandleXRGetSpatialAudioStatus)
+XR_AH_STUB(HandleXRConfigureAudioAttenuation)
+
+#undef XR_AH_STUB
+
+#endif // WITH_OCULUSXR

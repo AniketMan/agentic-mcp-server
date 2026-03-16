@@ -2,10 +2,13 @@
 // Meta XR / OculusXR handlers for AgenticMCP
 // Controls passthrough, guardian, hand tracking, HMD info
 
+#include "AgenticMCPServer.h"
+
+#if WITH_OCULUSXR
+
 // UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
 #pragma warning(push)
 #pragma warning(disable: 4459)
-#include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
@@ -428,3 +431,27 @@ FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params
 
 	return JsonToString(OutJson);
 }
+
+
+#pragma warning(pop)
+
+#else // !WITH_OCULUSXR -- stub implementations
+
+#define XR_STUB(FuncName) \
+FString FAgenticMCPServer::FuncName(const TMap<FString, FString>& Params, const FString& Body) \
+{ return MakeErrorJson(TEXT("OculusXR/MetaXR plugin is not available. Enable the Meta XR plugin.")); }
+
+XR_STUB(HandleXRStatus)
+XR_STUB(HandleXRGuardian)
+XR_STUB(HandleXRSetGuardianVisibility)
+XR_STUB(HandleXRHandTracking)
+XR_STUB(HandleXRControllers)
+XR_STUB(HandleXRPassthrough)
+XR_STUB(HandleXRSetPassthrough)
+XR_STUB(HandleXRSetDisplayFrequency)
+XR_STUB(HandleXRSetPerformanceLevels)
+XR_STUB(HandleXRRecenter)
+
+#undef XR_STUB
+
+#endif // WITH_OCULUSXR

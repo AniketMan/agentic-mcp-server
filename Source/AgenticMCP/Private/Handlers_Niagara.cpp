@@ -2,10 +2,13 @@
 // Niagara particle system debugging and control endpoints for AgenticMCP
 // Provides visibility into particle systems, emitters, parameters, and performance stats
 
+#include "AgenticMCPServer.h"
+
+#if WITH_NIAGARA
+
 // UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
 #pragma warning(push)
 #pragma warning(disable: 4459)
-#include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
@@ -951,3 +954,38 @@ FString FAgenticMCPServer::HandleNiagaraSpawnSystem(const FString& Body)
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
 	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
+
+
+#pragma warning(pop)
+
+#else // !WITH_NIAGARA -- stub implementations
+
+#define NIAGARA_STUB(FuncName) \
+FString FAgenticMCPServer::FuncName(const TMap<FString, FString>& Params, const FString& Body) \
+{ return MakeErrorJson(TEXT("Niagara plugin is not available. Enable the Niagara plugin.")); }
+
+#define NIAGARA_STUB_BODY(FuncName) \
+FString FAgenticMCPServer::FuncName(const FString& Body) \
+{ return MakeErrorJson(TEXT("Niagara plugin is not available. Enable the Niagara plugin.")); }
+
+NIAGARA_STUB(HandleNiagaraGetStatus)
+NIAGARA_STUB(HandleNiagaraListSystems)
+NIAGARA_STUB(HandleNiagaraGetSystemInfo)
+NIAGARA_STUB(HandleNiagaraGetEmitters)
+NIAGARA_STUB(HandleNiagaraSetParameter)
+NIAGARA_STUB(HandleNiagaraGetParameters)
+NIAGARA_STUB(HandleNiagaraActivateSystem)
+NIAGARA_STUB(HandleNiagaraSetEmitterEnable)
+NIAGARA_STUB(HandleNiagaraResetSystem)
+NIAGARA_STUB(HandleNiagaraGetStats)
+NIAGARA_STUB(HandleNiagaraDebugHUD)
+NIAGARA_STUB_BODY(HandleNiagaraCreateSystem)
+NIAGARA_STUB_BODY(HandleNiagaraAddEmitter)
+NIAGARA_STUB_BODY(HandleNiagaraRemoveEmitter)
+NIAGARA_STUB_BODY(HandleNiagaraSetSystemProperty)
+NIAGARA_STUB_BODY(HandleNiagaraSpawnSystem)
+
+#undef NIAGARA_STUB
+#undef NIAGARA_STUB_BODY
+
+#endif // WITH_NIAGARA
