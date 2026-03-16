@@ -1,6 +1,9 @@
 // Handlers_VCam.cpp
 // Virtual Camera handlers for AgenticMCP.
 // UE 5.6 target. VCam component, modifiers, output providers.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -48,7 +51,7 @@ FString FAgenticMCPServer::HandleVCamList(const FString& Body)
 
         // Check for VCam component
         UActorComponent* VCamComp = Cam->FindComponentByClass(
-            FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("VCamComponent")));
+            FindObject<UClass>(nullptr, TEXT("VCamComponent")));
         Writer->WriteValue(TEXT("hasVCamComponent"), VCamComp != nullptr);
         Writer->WriteObjectEnd();
     }
@@ -101,7 +104,7 @@ FString FAgenticMCPServer::HandleVCamCreate(const FString& Body)
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     FTransform SpawnTransform(Rotation, Location);
-    ACameraActor* Cam = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), &SpawnTransform, Params);
+    ACameraActor* Cam = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), SpawnTransform, Params);
     if (!Cam)
     {
         return MakeErrorJson(TEXT("Failed to spawn camera actor"));
@@ -111,7 +114,7 @@ FString FAgenticMCPServer::HandleVCamCreate(const FString& Body)
     Cam->SetActorLabel(*Name);
 
     // Try to add VCam component dynamically
-    UClass* VCamClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("VCamComponent"));
+    UClass* VCamClass = FindObject<UClass>(nullptr, TEXT("VCamComponent"));
     if (VCamClass)
     {
         UActorComponent* VCamComp = NewObject<UActorComponent>(Cam, VCamClass, TEXT("VCamComponent"));

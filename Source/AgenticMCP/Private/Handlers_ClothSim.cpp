@@ -1,6 +1,9 @@
 // Handlers_ClothSim.cpp
 // Cloth simulation handlers for AgenticMCP.
 // UE 5.6 target. Cloth painting, config, and asset management.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"

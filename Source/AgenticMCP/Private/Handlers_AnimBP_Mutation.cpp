@@ -11,6 +11,9 @@
 //   animBPGetStateMachine    - Get full state machine graph (states, transitions)
 //   animBPSetStateAnimation  - Assign an animation sequence to a state
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Animation/AnimBlueprint.h"
 #include "Animation/AnimBlueprintGeneratedClass.h"
@@ -143,13 +146,13 @@ FString FAgenticMCPServer::HandleAnimBPAddState(const FString& Body)
 	FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBP);
 	AnimBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetStringField(TEXT("stateName"), StateName);
-	Result->SetNumberField(TEXT("posX"), PosX);
-	Result->SetNumberField(TEXT("posY"), PosY);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetStringField(TEXT("stateName"), StateName);
+	OutJson->SetNumberField(TEXT("posX"), PosX);
+	OutJson->SetNumberField(TEXT("posY"), PosY);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -188,11 +191,11 @@ FString FAgenticMCPServer::HandleAnimBPRemoveState(const FString& Body)
 	FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBP);
 	AnimBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetStringField(TEXT("removedState"), StateName);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetStringField(TEXT("removedState"), StateName);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -265,12 +268,12 @@ FString FAgenticMCPServer::HandleAnimBPAddTransition(const FString& Body)
 	FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBP);
 	AnimBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetStringField(TEXT("fromState"), FromState);
-	Result->SetStringField(TEXT("toState"), ToState);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetStringField(TEXT("fromState"), FromState);
+	OutJson->SetStringField(TEXT("toState"), ToState);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -309,8 +312,8 @@ FString FAgenticMCPServer::HandleAnimBPSetTransitionRule(const FString& Body)
 		UAnimStateTransitionNode* TN = Cast<UAnimStateTransitionNode>(Node);
 		if (!TN) continue;
 
-		UAnimStateNode* Prev = TN->GetPreviousState();
-		UAnimStateNode* Next = TN->GetNextState();
+		UAnimStateNode* Prev = Cast<UAnimStateNode>(TN->GetPreviousState());
+		UAnimStateNode* Next = Cast<UAnimStateNode>(TN->GetNextState());
 		if (Prev && Next &&
 			Prev->GetStateName() == FromState &&
 			Next->GetStateName() == ToState)
@@ -344,25 +347,25 @@ FString FAgenticMCPServer::HandleAnimBPSetTransitionRule(const FString& Body)
 	FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBP);
 	AnimBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetStringField(TEXT("fromState"), FromState);
-	Result->SetStringField(TEXT("toState"), ToState);
-	Result->SetStringField(TEXT("conditionType"), CondType);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetStringField(TEXT("fromState"), FromState);
+	OutJson->SetStringField(TEXT("toState"), ToState);
+	OutJson->SetStringField(TEXT("conditionType"), CondType);
 	if (CondType == TEXT("bool"))
 	{
 		FString BoolVar = Json->GetStringField(TEXT("boolVariableName"));
-		Result->SetStringField(TEXT("boolVariableName"), BoolVar);
-		Result->SetStringField(TEXT("note"), FString::Printf(
+		OutJson->SetStringField(TEXT("boolVariableName"), BoolVar);
+		OutJson->SetStringField(TEXT("note"), FString::Printf(
 			TEXT("Transition set to bool-based. Use 'addNode' in the transition graph to add a 'Get %s' node "
 				 "and connect it to the transition result."), *BoolVar));
 	}
 	else if (CondType == TEXT("automatic"))
 	{
-		Result->SetStringField(TEXT("note"), TEXT("Transition set to automatic (fires when animation completes)."));
+		OutJson->SetStringField(TEXT("note"), TEXT("Transition set to automatic (fires when animation completes)."));
 	}
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -462,13 +465,13 @@ FString FAgenticMCPServer::HandleAnimBPSetStateAnimation(const FString& Body)
 	FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBP);
 	AnimBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetStringField(TEXT("stateName"), StateName);
-	Result->SetStringField(TEXT("animationAsset"), AnimSeq->GetName());
-	Result->SetBoolField(TEXT("looping"), bLooping);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetStringField(TEXT("stateName"), StateName);
+	OutJson->SetStringField(TEXT("animationAsset"), AnimSeq->GetName());
+	OutJson->SetBoolField(TEXT("looping"), bLooping);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -511,7 +514,7 @@ FString FAgenticMCPServer::HandleAnimBPGetStateMachine(const FString& Body)
 				{
 					if (UAnimGraphNode_SequencePlayer* SP = Cast<UAnimGraphNode_SequencePlayer>(InnerNode))
 					{
-						UAnimSequence* Seq = SP->Node.GetSequence();
+						UAnimSequence* Seq = Cast<UAnimSequence>(SP->Node.GetSequence());
 						if (Seq)
 						{
 							StateJson->SetStringField(TEXT("animation"), Seq->GetName());
@@ -527,8 +530,8 @@ FString FAgenticMCPServer::HandleAnimBPGetStateMachine(const FString& Body)
 		else if (UAnimStateTransitionNode* TransNode = Cast<UAnimStateTransitionNode>(Node))
 		{
 			TSharedRef<FJsonObject> TransJson = MakeShared<FJsonObject>();
-			UAnimStateNode* Prev = TransNode->GetPreviousState();
-			UAnimStateNode* Next = TransNode->GetNextState();
+			UAnimStateNode* Prev = Cast<UAnimStateNode>(TransNode->GetPreviousState());
+			UAnimStateNode* Next = Cast<UAnimStateNode>(TransNode->GetNextState());
 			TransJson->SetStringField(TEXT("fromState"), Prev ? Prev->GetStateName() : TEXT("(none)"));
 			TransJson->SetStringField(TEXT("toState"), Next ? Next->GetStateName() : TEXT("(none)"));
 			TransJson->SetBoolField(TEXT("automaticRule"), TransNode->bAutomaticRuleBasedOnSequencePlayerInState);
@@ -536,14 +539,14 @@ FString FAgenticMCPServer::HandleAnimBPGetStateMachine(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetNumberField(TEXT("stateCount"), StatesArr.Num());
-	Result->SetArrayField(TEXT("states"), StatesArr);
-	Result->SetNumberField(TEXT("transitionCount"), TransitionsArr.Num());
-	Result->SetArrayField(TEXT("transitions"), TransitionsArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetNumberField(TEXT("stateCount"), StatesArr.Num());
+	OutJson->SetArrayField(TEXT("states"), StatesArr);
+	OutJson->SetNumberField(TEXT("transitionCount"), TransitionsArr.Num());
+	OutJson->SetArrayField(TEXT("transitions"), TransitionsArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -626,10 +629,10 @@ FString FAgenticMCPServer::HandleAnimBPAddBlendNode(const FString& Body)
 	FBlueprintEditorUtils::MarkBlueprintAsModified(AnimBP);
 	AnimBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("animBlueprintName"), ABPName);
-	Result->SetStringField(TEXT("stateName"), StateName);
-	Result->SetStringField(TEXT("blendSpace"), BlendSpace->GetName());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("animBlueprintName"), ABPName);
+	OutJson->SetStringField(TEXT("stateName"), StateName);
+	OutJson->SetStringField(TEXT("blendSpace"), BlendSpace->GetName());
+	return JsonToString(OutJson);
 }

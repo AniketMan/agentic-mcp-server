@@ -2,6 +2,9 @@
 // Story progression handlers for AgenticMCP
 // Controls story state, advancement, and navigation via BP_StoryController
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -56,7 +59,7 @@ static AActor* FindStoryControllerInWorld(UWorld* World)
 
 FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Use editor world - streaming levels are visible there even during PIE
 	UWorld* World = nullptr;
@@ -95,8 +98,8 @@ FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params
 			*LevelList));
 	}
 
-	Result->SetStringField(TEXT("controllerName"), StoryController->GetName());
-	Result->SetStringField(TEXT("controllerClass"), StoryController->GetClass()->GetName());
+	OutJson->SetStringField(TEXT("controllerName"), StoryController->GetName());
+	OutJson->SetStringField(TEXT("controllerClass"), StoryController->GetClass()->GetName());
 
 	// Get CurrentStoryIndex property
 	FProperty* IndexProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentStoryIndex"));
@@ -104,7 +107,7 @@ FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params
 	{
 		int32 CurrentIndex = 0;
 		IndexProp->GetValue_InContainer(StoryController, &CurrentIndex);
-		Result->SetNumberField(TEXT("currentStoryIndex"), CurrentIndex);
+		OutJson->SetNumberField(TEXT("currentStoryIndex"), CurrentIndex);
 	}
 
 	// Get CurrentSequence property if exists
@@ -126,7 +129,7 @@ FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params
 		}
 		if (!SeqName.IsEmpty())
 		{
-			Result->SetStringField(TEXT("currentSequence"), SeqName);
+			OutJson->SetStringField(TEXT("currentSequence"), SeqName);
 		}
 	}
 
@@ -143,7 +146,7 @@ FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params
 		{
 			bIsPlaying = BoolProp->GetPropertyValue_InContainer(StoryController);
 		}
-		Result->SetBoolField(TEXT("isPlaying"), bIsPlaying);
+		OutJson->SetBoolField(TEXT("isPlaying"), bIsPlaying);
 	}
 
 	// Try to get total steps from DataTable reference
@@ -159,17 +162,17 @@ FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params
 			UObject* DTObj = ObjProp->GetObjectPropertyValue_InContainer(StoryController);
 			if (DTObj)
 			{
-				Result->SetStringField(TEXT("dataTable"), DTObj->GetName());
+				OutJson->SetStringField(TEXT("dataTable"), DTObj->GetName());
 			}
 		}
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Use editor world - streaming levels are visible there even during PIE
 	UWorld* World = nullptr;
@@ -213,9 +216,9 @@ FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Para
 	if (AdvanceFunc)
 	{
 		StoryController->ProcessEvent(AdvanceFunc, nullptr);
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("method"), TEXT("function"));
-		Result->SetStringField(TEXT("functionCalled"), AdvanceFunc->GetName());
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("method"), TEXT("function"));
+		OutJson->SetStringField(TEXT("functionCalled"), AdvanceFunc->GetName());
 	}
 	else
 	{
@@ -224,8 +227,8 @@ FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Para
 		{
 			int32 NewIndex = PreviousIndex + 1;
 			IndexProp->SetValue_InContainer(StoryController, &NewIndex);
-			Result->SetBoolField(TEXT("success"), true);
-			Result->SetStringField(TEXT("method"), TEXT("property"));
+			OutJson->SetBoolField(TEXT("success"), true);
+			OutJson->SetStringField(TEXT("method"), TEXT("property"));
 		}
 		else
 		{
@@ -240,15 +243,15 @@ FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Para
 		IndexProp->GetValue_InContainer(StoryController, &NewIndex);
 	}
 
-	Result->SetNumberField(TEXT("previousIndex"), PreviousIndex);
-	Result->SetNumberField(TEXT("newIndex"), NewIndex);
+	OutJson->SetNumberField(TEXT("previousIndex"), PreviousIndex);
+	OutJson->SetNumberField(TEXT("newIndex"), NewIndex);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -323,7 +326,7 @@ FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params,
 						uint8* RowData = DataTable->FindRowUnchecked(RowName);
 						if (RowData)
 						{
-							UScriptStruct* RowStruct = DataTable->GetRowStruct();
+							const UScriptStruct* RowStruct = DataTable->GetRowStruct();
 							if (RowStruct)
 							{
 								FProperty* NameProp = RowStruct->FindPropertyByName(TEXT("StepName"));
@@ -412,16 +415,16 @@ FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params,
 		struct { int32 Index; } Parms;
 		Parms.Index = TargetIndex;
 		StoryController->ProcessEvent(GotoFunc, &Parms);
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("method"), TEXT("function"));
-		Result->SetStringField(TEXT("functionCalled"), GotoFunc->GetName());
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("method"), TEXT("function"));
+		OutJson->SetStringField(TEXT("functionCalled"), GotoFunc->GetName());
 	}
 	else if (IndexProp)
 	{
 		// Fallback: directly set the property
 		IndexProp->SetValue_InContainer(StoryController, &TargetIndex);
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("method"), TEXT("property"));
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("method"), TEXT("property"));
 	}
 	else
 	{
@@ -435,16 +438,16 @@ FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params,
 		IndexProp->GetValue_InContainer(StoryController, &NewIndex);
 	}
 
-	Result->SetNumberField(TEXT("previousIndex"), PreviousIndex);
-	Result->SetNumberField(TEXT("targetIndex"), TargetIndex);
-	Result->SetNumberField(TEXT("newIndex"), NewIndex);
+	OutJson->SetNumberField(TEXT("previousIndex"), PreviousIndex);
+	OutJson->SetNumberField(TEXT("targetIndex"), TargetIndex);
+	OutJson->SetNumberField(TEXT("newIndex"), NewIndex);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleStoryPlay(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Try PIE world first, then editor world
 	UWorld* World = nullptr;
@@ -492,10 +495,10 @@ FString FAgenticMCPServer::HandleStoryPlay(const TMap<FString, FString>& Params,
 	if (PlayFunc)
 	{
 		StoryController->ProcessEvent(PlayFunc, nullptr);
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("method"), TEXT("function"));
-		Result->SetStringField(TEXT("functionCalled"), PlayFunc->GetName());
-		Result->SetNumberField(TEXT("currentIndex"), CurrentIndex);
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("method"), TEXT("function"));
+		OutJson->SetStringField(TEXT("functionCalled"), PlayFunc->GetName());
+		OutJson->SetNumberField(TEXT("currentIndex"), CurrentIndex);
 	}
 	else
 	{
@@ -510,16 +513,16 @@ FString FAgenticMCPServer::HandleStoryPlay(const TMap<FString, FString>& Params,
 			}
 		}
 
-		Result->SetBoolField(TEXT("success"), false);
-		Result->SetStringField(TEXT("error"), TEXT("PlayCurrentStep function not found"));
+		OutJson->SetBoolField(TEXT("success"), false);
+		OutJson->SetStringField(TEXT("error"), TEXT("PlayCurrentStep function not found"));
 
 		TArray<TSharedPtr<FJsonValue>> FuncArray;
 		for (const FString& Name : FuncNames)
 		{
 			FuncArray.Add(MakeShared<FJsonValueString>(Name));
 		}
-		Result->SetArrayField(TEXT("availableFunctions"), FuncArray);
+		OutJson->SetArrayField(TEXT("availableFunctions"), FuncArray);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

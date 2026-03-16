@@ -2,6 +2,9 @@
 // Meta XR / OculusXR handlers for AgenticMCP
 // Controls passthrough, guardian, hand tracking, HMD info
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -18,14 +21,14 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 	{
 		return MakeErrorJson(TEXT("XR system not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Device info
 	FString DeviceName = UOculusXRFunctionLibrary::GetDeviceName();
 	EOculusXRDeviceType DeviceType = UOculusXRFunctionLibrary::GetDeviceType();
 
-	Result->SetStringField(TEXT("deviceName"), DeviceName);
-	Result->SetStringField(TEXT("deviceType"), UEnum::GetValueAsString(DeviceType));
+	OutJson->SetStringField(TEXT("deviceName"), DeviceName);
+	OutJson->SetStringField(TEXT("deviceType"), UEnum::GetValueAsString(DeviceType));
 
 	// HMD Pose
 	FRotator DeviceRotation;
@@ -40,7 +43,7 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 	PoseObj->SetNumberField(TEXT("positionX"), DevicePosition.X);
 	PoseObj->SetNumberField(TEXT("positionY"), DevicePosition.Y);
 	PoseObj->SetNumberField(TEXT("positionZ"), DevicePosition.Z);
-	Result->SetObjectField(TEXT("pose"), PoseObj);
+	OutJson->SetObjectField(TEXT("pose"), PoseObj);
 
 	// Tracking status
 	bool bHMDTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::HMD);
@@ -51,7 +54,7 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 	TrackingObj->SetBoolField(TEXT("hmd"), bHMDTracked);
 	TrackingObj->SetBoolField(TEXT("leftController"), bLeftControllerTracked);
 	TrackingObj->SetBoolField(TEXT("rightController"), bRightControllerTracked);
-	Result->SetObjectField(TEXT("tracking"), TrackingObj);
+	OutJson->SetObjectField(TEXT("tracking"), TrackingObj);
 
 	// Passthrough support
 	bool bPassthroughSupported = UOculusXRFunctionLibrary::IsPassthroughSupported();
@@ -62,7 +65,7 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 	PassthroughObj->SetBoolField(TEXT("supported"), bPassthroughSupported);
 	PassthroughObj->SetBoolField(TEXT("colorSupported"), bColorPassthroughSupported);
 	PassthroughObj->SetBoolField(TEXT("recommended"), bPassthroughRecommended);
-	Result->SetObjectField(TEXT("passthrough"), PassthroughObj);
+	OutJson->SetObjectField(TEXT("passthrough"), PassthroughObj);
 
 	// Display info
 	float CurrentFreq = UOculusXRFunctionLibrary::GetCurrentDisplayFrequency();
@@ -76,7 +79,7 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 		FreqArray.Add(MakeShared<FJsonValueNumber>(Freq));
 	}
 	DisplayObj->SetArrayField(TEXT("availableFrequencies"), FreqArray);
-	Result->SetObjectField(TEXT("display"), DisplayObj);
+	OutJson->SetObjectField(TEXT("display"), DisplayObj);
 
 	// Performance
 	EOculusXRProcessorPerformanceLevel CpuLevel, GpuLevel;
@@ -91,15 +94,15 @@ FString FAgenticMCPServer::HandleXRStatus(const TMap<FString, FString>& Params, 
 	UOculusXRFunctionLibrary::GetGPUUtilization(bGpuAvailable, GpuUtil);
 	PerfObj->SetBoolField(TEXT("gpuAvailable"), bGpuAvailable);
 	PerfObj->SetNumberField(TEXT("gpuUtilization"), GpuUtil);
-	Result->SetObjectField(TEXT("performance"), PerfObj);
+	OutJson->SetObjectField(TEXT("performance"), PerfObj);
 
 	// Input focus
 	bool bHasInputFocus = UOculusXRFunctionLibrary::HasInputFocus();
 	bool bHasSystemOverlay = UOculusXRFunctionLibrary::HasSystemOverlayPresent();
-	Result->SetBoolField(TEXT("hasInputFocus"), bHasInputFocus);
-	Result->SetBoolField(TEXT("hasSystemOverlay"), bHasSystemOverlay);
+	OutJson->SetBoolField(TEXT("hasInputFocus"), bHasInputFocus);
+	OutJson->SetBoolField(TEXT("hasSystemOverlay"), bHasSystemOverlay);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params, const FString& Body)
@@ -108,14 +111,14 @@ FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params
 	{
 		return MakeErrorJson(TEXT("XR system not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Guardian status
 	bool bConfigured = UOculusXRFunctionLibrary::IsGuardianConfigured();
 	bool bDisplayed = UOculusXRFunctionLibrary::IsGuardianDisplayed();
 
-	Result->SetBoolField(TEXT("configured"), bConfigured);
-	Result->SetBoolField(TEXT("displayed"), bDisplayed);
+	OutJson->SetBoolField(TEXT("configured"), bConfigured);
+	OutJson->SetBoolField(TEXT("displayed"), bDisplayed);
 
 	if (bConfigured)
 	{
@@ -127,13 +130,13 @@ FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params
 		OuterObj->SetNumberField(TEXT("x"), OuterDimensions.X);
 		OuterObj->SetNumberField(TEXT("y"), OuterDimensions.Y);
 		OuterObj->SetNumberField(TEXT("z"), OuterDimensions.Z);
-		Result->SetObjectField(TEXT("outerBoundary"), OuterObj);
+		OutJson->SetObjectField(TEXT("outerBoundary"), OuterObj);
 
 		TSharedRef<FJsonObject> PlayAreaObj = MakeShared<FJsonObject>();
 		PlayAreaObj->SetNumberField(TEXT("x"), PlayAreaDimensions.X);
 		PlayAreaObj->SetNumberField(TEXT("y"), PlayAreaDimensions.Y);
 		PlayAreaObj->SetNumberField(TEXT("z"), PlayAreaDimensions.Z);
-		Result->SetObjectField(TEXT("playArea"), PlayAreaObj);
+		OutJson->SetObjectField(TEXT("playArea"), PlayAreaObj);
 
 		// Play area transform
 		FTransform PlayAreaTransform = UOculusXRFunctionLibrary::GetPlayAreaTransform();
@@ -144,7 +147,7 @@ FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params
 		TransformObj->SetNumberField(TEXT("rotationPitch"), PlayAreaTransform.GetRotation().Rotator().Pitch);
 		TransformObj->SetNumberField(TEXT("rotationYaw"), PlayAreaTransform.GetRotation().Rotator().Yaw);
 		TransformObj->SetNumberField(TEXT("rotationRoll"), PlayAreaTransform.GetRotation().Rotator().Roll);
-		Result->SetObjectField(TEXT("playAreaTransform"), TransformObj);
+		OutJson->SetObjectField(TEXT("playAreaTransform"), TransformObj);
 
 		// Guardian boundary points (outer)
 		TArray<FVector> BoundaryPoints = UOculusXRFunctionLibrary::GetGuardianPoints(EOculusXRBoundaryType::Boundary_Outer, false);
@@ -157,15 +160,15 @@ FString FAgenticMCPServer::HandleXRGuardian(const TMap<FString, FString>& Params
 			PointObj->SetNumberField(TEXT("z"), Point.Z);
 			PointsArray.Add(MakeShared<FJsonValueObject>(PointObj));
 		}
-		Result->SetArrayField(TEXT("boundaryPoints"), PointsArray);
+		OutJson->SetArrayField(TEXT("boundaryPoints"), PointsArray);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRSetGuardianVisibility(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -178,10 +181,10 @@ FString FAgenticMCPServer::HandleXRSetGuardianVisibility(const TMap<FString, FSt
 
 	UOculusXRFunctionLibrary::SetGuardianVisibility(bVisible);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("guardianVisible"), bVisible);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("guardianVisible"), bVisible);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Params, const FString& Body)
@@ -190,11 +193,11 @@ FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Pa
 	{
 		return MakeErrorJson(TEXT("XR system not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Check if hand tracking is enabled
 	bool bHandTrackingEnabled = UOculusXRInputFunctionLibrary::IsHandTrackingEnabled();
-	Result->SetBoolField(TEXT("handTrackingEnabled"), bHandTrackingEnabled);
+	OutJson->SetBoolField(TEXT("handTrackingEnabled"), bHandTrackingEnabled);
 
 	if (bHandTrackingEnabled)
 	{
@@ -222,7 +225,7 @@ FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Pa
 		float LeftScale = UOculusXRInputFunctionLibrary::GetHandScale(EOculusXRHandType::HandLeft);
 		LeftHandObj->SetNumberField(TEXT("handScale"), LeftScale);
 
-		Result->SetObjectField(TEXT("leftHand"), LeftHandObj);
+		OutJson->SetObjectField(TEXT("leftHand"), LeftHandObj);
 
 		// Right hand
 		TSharedRef<FJsonObject> RightHandObj = MakeShared<FJsonObject>();
@@ -250,12 +253,12 @@ FString FAgenticMCPServer::HandleXRHandTracking(const TMap<FString, FString>& Pa
 
 		// Dominant hand
 		EOculusXRHandType DominantHand = UOculusXRInputFunctionLibrary::GetDominantHand();
-		Result->SetStringField(TEXT("dominantHand"), DominantHand == EOculusXRHandType::HandLeft ? TEXT("Left") : TEXT("Right"));
+		OutJson->SetStringField(TEXT("dominantHand"), DominantHand == EOculusXRHandType::HandLeft ? TEXT("Left") : TEXT("Right"));
 
-		Result->SetObjectField(TEXT("rightHand"), RightHandObj);
+		OutJson->SetObjectField(TEXT("rightHand"), RightHandObj);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Params, const FString& Body)
@@ -264,7 +267,7 @@ FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Par
 	{
 		return MakeErrorJson(TEXT("XR system not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Left controller
 	bool bLeftTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::LTouch);
@@ -273,7 +276,7 @@ FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Par
 	TSharedRef<FJsonObject> LeftObj = MakeShared<FJsonObject>();
 	LeftObj->SetBoolField(TEXT("tracked"), bLeftTracked);
 	LeftObj->SetStringField(TEXT("type"), UEnum::GetValueAsString(LeftType));
-	Result->SetObjectField(TEXT("left"), LeftObj);
+	OutJson->SetObjectField(TEXT("left"), LeftObj);
 
 	// Right controller
 	bool bRightTracked = UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::RTouch);
@@ -282,9 +285,9 @@ FString FAgenticMCPServer::HandleXRControllers(const TMap<FString, FString>& Par
 	TSharedRef<FJsonObject> RightObj = MakeShared<FJsonObject>();
 	RightObj->SetBoolField(TEXT("tracked"), bRightTracked);
 	RightObj->SetStringField(TEXT("type"), UEnum::GetValueAsString(RightType));
-	Result->SetObjectField(TEXT("right"), RightObj);
+	OutJson->SetObjectField(TEXT("right"), RightObj);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRPassthrough(const TMap<FString, FString>& Params, const FString& Body)
@@ -293,24 +296,24 @@ FString FAgenticMCPServer::HandleXRPassthrough(const TMap<FString, FString>& Par
 	{
 		return MakeErrorJson(TEXT("XR system not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	bool bSupported = UOculusXRFunctionLibrary::IsPassthroughSupported();
 	bool bColorSupported = UOculusXRFunctionLibrary::IsColorPassthroughSupported();
 	bool bRecommended = UOculusXRFunctionLibrary::IsPassthroughRecommended();
 	bool bEnvironmentDepthStarted = UOculusXRFunctionLibrary::IsEnvironmentDepthStarted();
 
-	Result->SetBoolField(TEXT("supported"), bSupported);
-	Result->SetBoolField(TEXT("colorSupported"), bColorSupported);
-	Result->SetBoolField(TEXT("recommended"), bRecommended);
-	Result->SetBoolField(TEXT("environmentDepthStarted"), bEnvironmentDepthStarted);
+	OutJson->SetBoolField(TEXT("supported"), bSupported);
+	OutJson->SetBoolField(TEXT("colorSupported"), bColorSupported);
+	OutJson->SetBoolField(TEXT("recommended"), bRecommended);
+	OutJson->SetBoolField(TEXT("environmentDepthStarted"), bEnvironmentDepthStarted);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRSetPassthrough(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -330,15 +333,15 @@ FString FAgenticMCPServer::HandleXRSetPassthrough(const TMap<FString, FString>& 
 		UOculusXRFunctionLibrary::StopEnvironmentDepth();
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("environmentDepthEnabled"), bEnable);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("environmentDepthEnabled"), bEnable);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRSetDisplayFrequency(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -351,15 +354,15 @@ FString FAgenticMCPServer::HandleXRSetDisplayFrequency(const TMap<FString, FStri
 
 	UOculusXRFunctionLibrary::SetDisplayFrequency(Frequency);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("frequency"), Frequency);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("frequency"), Frequency);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRSetPerformanceLevels(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -396,11 +399,11 @@ FString FAgenticMCPServer::HandleXRSetPerformanceLevels(const TMap<FString, FStr
 
 	UOculusXRFunctionLibrary::SetSuggestedCpuAndGpuPerformanceLevels(CpuLevel, GpuLevel);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("cpuLevel"), UEnum::GetValueAsString(CpuLevel));
-	Result->SetStringField(TEXT("gpuLevel"), UEnum::GetValueAsString(GpuLevel));
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("cpuLevel"), UEnum::GetValueAsString(CpuLevel));
+	OutJson->SetStringField(TEXT("gpuLevel"), UEnum::GetValueAsString(GpuLevel));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params, const FString& Body)
@@ -409,7 +412,7 @@ FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params
 	{
 		return MakeErrorJson(TEXT("XR system not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Reset position and rotation to current HMD pose
 	FRotator CurrentRotation;
@@ -420,8 +423,8 @@ FString FAgenticMCPServer::HandleXRRecenter(const TMap<FString, FString>& Params
 	// Set the base to current position (recenters the view)
 	UOculusXRFunctionLibrary::SetBaseRotationAndPositionOffset(FRotator::ZeroRotator, FVector::ZeroVector, EOrientPositionSelector::OrientationAndPosition);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("View recentered"));
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("View recentered"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

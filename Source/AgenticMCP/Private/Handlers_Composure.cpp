@@ -1,6 +1,9 @@
 // Handlers_Composure.cpp
 // Composure compositing system handlers for AgenticMCP.
 // UE 5.6 target. Composure elements, layers, passes.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -24,7 +27,7 @@ FString FAgenticMCPServer::HandleComposureList(const FString& Body)
     }
 
     // Find CompositingElement actors
-    UClass* CompElementClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("CompositingElement"));
+    UClass* CompElementClass = FindObject<UClass>(nullptr, TEXT("CompositingElement"));
 
     FString Result;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -88,11 +91,11 @@ FString FAgenticMCPServer::HandleComposureCreateElement(const FString& Body)
     else if (ElementType == TEXT("MediaPlate")) ClassName = TEXT("CompositingMediaInput");
     else ClassName = TEXT("CompositingElement");
 
-    UClass* ElementClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, *ClassName);
+    UClass* ElementClass = FindObject<UClass>(nullptr, *ClassName);
     if (!ElementClass)
     {
         // Fallback to base CompositingElement
-        ElementClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("CompositingElement"));
+        ElementClass = FindObject<UClass>(nullptr, TEXT("CompositingElement"));
     }
 
     if (!ElementClass)
@@ -112,7 +115,7 @@ FString FAgenticMCPServer::HandleComposureCreateElement(const FString& Body)
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     FTransform SpawnTransform(FRotator::ZeroRotator, Location);
-    AActor* NewActor = World->SpawnActor<AActor>(ElementClass, &SpawnTransform, Params);
+    AActor* NewActor = World->SpawnActor<AActor>(ElementClass, SpawnTransform, Params);
     if (!NewActor)
     {
         return MakeErrorJson(TEXT("Failed to spawn Composure element"));

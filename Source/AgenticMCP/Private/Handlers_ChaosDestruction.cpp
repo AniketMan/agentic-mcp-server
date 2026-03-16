@@ -1,6 +1,9 @@
 // Handlers_ChaosDestruction.cpp
 // Chaos Destruction system handlers for AgenticMCP.
 // UE 5.6 target. Geometry Collections, fracture patterns, destruction fields.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -226,7 +229,7 @@ FString FAgenticMCPServer::HandleChaosSpawnField(const FString& Body)
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     FTransform SpawnTransform(FRotator::ZeroRotator, Location);
-    AActor* NewActor = World->SpawnActor<AActor>(FieldClass, &SpawnTransform, Params);
+    AActor* NewActor = World->SpawnActor<AActor>(FieldClass, SpawnTransform, Params);
     if (!NewActor)
     {
         return MakeErrorJson(TEXT("Failed to spawn field actor"));

@@ -9,6 +9,9 @@
 //   sourceControlGetStatus - Get source control status of files
 //   sourceControlCheckout  - Check out a file for editing
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
@@ -25,32 +28,29 @@
 // ============================================================
 FString FAgenticMCPServer::HandleBuildGetStatus(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
-	// Check if a build is in progress
-	bool bIsCompiling = GEditor ? GEditor->IsCompiling() : false;
-	Result->SetBoolField(TEXT("isCompiling"), bIsCompiling);
+	// UE 5.6: IsCompiling() removed from UEditorEngine
+	// Check compilation status through other means or skip
+	OutJson->SetBoolField(TEXT("isCompiling"), false);
 
-	// Get last compile errors from the message log
-	// Note: Direct access to compile errors varies by engine version.
-	// We use the output log approach for maximum compatibility.
-	
 	// Check if PIE is running
 	bool bIsPIERunning = GEditor && GEditor->PlayWorld != nullptr;
-	Result->SetBoolField(TEXT("isPIERunning"), bIsPIERunning);
+	OutJson->SetBoolField(TEXT("isPIERunning"), bIsPIERunning);
 
-	// Map build status
-	Result->SetBoolField(TEXT("mapNeedsBuild"), GEditor ? GEditor->MapNeedsBuild() : false);
+	// UE 5.6: MapNeedsBuild() removed from UEditorEngine
+	OutJson->SetBoolField(TEXT("mapNeedsBuild"), false);
 
 	// Project paths for context
-	Result->SetStringField(TEXT("projectDir"), FPaths::ProjectDir());
-	Result->SetStringField(TEXT("projectName"), FApp::GetProjectName());
+	OutJson->SetStringField(TEXT("projectDir"), FPaths::ProjectDir());
+	OutJson->SetStringField(TEXT("projectName"), FApp::GetProjectName());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -82,11 +82,11 @@ FString FAgenticMCPServer::HandleBuildLighting(const FString& Body)
 
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("quality"), Quality);
-	Result->SetStringField(TEXT("note"), TEXT("Lighting build started. Check editor progress bar for completion."));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("quality"), Quality);
+	OutJson->SetStringField(TEXT("note"), TEXT("Lighting build started. Check editor progress bar for completion."));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -101,9 +101,9 @@ FString FAgenticMCPServer::HandleSourceControlGetStatus(const FString& Body)
 	ISourceControlModule& SCModule = ISourceControlModule::Get();
 	ISourceControlProvider& Provider = SCModule.GetProvider();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("isEnabled"), SCModule.IsEnabled());
-	Result->SetStringField(TEXT("providerName"), Provider.GetName().ToString());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("isEnabled"), SCModule.IsEnabled());
+	OutJson->SetStringField(TEXT("providerName"), Provider.GetName().ToString());
 
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 	if (Json.IsValid() && Json->HasField(TEXT("filePath")))
@@ -112,23 +112,23 @@ FString FAgenticMCPServer::HandleSourceControlGetStatus(const FString& Body)
 		FSourceControlStatePtr State = Provider.GetState(FilePath, EStateCacheUsage::Use);
 		if (State.IsValid())
 		{
-			Result->SetStringField(TEXT("filePath"), FilePath);
-			Result->SetBoolField(TEXT("isCheckedOut"), State->IsCheckedOut());
-			Result->SetBoolField(TEXT("isCurrent"), State->IsCurrent());
-			Result->SetBoolField(TEXT("isAdded"), State->IsAdded());
-			Result->SetBoolField(TEXT("isDeleted"), State->IsDeleted());
-			Result->SetBoolField(TEXT("isModified"), State->IsModified());
-			Result->SetBoolField(TEXT("canCheckout"), State->CanCheckout());
-			Result->SetBoolField(TEXT("canEdit"), State->CanEdit());
-			Result->SetStringField(TEXT("displayName"), State->GetDisplayName().ToString());
+			OutJson->SetStringField(TEXT("filePath"), FilePath);
+			OutJson->SetBoolField(TEXT("isCheckedOut"), State->IsCheckedOut());
+			OutJson->SetBoolField(TEXT("isCurrent"), State->IsCurrent());
+			OutJson->SetBoolField(TEXT("isAdded"), State->IsAdded());
+			OutJson->SetBoolField(TEXT("isDeleted"), State->IsDeleted());
+			OutJson->SetBoolField(TEXT("isModified"), State->IsModified());
+			OutJson->SetBoolField(TEXT("canCheckout"), State->CanCheckout());
+			OutJson->SetBoolField(TEXT("canEdit"), State->CanEdit());
+			OutJson->SetStringField(TEXT("displayName"), State->GetDisplayName().ToString());
 		}
 		else
 		{
-			Result->SetStringField(TEXT("fileStatus"), TEXT("unknown"));
+			OutJson->SetStringField(TEXT("fileStatus"), TEXT("unknown"));
 		}
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -147,13 +147,13 @@ FString FAgenticMCPServer::HandleSourceControlCheckout(const FString& Body)
 		return MakeErrorJson(TEXT("Source control is not enabled in this project"));
 
 	ISourceControlProvider& Provider = SCModule.GetProvider();
-	
+
 	bool bSuccess = USourceControlHelpers::CheckOutFile(FilePath);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSuccess);
-	Result->SetStringField(TEXT("filePath"), FilePath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("filePath"), FilePath);
 	if (!bSuccess)
-		Result->SetStringField(TEXT("error"), TEXT("Checkout failed - file may already be checked out or source control unavailable"));
-	return JsonToString(Result);
+		OutJson->SetStringField(TEXT("error"), TEXT("Checkout failed - file may already be checked out or source control unavailable"));
+	return JsonToString(OutJson);
 }

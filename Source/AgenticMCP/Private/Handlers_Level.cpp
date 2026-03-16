@@ -8,6 +8,9 @@
 //   /api/remove-sublevel      - Remove a streaming sublevel from the world
 //   /api/get-level-blueprint  - Get the level blueprint for a specific level
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "Engine/Level.h"
@@ -49,9 +52,9 @@ FString FAgenticMCPServer::HandleListLevels(const FString& Body)
 		return MakeErrorJson(TEXT("No editor world available. Is a level open in the editor?"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("worldName"), World->GetName());
-	Result->SetStringField(TEXT("worldPath"), World->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("worldName"), World->GetName());
+	OutJson->SetStringField(TEXT("worldPath"), World->GetPathName());
 
 	// Persistent level
 	TSharedRef<FJsonObject> PersistentJson = MakeShared<FJsonObject>();
@@ -79,7 +82,7 @@ FString FAgenticMCPServer::HandleListLevels(const FString& Body)
 	}
 	PersistentJson->SetNumberField(TEXT("actorCount"), PersistentActorCount);
 
-	Result->SetObjectField(TEXT("persistentLevel"), PersistentJson);
+	OutJson->SetObjectField(TEXT("persistentLevel"), PersistentJson);
 
 	// Streaming levels (sublevels)
 	TArray<TSharedPtr<FJsonValue>> SubLevelArray;
@@ -121,9 +124,9 @@ FString FAgenticMCPServer::HandleListLevels(const FString& Body)
 
 		SubLevelArray.Add(MakeShared<FJsonValueObject>(SubJson));
 	}
-	Result->SetArrayField(TEXT("streamingLevels"), SubLevelArray);
+	OutJson->SetArrayField(TEXT("streamingLevels"), SubLevelArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -151,47 +154,31 @@ FString FAgenticMCPServer::HandleLoadLevel(const FString& Body)
 		{
 			if (StreamingLevel->HasLoadedLevel())
 			{
-				TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-				Result->SetBoolField(TEXT("success"), true);
-				Result->SetBoolField(TEXT("alreadyLoaded"), true);
-				Result->SetStringField(TEXT("levelPath"), LevelPath);
-				return JsonToString(Result);
+				TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+				OutJson->SetBoolField(TEXT("success"), true);
+				OutJson->SetBoolField(TEXT("alreadyLoaded"), true);
+				OutJson->SetStringField(TEXT("levelPath"), LevelPath);
+				return JsonToString(OutJson);
 			}
 		}
 	}
 
 	// Add the sublevel via editor utilities
-	// Wrapped in SEH to catch FSlowTask crashes during level loading
+	// Note: SEH exception handling removed for UE 5.6 compatibility
+	// UE 5.6 does not allow __try in functions with C++ objects requiring unwinding
 	ULevelStreaming* NewLevel = nullptr;
 
-#if PLATFORM_WINDOWS
-	__try
-	{
-#endif
-
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
-		// UE 5.6+ uses struct-based API with constructor
-		UEditorLevelUtils::FAddLevelToWorldParams AddParams(
-			ULevelStreamingDynamic::StaticClass(),
-			FName(*LevelPath)
-		);
-		NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
+	// UE 5.6+ uses struct-based API with constructor
+	UEditorLevelUtils::FAddLevelToWorldParams AddParams(
+		ULevelStreamingDynamic::StaticClass(),
+		FName(*LevelPath)
+	);
+	NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
 #else
-		// UE 5.4-5.5 uses the 3-param overload
-		NewLevel = EditorLevelUtils::AddLevelToWorld(
-			World, *LevelPath, ULevelStreamingDynamic::StaticClass());
-#endif
-
-#if PLATFORM_WINDOWS
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("AgenticMCP: AddLevelToWorld crashed (SEH caught) for '%s' - "
-				 "FSlowTask/FText issue during level streaming. Level may still be partially loaded."),
-			*LevelPath);
-		NewLevel = nullptr;
-	}
+	// UE 5.4-5.5 uses the 3-param overload
+	NewLevel = EditorLevelUtils::AddLevelToWorld(
+		World, *LevelPath, ULevelStreamingDynamic::StaticClass());
 #endif
 
 	if (!NewLevel)
@@ -200,11 +187,11 @@ FString FAgenticMCPServer::HandleLoadLevel(const FString& Body)
 			TEXT("Failed to load level '%s'. Verify the path exists."), *LevelPath));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("levelPath"), LevelPath);
-	Result->SetBoolField(TEXT("isLoaded"), NewLevel->HasLoadedLevel());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("levelPath"), LevelPath);
+	OutJson->SetBoolField(TEXT("isLoaded"), NewLevel->HasLoadedLevel());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -272,12 +259,12 @@ FString FAgenticMCPServer::HandleRemoveSublevel(const FString& Body)
 		World->MarkPackageDirty();
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSuccess);
-	Result->SetStringField(TEXT("removedLevel"), RemovedPackageName);
-	Result->SetNumberField(TEXT("remainingSublevels"), World->GetStreamingLevels().Num());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("removedLevel"), RemovedPackageName);
+	OutJson->SetNumberField(TEXT("remainingSublevels"), World->GetStreamingLevels().Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -327,30 +314,17 @@ FString FAgenticMCPServer::HandleSetStreamingLevelVisibility(const FString& Body
 	FoundLevel->SetShouldBeVisible(bVisible);
 
 	// Force update streaming
-	// Wrapped in SEH - FlushLevelStreaming can trigger FSlowTask crashes
-#if PLATFORM_WINDOWS
-	__try
-	{
-#endif
-		World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
-#if PLATFORM_WINDOWS
-	}
-	__except (EXCEPTION_EXECUTE_HANDLER)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("AgenticMCP: FlushLevelStreaming crashed (SEH caught) - "
-				 "visibility change may not be fully applied"));
-	}
-#endif
+	// Note: SEH exception handling removed for UE 5.6 compatibility
+	World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("levelPath"), FoundLevel->GetWorldAssetPackageName());
-	Result->SetBoolField(TEXT("wasVisible"), bWasVisible);
-	Result->SetBoolField(TEXT("isNowVisible"), bVisible);
-	Result->SetBoolField(TEXT("isLoaded"), FoundLevel->HasLoadedLevel());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("levelPath"), FoundLevel->GetWorldAssetPackageName());
+	OutJson->SetBoolField(TEXT("wasVisible"), bWasVisible);
+	OutJson->SetBoolField(TEXT("isNowVisible"), bVisible);
+	OutJson->SetBoolField(TEXT("isLoaded"), FoundLevel->HasLoadedLevel());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -384,7 +358,7 @@ FString FAgenticMCPServer::HandleGetOutputLog(const FString& Body)
 
 	NumLines = FMath::Clamp(NumLines, 1, 500);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> LogArray;
 
 	// Access the output log via GLog
@@ -418,19 +392,19 @@ FString FAgenticMCPServer::HandleGetOutputLog(const FString& Body)
 				}
 			}
 
-			Result->SetStringField(TEXT("logFile"), LatestLog);
+			OutJson->SetStringField(TEXT("logFile"), LatestLog);
 		}
 	}
 
-	Result->SetArrayField(TEXT("lines"), LogArray);
-	Result->SetNumberField(TEXT("count"), LogArray.Num());
-	Result->SetNumberField(TEXT("requested"), NumLines);
+	OutJson->SetArrayField(TEXT("lines"), LogArray);
+	OutJson->SetNumberField(TEXT("count"), LogArray.Num());
+	OutJson->SetNumberField(TEXT("requested"), NumLines);
 	if (!Filter.IsEmpty())
 	{
-		Result->SetStringField(TEXT("filter"), Filter);
+		OutJson->SetStringField(TEXT("filter"), Filter);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -452,10 +426,10 @@ FString FAgenticMCPServer::HandleGetLevelBlueprint(const FString& Body)
 	UBlueprint* LevelBP = LoadBlueprintByName(LevelName, LoadError);
 	if (LevelBP)
 	{
-		TSharedRef<FJsonObject> Result = SerializeBlueprint(LevelBP);
-		Result->SetStringField(TEXT("level"), LevelName);
-		Result->SetStringField(TEXT("type"), TEXT("LevelScriptBlueprint"));
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = SerializeBlueprint(LevelBP);
+		OutJson->SetStringField(TEXT("level"), LevelName);
+		OutJson->SetStringField(TEXT("type"), TEXT("LevelScriptBlueprint"));
+		return JsonToString(OutJson);
 	}
 
 	// Try finding in the current world's streaming levels
@@ -468,10 +442,10 @@ FString FAgenticMCPServer::HandleGetLevelBlueprint(const FString& Body)
 			ULevelScriptBlueprint* PBP = World->PersistentLevel->GetLevelScriptBlueprint(true);
 			if (PBP)
 			{
-				TSharedRef<FJsonObject> Result = SerializeBlueprint(PBP);
-				Result->SetStringField(TEXT("level"), World->GetName());
-				Result->SetStringField(TEXT("type"), TEXT("LevelScriptBlueprint"));
-				return JsonToString(Result);
+				TSharedRef<FJsonObject> OutJson = SerializeBlueprint(PBP);
+				OutJson->SetStringField(TEXT("level"), World->GetName());
+				OutJson->SetStringField(TEXT("type"), TEXT("LevelScriptBlueprint"));
+				return JsonToString(OutJson);
 			}
 		}
 
@@ -489,10 +463,10 @@ FString FAgenticMCPServer::HandleGetLevelBlueprint(const FString& Body)
 					ULevelScriptBlueprint* SubBP = LoadedLevel->GetLevelScriptBlueprint(true);
 					if (SubBP)
 					{
-						TSharedRef<FJsonObject> Result = SerializeBlueprint(SubBP);
-						Result->SetStringField(TEXT("level"), StreamName);
-						Result->SetStringField(TEXT("type"), TEXT("LevelScriptBlueprint"));
-						return JsonToString(Result);
+						TSharedRef<FJsonObject> OutJson = SerializeBlueprint(SubBP);
+						OutJson->SetStringField(TEXT("level"), StreamName);
+						OutJson->SetStringField(TEXT("type"), TEXT("LevelScriptBlueprint"));
+						return JsonToString(OutJson);
 					}
 				}
 			}
@@ -554,12 +528,12 @@ FString FAgenticMCPServer::HandleLevelCreate(const FString& Body)
 		return MakeErrorJson(TEXT("Failed to save new level"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("path"), PackageName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("path"), PackageName);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -597,11 +571,11 @@ FString FAgenticMCPServer::HandleLevelSave(const FString& Body)
 		bSuccess = FEditorFileUtils::SaveLevel(World->PersistentLevel);
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), bSuccess ? TEXT("ok") : TEXT("failed"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), bSuccess ? TEXT("ok") : TEXT("failed"));
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -645,12 +619,12 @@ FString FAgenticMCPServer::HandleLevelAddSublevel(const FString& Body)
 	World->AddStreamingLevel(StreamingLevel);
 	World->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("sublevel"), SublevelPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("sublevel"), SublevelPath);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -686,12 +660,12 @@ FString FAgenticMCPServer::HandleLevelSetCurrentLevel(const FString& Body)
 	if (World->PersistentLevel && World->PersistentLevel->GetOuter()->GetName().Contains(LevelName))
 	{
 		World->SetCurrentLevel(World->PersistentLevel);
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetStringField(TEXT("status"), TEXT("ok"));
-		Result->SetStringField(TEXT("currentLevel"), LevelName);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+		OutJson->SetStringField(TEXT("currentLevel"), LevelName);
 		FString Out;
 		TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-		FJsonSerializer::Serialize(Result, Writer);
+		FJsonSerializer::Serialize(OutJson, Writer);
 		return Out;
 	}
 
@@ -704,12 +678,12 @@ FString FAgenticMCPServer::HandleLevelSetCurrentLevel(const FString& Body)
 			if (Level)
 			{
 				World->SetCurrentLevel(Level);
-				TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-				Result->SetStringField(TEXT("status"), TEXT("ok"));
-				Result->SetStringField(TEXT("currentLevel"), LevelName);
+				TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+				OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+				OutJson->SetStringField(TEXT("currentLevel"), LevelName);
 				FString Out;
 				TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-				FJsonSerializer::Serialize(Result, Writer);
+				FJsonSerializer::Serialize(OutJson, Writer);
 				return Out;
 			}
 			else
@@ -748,12 +722,12 @@ FString FAgenticMCPServer::HandleLevelBuildLighting(const FString& Body)
 
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *FString::Printf(TEXT("BUILD LIGHTING QUALITY=%d"), QualityLevel));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("quality"), Quality);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("quality"), Quality);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -781,10 +755,10 @@ FString FAgenticMCPServer::HandleLevelBuildNavigation(const FString& Body)
 
 	NavSys->Build();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

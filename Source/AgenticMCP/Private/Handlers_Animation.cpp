@@ -2,6 +2,9 @@
 // Animation playback handlers for AgenticMCP
 // Controls skeletal mesh animations on actors
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -17,7 +20,7 @@
 
 FString FAgenticMCPServer::HandleAnimationPlay(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -103,9 +106,9 @@ FString FAgenticMCPServer::HandleAnimationPlay(const TMap<FString, FString>& Par
 		if (AnimInstance)
 		{
 			float Duration = AnimInstance->Montage_Play(Montage, PlayRate);
-			Result->SetBoolField(TEXT("success"), Duration > 0);
-			Result->SetStringField(TEXT("type"), TEXT("montage"));
-			Result->SetNumberField(TEXT("duration"), Duration);
+			OutJson->SetBoolField(TEXT("success"), Duration > 0);
+			OutJson->SetStringField(TEXT("type"), TEXT("montage"));
+			OutJson->SetNumberField(TEXT("duration"), Duration);
 		}
 		else
 		{
@@ -116,26 +119,26 @@ FString FAgenticMCPServer::HandleAnimationPlay(const TMap<FString, FString>& Par
 	{
 		// Play as sequence directly on the component
 		SkelMesh->PlayAnimation(Sequence, bLooping);
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("type"), TEXT("sequence"));
-		Result->SetNumberField(TEXT("duration"), Sequence->GetPlayLength());
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("type"), TEXT("sequence"));
+		OutJson->SetNumberField(TEXT("duration"), Sequence->GetPlayLength());
 	}
 	else
 	{
 		return MakeErrorJson(TEXT("Animation asset is not a Montage or Sequence"));
 	}
 
-	Result->SetStringField(TEXT("actor"), TargetActor->GetName());
-	Result->SetStringField(TEXT("animation"), AnimAsset->GetName());
-	Result->SetNumberField(TEXT("playRate"), PlayRate);
-	Result->SetBoolField(TEXT("looping"), bLooping);
+	OutJson->SetStringField(TEXT("actor"), TargetActor->GetName());
+	OutJson->SetStringField(TEXT("animation"), AnimAsset->GetName());
+	OutJson->SetNumberField(TEXT("playRate"), PlayRate);
+	OutJson->SetBoolField(TEXT("looping"), bLooping);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAnimationStop(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -205,10 +208,10 @@ FString FAgenticMCPServer::HandleAnimationStop(const TMap<FString, FString>& Par
 	// Stop any playing animation sequence
 	SkelMesh->Stop();
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actor"), TargetActor->GetName());
-	Result->SetBoolField(TEXT("stoppedMontages"), bStopMontages);
-	Result->SetNumberField(TEXT("blendOutTime"), BlendOutTime);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actor"), TargetActor->GetName());
+	OutJson->SetBoolField(TEXT("stoppedMontages"), bStopMontages);
+	OutJson->SetNumberField(TEXT("blendOutTime"), BlendOutTime);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

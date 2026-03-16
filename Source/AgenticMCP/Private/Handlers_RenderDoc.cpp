@@ -2,6 +2,9 @@
 // RenderDoc capture handler for AgenticMCP.
 // Provides endpoints to trigger RenderDoc frame captures via console commands.
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Modules/ModuleManager.h"
@@ -39,10 +42,10 @@ FString FAgenticMCPServer::HandleRenderDocCapture(const TMap<FString, FString>& 
 		return MakeErrorJson(TEXT("GEditor not available"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("frameCount"), FrameCount);
-	Result->SetStringField(TEXT("note"), TEXT("RenderDoc capture command sent. Ensure RenderDoc is attached to the Unreal process."));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("frameCount"), FrameCount);
+	OutJson->SetStringField(TEXT("note"), TEXT("RenderDoc capture command sent. Ensure RenderDoc is attached to the Unreal process."));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

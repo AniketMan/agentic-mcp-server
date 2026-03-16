@@ -1,6 +1,9 @@
 // Handlers_WorldPartition.cpp
 // World Partition and Data Layer handlers for AgenticMCP.
 // UE 5.6 target.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "Editor.h"
@@ -22,12 +25,12 @@ FString FAgenticMCPServer::HandleWPGetInfo(const FString& Body)
 	if (!World)
 		return MakeErrorJson(TEXT("No editor world"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("worldPartitionEnabled"), World->GetWorldPartition() != nullptr);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("worldPartitionEnabled"), World->GetWorldPartition() != nullptr);
 
 	if (UWorldPartition* WP = World->GetWorldPartition())
 	{
-		Result->SetBoolField(TEXT("isStreamingEnabled"), WP->IsStreamingEnabled());
+		OutJson->SetBoolField(TEXT("isStreamingEnabled"), WP->IsStreamingEnabled());
 	}
 
 	// Data layers
@@ -47,10 +50,10 @@ FString FAgenticMCPServer::HandleWPGetInfo(const FString& Body)
 			return true;
 		});
 	}
-	Result->SetArrayField(TEXT("dataLayers"), LayersArr);
+	OutJson->SetArrayField(TEXT("dataLayers"), LayersArr);
 
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- wpSetActorDataLayer ---
@@ -101,12 +104,12 @@ FString FAgenticMCPServer::HandleWPSetActorDataLayer(const FString& Body)
 	FoundActor->AddDataLayer(Layer);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("actor"), ActorName);
-	Result->SetStringField(TEXT("dataLayer"), LayerName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("actor"), ActorName);
+	OutJson->SetStringField(TEXT("dataLayer"), LayerName);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- wpSetActorRuntimeGrid ---
@@ -139,9 +142,9 @@ FString FAgenticMCPServer::HandleWPSetActorRuntimeGrid(const FString& Body)
 	FoundActor->SetRuntimeGrid(FName(*GridName));
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("runtimeGrid"), GridName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("runtimeGrid"), GridName);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }

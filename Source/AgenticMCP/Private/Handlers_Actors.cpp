@@ -10,6 +10,9 @@
 //   /api/set-actor-property  - Set a property value on an actor
 //   /api/set-actor-transform - Set an actor's transform (location, rotation, scale)
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "Engine/Level.h"
@@ -20,6 +23,7 @@
 #include "EngineUtils.h"
 #include "Editor.h"
 #include "EditorLevelUtils.h"
+#include "Selection.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonWriter.h"
@@ -141,11 +145,11 @@ FString FAgenticMCPServer::HandleListActors(const FString& Body)
 		Count++;
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), Count);
-	Result->SetStringField(TEXT("worldName"), World->GetName());
-	Result->SetArrayField(TEXT("actors"), ActorArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), Count);
+	OutJson->SetStringField(TEXT("worldName"), World->GetName());
+	OutJson->SetArrayField(TEXT("actors"), ActorArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -182,7 +186,7 @@ FString FAgenticMCPServer::HandleGetActor(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Actor '%s' not found"), *ActorName));
 
 	// Build detailed response
-	TSharedRef<FJsonObject> Result = SerializeActorBasic(FoundActor);
+	TSharedRef<FJsonObject> OutJson = SerializeActorBasic(FoundActor);
 
 	// Components
 	TArray<TSharedPtr<FJsonValue>> CompArray;
@@ -206,7 +210,7 @@ FString FAgenticMCPServer::HandleGetActor(const FString& Body)
 
 		CompArray.Add(MakeShared<FJsonValueObject>(CompJson));
 	}
-	Result->SetArrayField(TEXT("components"), CompArray);
+	OutJson->SetArrayField(TEXT("components"), CompArray);
 
 	// Blueprint-visible properties (EditAnywhere or BlueprintReadWrite)
 	TArray<TSharedPtr<FJsonValue>> PropArray;
@@ -236,9 +240,9 @@ FString FAgenticMCPServer::HandleGetActor(const FString& Body)
 
 		PropArray.Add(MakeShared<FJsonValueObject>(PropJson));
 	}
-	Result->SetArrayField(TEXT("properties"), PropArray);
+	OutJson->SetArrayField(TEXT("properties"), PropArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -327,9 +331,9 @@ FString FAgenticMCPServer::HandleSpawnActor(const FString& Body)
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Spawned '%s' (%s) at (%.0f, %.0f, %.0f)"),
 		*NewActor->GetName(), *ClassName, Location.X, Location.Y, Location.Z);
 
-	TSharedRef<FJsonObject> Result = SerializeActorBasic(NewActor);
-	Result->SetBoolField(TEXT("success"), true);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = SerializeActorBasic(NewActor);
+	OutJson->SetBoolField(TEXT("success"), true);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -368,11 +372,11 @@ FString FAgenticMCPServer::HandleDeleteActor(const FString& Body)
 
 	bool bDestroyed = World->DestroyActor(FoundActor);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bDestroyed);
-	Result->SetStringField(TEXT("deletedActor"), DeletedName);
-	Result->SetStringField(TEXT("deletedClass"), DeletedClass);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bDestroyed);
+	OutJson->SetStringField(TEXT("deletedActor"), DeletedName);
+	OutJson->SetStringField(TEXT("deletedClass"), DeletedClass);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -454,12 +458,12 @@ FString FAgenticMCPServer::HandleSetActorProperty(const FString& Body)
 	FString ReadBack;
 	Prop->ExportTextItem_Direct(ReadBack, ValuePtr, nullptr, TargetObj, PPF_None);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actor"), ActorName);
-	Result->SetStringField(TEXT("property"), PropertyName);
-	Result->SetStringField(TEXT("newValue"), ReadBack);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actor"), ActorName);
+	OutJson->SetStringField(TEXT("property"), PropertyName);
+	OutJson->SetStringField(TEXT("newValue"), ReadBack);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -514,9 +518,9 @@ FString FAgenticMCPServer::HandleSetActorTransform(const FString& Body)
 	FoundActor->SetActorScale3D(Scale);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = SerializeActorBasic(FoundActor);
-	Result->SetBoolField(TEXT("success"), true);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = SerializeActorBasic(FoundActor);
+	OutJson->SetBoolField(TEXT("success"), true);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -572,9 +576,13 @@ FString FAgenticMCPServer::HandleActorDuplicate(const FString& Body)
 
 	// Find the newly created actor (last selected)
 	AActor* NewActor = nullptr;
-	for (FSelectionIterator It(GEditor->GetSelectedActorIterator()); It; ++It)
+	USelection* SelectedActors = GEditor->GetSelectedActors();
+	if (SelectedActors)
 	{
-		NewActor = Cast<AActor>(*It);
+		for (int32 i = 0; i < SelectedActors->Num(); ++i)
+		{
+			NewActor = Cast<AActor>(SelectedActors->GetSelectedObject(i));
+		}
 	}
 
 	if (!NewActor)
@@ -597,13 +605,13 @@ FString FAgenticMCPServer::HandleActorDuplicate(const FString& Body)
 		NewActor->SetActorLabel(NewName);
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("newActorName"), NewActor->GetActorLabel());
-	Result->SetStringField(TEXT("newActorPath"), NewActor->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("newActorName"), NewActor->GetActorLabel());
+	OutJson->SetStringField(TEXT("newActorPath"), NewActor->GetPathName());
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -669,12 +677,12 @@ FString FAgenticMCPServer::HandleActorSetMobility(const FString& Body)
 	RootComp->SetMobility(MobilityType);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("mobility"), Mobility);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("mobility"), Mobility);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -761,12 +769,12 @@ FString FAgenticMCPServer::HandleActorSetTags(const FString& Body)
 		TagsOut.Add(MakeShared<FJsonValueString>(Tag.ToString()));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetArrayField(TEXT("tags"), TagsOut);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetArrayField(TEXT("tags"), TagsOut);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -818,11 +826,11 @@ FString FAgenticMCPServer::HandleActorSetLayer(const FString& Body)
 	FoundActor->Layers.Add(FName(*Layer));
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("layer"), Layer);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("layer"), Layer);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

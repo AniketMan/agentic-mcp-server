@@ -1,6 +1,9 @@
 // Handlers_WaterSystem.cpp
 // Water system handlers for AgenticMCP.
 // UE 5.6 target. Water bodies, ocean, rivers, lakes.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -23,7 +26,7 @@ FString FAgenticMCPServer::HandleWaterList(const FString& Body)
         return MakeErrorJson(TEXT("No editor world"));
     }
 
-    UClass* WaterBodyClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("WaterBody"));
+    UClass* WaterBodyClass = FindObject<UClass>(nullptr, TEXT("WaterBody"));
 
     FString Result;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -87,7 +90,7 @@ FString FAgenticMCPServer::HandleWaterCreate(const FString& Body)
     else if (WaterType == TEXT("Lake")) ClassName = TEXT("WaterBodyLake");
     else ClassName = TEXT("WaterBodyCustom");
 
-    UClass* WaterClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, *ClassName);
+    UClass* WaterClass = FindObject<UClass>(nullptr, *ClassName);
     if (!WaterClass)
     {
         return MakeErrorJson(FString::Printf(TEXT("Water class not found: %s. Enable the Water plugin."), *ClassName));
@@ -105,7 +108,7 @@ FString FAgenticMCPServer::HandleWaterCreate(const FString& Body)
     FActorSpawnParameters Params;
     Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
     FTransform SpawnTransform(FRotator::ZeroRotator, Location);
-    AActor* NewActor = World->SpawnActor<AActor>(WaterClass, &SpawnTransform, Params);
+    AActor* NewActor = World->SpawnActor<AActor>(WaterClass, SpawnTransform, Params);
     if (!NewActor)
     {
         return MakeErrorJson(TEXT("Failed to spawn water body"));

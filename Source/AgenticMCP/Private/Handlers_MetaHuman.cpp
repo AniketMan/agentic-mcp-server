@@ -1,6 +1,9 @@
 // Handlers_MetaHuman.cpp
 // MetaHuman and Groom asset handlers for AgenticMCP.
 // UE 5.6 target.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "Editor.h"
@@ -37,11 +40,11 @@ FString FAgenticMCPServer::HandleMetaHumanList(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), AssetsArr.Num());
-	Result->SetArrayField(TEXT("metahumans"), AssetsArr);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), AssetsArr.Num());
+	OutJson->SetArrayField(TEXT("metahumans"), AssetsArr);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- metahumanSpawn ---
@@ -80,7 +83,8 @@ FString FAgenticMCPServer::HandleMetaHumanSpawn(const FString& Body)
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	FTransform SpawnTransform(Rotation, Location);
-	AActor* Actor = World->SpawnActor<AActor>(BP->GeneratedClass, &SpawnTransform, SpawnParams);
+	// UE 5.6: SpawnActor no longer takes FTransform pointer, use reference
+	AActor* Actor = World->SpawnActor<AActor>(BP->GeneratedClass, SpawnTransform, SpawnParams);
 	if (!Actor)
 		return MakeErrorJson(TEXT("Failed to spawn MetaHuman"));
 
@@ -88,11 +92,11 @@ FString FAgenticMCPServer::HandleMetaHumanSpawn(const FString& Body)
 	if (Json->TryGetStringField(TEXT("label"), Label) && !Label.IsEmpty())
 		Actor->SetActorLabel(Label);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("actor"), Actor->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("actor"), Actor->GetName());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- groomList ---
@@ -116,11 +120,11 @@ FString FAgenticMCPServer::HandleGroomList(const FString& Body)
 		AssetsArr.Add(MakeShared<FJsonValueObject>(Obj));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), AssetsArr.Num());
-	Result->SetArrayField(TEXT("grooms"), AssetsArr);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), AssetsArr.Num());
+	OutJson->SetArrayField(TEXT("grooms"), AssetsArr);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- groomSetBinding ---
@@ -197,11 +201,11 @@ FString FAgenticMCPServer::HandleGroomSetBinding(const FString& Body)
 
 			FoundActor->MarkPackageDirty();
 
-			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-			Result->SetStringField(TEXT("status"), TEXT("ok"));
-			Result->SetStringField(TEXT("groom"), GroomPath);
+			TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+			OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+			OutJson->SetStringField(TEXT("groom"), GroomPath);
 			FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-			FJsonSerializer::Serialize(Result, W); return Out;
+			FJsonSerializer::Serialize(OutJson, W); return Out;
 		}
 	}
 

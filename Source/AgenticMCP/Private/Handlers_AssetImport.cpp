@@ -10,6 +10,9 @@
 //   assetDelete           - Delete an asset (with confirmation flag)
 //   assetListByType       - List assets filtered by type (StaticMesh, Texture, Sound, etc.)
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
@@ -64,11 +67,11 @@ FString FAgenticMCPServer::HandleAssetImport(const FString& Body)
 		ImportedArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("importedCount"), ImportedArr.Num());
-	Result->SetArrayField(TEXT("importedAssets"), ImportedArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("importedCount"), ImportedArr.Num());
+	OutJson->SetArrayField(TEXT("importedAssets"), ImportedArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -105,45 +108,45 @@ FString FAgenticMCPServer::HandleAssetGetInfo(const FString& Body)
 	}
 	if (!bFound) return MakeErrorJson(FString::Printf(TEXT("Asset not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), FoundAsset.AssetName.ToString());
-	Result->SetStringField(TEXT("path"), FoundAsset.GetObjectPathString());
-	Result->SetStringField(TEXT("class"), FoundAsset.AssetClassPath.GetAssetName().ToString());
-	Result->SetStringField(TEXT("packageName"), FoundAsset.PackageName.ToString());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), FoundAsset.AssetName.ToString());
+	OutJson->SetStringField(TEXT("path"), FoundAsset.GetObjectPathString());
+	OutJson->SetStringField(TEXT("class"), FoundAsset.AssetClassPath.GetAssetName().ToString());
+	OutJson->SetStringField(TEXT("packageName"), FoundAsset.PackageName.ToString());
 
 	// Disk size
 	int64 DiskSize = FoundAsset.GetTagValueRef<int64>(FName("Size"));
 	if (DiskSize > 0)
 	{
-		Result->SetNumberField(TEXT("diskSizeBytes"), (double)DiskSize);
+		OutJson->SetNumberField(TEXT("diskSizeBytes"), (double)DiskSize);
 	}
 
 	// Type-specific info
 	UObject* LoadedAsset = FoundAsset.GetAsset();
 	if (UStaticMesh* SM = Cast<UStaticMesh>(LoadedAsset))
 	{
-		Result->SetNumberField(TEXT("numLODs"), SM->GetNumLODs());
+		OutJson->SetNumberField(TEXT("numLODs"), SM->GetNumLODs());
 		if (SM->GetRenderData() && SM->GetRenderData()->LODResources.Num() > 0)
 		{
-			Result->SetNumberField(TEXT("numVertices"), SM->GetRenderData()->LODResources[0].GetNumVertices());
-			Result->SetNumberField(TEXT("numTriangles"), SM->GetRenderData()->LODResources[0].GetNumTriangles());
+			OutJson->SetNumberField(TEXT("numVertices"), SM->GetRenderData()->LODResources[0].GetNumVertices());
+			OutJson->SetNumberField(TEXT("numTriangles"), SM->GetRenderData()->LODResources[0].GetNumTriangles());
 		}
 	}
 	else if (UTexture2D* Tex = Cast<UTexture2D>(LoadedAsset))
 	{
-		Result->SetNumberField(TEXT("width"), Tex->GetSizeX());
-		Result->SetNumberField(TEXT("height"), Tex->GetSizeY());
-		Result->SetStringField(TEXT("pixelFormat"), GetPixelFormatString(Tex->GetPixelFormat()));
-		Result->SetNumberField(TEXT("numMips"), Tex->GetNumMips());
+		OutJson->SetNumberField(TEXT("width"), Tex->GetSizeX());
+		OutJson->SetNumberField(TEXT("height"), Tex->GetSizeY());
+		OutJson->SetStringField(TEXT("pixelFormat"), GetPixelFormatString(Tex->GetPixelFormat()));
+		OutJson->SetNumberField(TEXT("numMips"), Tex->GetNumMips());
 	}
 	else if (USoundWave* Sound = Cast<USoundWave>(LoadedAsset))
 	{
-		Result->SetNumberField(TEXT("duration"), Sound->Duration);
-		Result->SetNumberField(TEXT("sampleRate"), Sound->GetSampleRateForCurrentPlatform());
-		Result->SetNumberField(TEXT("numChannels"), Sound->NumChannels);
+		OutJson->SetNumberField(TEXT("duration"), Sound->Duration);
+		OutJson->SetNumberField(TEXT("sampleRate"), Sound->GetSampleRateForCurrentPlatform());
+		OutJson->SetNumberField(TEXT("numChannels"), Sound->NumChannels);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -162,17 +165,20 @@ FString FAgenticMCPServer::HandleAssetDuplicate(const FString& Body)
 	FString DestPath = Json->HasField(TEXT("destinationPath")) ? Json->GetStringField(TEXT("destinationPath")) : FPaths::GetPath(SourcePath);
 
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-	UObject* DupAsset = AssetTools.DuplicateAsset(NewName, DestPath, SourcePath);
+	// UE 5.6: DuplicateAsset takes UObject* not path
+    UObject* SourceAsset = StaticLoadObject(UObject::StaticClass(), nullptr, *SourcePath);
+    if (!SourceAsset) return MakeErrorJson(FString::Printf(TEXT("Source asset not found: %s"), *SourcePath));
+    UObject* DupAsset = AssetTools.DuplicateAsset(NewName, DestPath, SourceAsset);
 
 	if (!DupAsset)
 		return MakeErrorJson(FString::Printf(TEXT("Failed to duplicate: %s"), *SourcePath));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), DupAsset->GetName());
-	Result->SetStringField(TEXT("path"), DupAsset->GetPathName());
-	Result->SetStringField(TEXT("class"), DupAsset->GetClass()->GetName());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), DupAsset->GetName());
+	OutJson->SetStringField(TEXT("path"), DupAsset->GetPathName());
+	OutJson->SetStringField(TEXT("class"), DupAsset->GetClass()->GetName());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -193,17 +199,20 @@ FString FAgenticMCPServer::HandleAssetRename(const FString& Body)
 	FString NewPath = FPaths::GetPath(OldPath) / NewName;
 
 	TArray<FAssetRenameData> RenameData;
-	RenameData.Add(FAssetRenameData(OldPath, FPaths::GetPath(OldPath), NewName));
+	// UE 5.6: FAssetRenameData takes TWeakObjectPtr<UObject> not path
+    UObject* AssetToRename = StaticLoadObject(UObject::StaticClass(), nullptr, *OldPath);
+    if (!AssetToRename) return MakeErrorJson(FString::Printf(TEXT("Asset not found: %s"), *OldPath));
+    RenameData.Add(FAssetRenameData(AssetToRename, FPaths::GetPath(OldPath), NewName));
 
 	bool bSuccess = AssetTools.RenameAssets(RenameData);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSuccess);
-	Result->SetStringField(TEXT("oldPath"), OldPath);
-	Result->SetStringField(TEXT("newName"), NewName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("oldPath"), OldPath);
+	OutJson->SetStringField(TEXT("newName"), NewName);
 	if (!bSuccess)
-		Result->SetStringField(TEXT("error"), TEXT("Rename failed - asset may be in use or name conflicts"));
-	return JsonToString(Result);
+		OutJson->SetStringField(TEXT("error"), TEXT("Rename failed - asset may be in use or name conflicts"));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -233,12 +242,12 @@ FString FAgenticMCPServer::HandleAssetDelete(const FString& Body)
 	ObjectsToDelete.Add(Asset);
 	int32 Deleted = ObjectTools::DeleteObjects(ObjectsToDelete, false);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), Deleted > 0);
-	Result->SetStringField(TEXT("deletedAsset"), AssetName);
-	Result->SetStringField(TEXT("class"), AssetClass);
-	Result->SetNumberField(TEXT("deletedCount"), Deleted);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), Deleted > 0);
+	OutJson->SetStringField(TEXT("deletedAsset"), AssetName);
+	OutJson->SetStringField(TEXT("class"), AssetClass);
+	OutJson->SetNumberField(TEXT("deletedCount"), Deleted);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -290,11 +299,11 @@ FString FAgenticMCPServer::HandleAssetListByType(const FString& Body)
 		AssetArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("type"), TypeName);
-	Result->SetNumberField(TEXT("count"), AssetArr.Num());
-	Result->SetArrayField(TEXT("assets"), AssetArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("type"), TypeName);
+	OutJson->SetNumberField(TEXT("count"), AssetArr.Num());
+	OutJson->SetArrayField(TEXT("assets"), AssetArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -349,12 +358,12 @@ FString FAgenticMCPServer::HandleAssetMove(const FString& Body)
 		return MakeErrorJson(TEXT("Asset move failed"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("from"), SourcePath);
-	Result->SetStringField(TEXT("to"), DestPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("from"), SourcePath);
+	OutJson->SetStringField(TEXT("to"), DestPath);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

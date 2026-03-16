@@ -9,6 +9,9 @@
 //   physicsListConstraints - List all physics constraint actors in the level
 //   physicsGetOverlaps    - Get overlapping actors for a given actor
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -64,42 +67,42 @@ FString FAgenticMCPServer::HandlePhysicsGetBodyInfo(const FString& Body)
 		PrimComp = Actor->FindComponentByClass<UPrimitiveComponent>();
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
 
 	if (!PrimComp)
 	{
-		Result->SetBoolField(TEXT("hasPhysicsBody"), false);
-		Result->SetStringField(TEXT("note"), TEXT("Actor has no PrimitiveComponent"));
-		return JsonToString(Result);
+		OutJson->SetBoolField(TEXT("hasPhysicsBody"), false);
+		OutJson->SetStringField(TEXT("note"), TEXT("Actor has no PrimitiveComponent"));
+		return JsonToString(OutJson);
 	}
 
-	Result->SetBoolField(TEXT("hasPhysicsBody"), true);
-	Result->SetStringField(TEXT("componentName"), PrimComp->GetName());
-	Result->SetStringField(TEXT("componentClass"), PrimComp->GetClass()->GetName());
-	Result->SetBoolField(TEXT("simulatePhysics"), PrimComp->IsSimulatingPhysics());
-	Result->SetBoolField(TEXT("gravityEnabled"), PrimComp->IsGravityEnabled());
-	Result->SetNumberField(TEXT("mass"), PrimComp->GetMass());
+	OutJson->SetBoolField(TEXT("hasPhysicsBody"), true);
+	OutJson->SetStringField(TEXT("componentName"), PrimComp->GetName());
+	OutJson->SetStringField(TEXT("componentClass"), PrimComp->GetClass()->GetName());
+	OutJson->SetBoolField(TEXT("simulatePhysics"), PrimComp->IsSimulatingPhysics());
+	OutJson->SetBoolField(TEXT("gravityEnabled"), PrimComp->IsGravityEnabled());
+	OutJson->SetNumberField(TEXT("mass"), PrimComp->GetMass());
 
 	// Collision
-	Result->SetBoolField(TEXT("collisionEnabled"), PrimComp->GetCollisionEnabled() != ECollisionEnabled::NoCollision);
-	Result->SetStringField(TEXT("collisionProfile"), PrimComp->GetCollisionProfileName().ToString());
+	OutJson->SetBoolField(TEXT("collisionEnabled"), PrimComp->GetCollisionEnabled() != ECollisionEnabled::NoCollision);
+	OutJson->SetStringField(TEXT("collisionProfile"), PrimComp->GetCollisionProfileName().ToString());
 
 	// Linear/angular damping
-	Result->SetNumberField(TEXT("linearDamping"), PrimComp->GetLinearDamping());
-	Result->SetNumberField(TEXT("angularDamping"), PrimComp->GetAngularDamping());
+	OutJson->SetNumberField(TEXT("linearDamping"), PrimComp->GetLinearDamping());
+	OutJson->SetNumberField(TEXT("angularDamping"), PrimComp->GetAngularDamping());
 
 	// Velocity (only meaningful during PIE)
 	FVector LinVel = PrimComp->GetPhysicsLinearVelocity();
 	FVector AngVel = PrimComp->GetPhysicsAngularVelocityInDegrees();
-	Result->SetNumberField(TEXT("linearVelocityX"), LinVel.X);
-	Result->SetNumberField(TEXT("linearVelocityY"), LinVel.Y);
-	Result->SetNumberField(TEXT("linearVelocityZ"), LinVel.Z);
-	Result->SetNumberField(TEXT("angularVelocityX"), AngVel.X);
-	Result->SetNumberField(TEXT("angularVelocityY"), AngVel.Y);
-	Result->SetNumberField(TEXT("angularVelocityZ"), AngVel.Z);
+	OutJson->SetNumberField(TEXT("linearVelocityX"), LinVel.X);
+	OutJson->SetNumberField(TEXT("linearVelocityY"), LinVel.Y);
+	OutJson->SetNumberField(TEXT("linearVelocityZ"), LinVel.Z);
+	OutJson->SetNumberField(TEXT("angularVelocityX"), AngVel.X);
+	OutJson->SetNumberField(TEXT("angularVelocityY"), AngVel.Y);
+	OutJson->SetNumberField(TEXT("angularVelocityZ"), AngVel.Z);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -131,12 +134,12 @@ FString FAgenticMCPServer::HandlePhysicsSetSimulate(const FString& Body)
 	bool bOldState = PrimComp->IsSimulatingPhysics();
 	PrimComp->SetSimulatePhysics(bSimulate);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
-	Result->SetBoolField(TEXT("previousState"), bOldState);
-	Result->SetBoolField(TEXT("newState"), bSimulate);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
+	OutJson->SetBoolField(TEXT("previousState"), bOldState);
+	OutJson->SetBoolField(TEXT("newState"), bSimulate);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -189,14 +192,14 @@ FString FAgenticMCPServer::HandlePhysicsApplyForce(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Unknown mode: %s. Supported: impulse, force, velocity"), *Mode));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
-	Result->SetStringField(TEXT("mode"), Mode);
-	Result->SetNumberField(TEXT("forceX"), ForceX);
-	Result->SetNumberField(TEXT("forceY"), ForceY);
-	Result->SetNumberField(TEXT("forceZ"), ForceZ);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
+	OutJson->SetStringField(TEXT("mode"), Mode);
+	OutJson->SetNumberField(TEXT("forceX"), ForceX);
+	OutJson->SetNumberField(TEXT("forceY"), ForceY);
+	OutJson->SetNumberField(TEXT("forceZ"), ForceZ);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -223,10 +226,10 @@ FString FAgenticMCPServer::HandlePhysicsListConstraints(const FString& Body)
 		ConstraintArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), ConstraintArr.Num());
-	Result->SetArrayField(TEXT("constraints"), ConstraintArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), ConstraintArr.Num());
+	OutJson->SetArrayField(TEXT("constraints"), ConstraintArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -259,11 +262,11 @@ FString FAgenticMCPServer::HandlePhysicsGetOverlaps(const FString& Body)
 		OverlapArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
-	Result->SetNumberField(TEXT("overlapCount"), OverlapArr.Num());
-	Result->SetArrayField(TEXT("overlappingActors"), OverlapArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("actorName"), Actor->GetActorLabel());
+	OutJson->SetNumberField(TEXT("overlapCount"), OverlapArr.Num());
+	OutJson->SetArrayField(TEXT("overlappingActors"), OverlapArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -324,8 +327,9 @@ FString FAgenticMCPServer::HandlePhysicsAddConstraint(const FString& Body)
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	FTransform ConstraintTransform(FRotator::ZeroRotator, (Actor1->GetActorLocation() + Actor2->GetActorLocation()) / 2.0f);
+	// UE 5.6: SpawnActor no longer takes FTransform pointer, use reference
 	APhysicsConstraintActor* ConstraintActor = World->SpawnActor<APhysicsConstraintActor>(
-		APhysicsConstraintActor::StaticClass(), &ConstraintTransform, SpawnParams
+		APhysicsConstraintActor::StaticClass(), ConstraintTransform, SpawnParams
 	);
 	if (!ConstraintActor)
 	{
@@ -383,13 +387,13 @@ FString FAgenticMCPServer::HandlePhysicsAddConstraint(const FString& Body)
 
 	ConstraintActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("constraintType"), ConstraintType);
-	Result->SetStringField(TEXT("constraintActor"), ConstraintActor->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("constraintType"), ConstraintType);
+	OutJson->SetStringField(TEXT("constraintActor"), ConstraintActor->GetName());
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -426,12 +430,12 @@ FString FAgenticMCPServer::HandlePhysicsRemoveConstraint(const FString& Body)
 		if (It->GetActorLabel() == ConstraintName || It->GetName() == ConstraintName)
 		{
 			World->DestroyActor(*It);
-			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-			Result->SetStringField(TEXT("status"), TEXT("ok"));
-			Result->SetStringField(TEXT("removed"), ConstraintName);
+			TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+			OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+			OutJson->SetStringField(TEXT("removed"), ConstraintName);
 			FString Out;
 			TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-			FJsonSerializer::Serialize(Result, Writer);
+			FJsonSerializer::Serialize(OutJson, Writer);
 			return Out;
 		}
 	}
@@ -487,12 +491,12 @@ FString FAgenticMCPServer::HandlePhysicsSetMass(const FString& Body)
 	PrimComp->SetMassOverrideInKg(NAME_None, (float)Mass, true);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("mass"), Mass);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("mass"), Mass);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -549,13 +553,13 @@ FString FAgenticMCPServer::HandlePhysicsSetDamping(const FString& Body)
 	PrimComp->SetAngularDamping((float)AngularDamping);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("linearDamping"), LinearDamping);
-	Result->SetNumberField(TEXT("angularDamping"), AngularDamping);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("linearDamping"), LinearDamping);
+	OutJson->SetNumberField(TEXT("angularDamping"), AngularDamping);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -608,12 +612,12 @@ FString FAgenticMCPServer::HandlePhysicsSetGravity(const FString& Body)
 	PrimComp->SetEnableGravity(bEnabled);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetBoolField(TEXT("gravityEnabled"), bEnabled);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetBoolField(TEXT("gravityEnabled"), bEnabled);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -678,10 +682,10 @@ FString FAgenticMCPServer::HandlePhysicsApplyImpulse(const FString& Body)
 		PrimComp->AddImpulse(Impulse);
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

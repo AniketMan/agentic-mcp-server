@@ -2,6 +2,9 @@
 // Level Sequence operations for AgenticMCP
 // Handles reading sequence tracks, audio cues, and timing data
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 
 // UE5 Engine includes

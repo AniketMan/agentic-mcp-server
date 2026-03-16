@@ -5,6 +5,9 @@
 // Endpoints:
 //   executePythonCapture  - Execute Python script with captured output (replaces executePython)
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
@@ -100,25 +103,25 @@ FString FAgenticMCPServer::HandleExecutePythonCapture(const FString& Body)
 	// Remove capture device
 	GLog->RemoveOutputDevice(&OutputCapture);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSuccess);
-	Result->SetStringField(TEXT("command"), Command);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("command"), Command);
 
 	// Trim trailing newlines
 	FString Output = OutputCapture.CapturedOutput.TrimEnd();
 	FString Errors = OutputCapture.CapturedErrors.TrimEnd();
 
-	Result->SetStringField(TEXT("stdout"), Output);
-	Result->SetStringField(TEXT("stderr"), Errors);
+	OutJson->SetStringField(TEXT("stdout"), Output);
+	OutJson->SetStringField(TEXT("stderr"), Errors);
 
 	if (!Errors.IsEmpty())
 	{
-		Result->SetBoolField(TEXT("hasErrors"), true);
+		OutJson->SetBoolField(TEXT("hasErrors"), true);
 	}
 	else
 	{
-		Result->SetBoolField(TEXT("hasErrors"), false);
+		OutJson->SetBoolField(TEXT("hasErrors"), false);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

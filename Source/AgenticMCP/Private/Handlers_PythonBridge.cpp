@@ -1,6 +1,9 @@
 // Handlers_PythonBridge.cpp
 // Improved Python bridge with structured execution and output capture.
 // UE 5.6 target.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Misc/FileHelper.h"
@@ -43,11 +46,11 @@ FString FAgenticMCPServer::HandlePythonExecFile(const FString& Body)
 	// Capture output via log
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("command"), Command);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("command"), Command);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- pythonExecString ---
@@ -74,10 +77,10 @@ FString FAgenticMCPServer::HandlePythonExecString(const FString& Body)
 	FString Command = FString::Printf(TEXT("py \"%s\""), *TempPath);
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("codeLength"), Code.Len());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("codeLength"), Code.Len());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 

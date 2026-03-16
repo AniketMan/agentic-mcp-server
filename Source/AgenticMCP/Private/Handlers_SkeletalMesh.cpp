@@ -9,6 +9,9 @@
 //   skelMeshGetMorphTargets - Get all morph targets and their ranges
 //   skelMeshGetSockets    - Get all sockets on a skeletal mesh
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
@@ -57,10 +60,10 @@ FString FAgenticMCPServer::HandleSkelMeshList(const FString& Body)
 		MeshArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), MeshArr.Num());
-	Result->SetArrayField(TEXT("skeletalMeshes"), MeshArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), MeshArr.Num());
+	OutJson->SetArrayField(TEXT("skeletalMeshes"), MeshArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -91,32 +94,32 @@ FString FAgenticMCPServer::HandleSkelMeshGetInfo(const FString& Body)
 	}
 	if (!Mesh) return MakeErrorJson(FString::Printf(TEXT("Skeletal mesh not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), Mesh->GetName());
-	Result->SetStringField(TEXT("path"), Mesh->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), Mesh->GetName());
+	OutJson->SetStringField(TEXT("path"), Mesh->GetPathName());
 
 	// Skeleton info
 	const FReferenceSkeleton& RefSkel = Mesh->GetRefSkeleton();
-	Result->SetNumberField(TEXT("boneCount"), RefSkel.GetNum());
+	OutJson->SetNumberField(TEXT("boneCount"), RefSkel.GetNum());
 
 	// LOD info
 	FSkeletalMeshRenderData* RenderData = Mesh->GetResourceForRendering();
 	if (RenderData)
 	{
-		Result->SetNumberField(TEXT("lodCount"), RenderData->LODRenderData.Num());
+		OutJson->SetNumberField(TEXT("lodCount"), RenderData->LODRenderData.Num());
 		if (RenderData->LODRenderData.Num() > 0)
 		{
 			const FSkeletalMeshLODRenderData& LOD0 = RenderData->LODRenderData[0];
-			Result->SetNumberField(TEXT("lod0Vertices"), LOD0.GetNumVertices());
+			OutJson->SetNumberField(TEXT("lod0Vertices"), LOD0.GetNumVertices());
 		}
 	}
 
 	// Morph targets
 	TArray<UMorphTarget*> MorphTargets = Mesh->GetMorphTargets();
-	Result->SetNumberField(TEXT("morphTargetCount"), MorphTargets.Num());
+	OutJson->SetNumberField(TEXT("morphTargetCount"), MorphTargets.Num());
 
 	// Sockets
-	Result->SetNumberField(TEXT("socketCount"), Mesh->NumSockets());
+	OutJson->SetNumberField(TEXT("socketCount"), Mesh->NumSockets());
 
 	// Materials
 	TArray<FSkeletalMaterial>& Materials = Mesh->GetMaterials();
@@ -128,9 +131,9 @@ FString FAgenticMCPServer::HandleSkelMeshGetInfo(const FString& Body)
 		MatJson->SetStringField(TEXT("material"), Mat.MaterialInterface ? Mat.MaterialInterface->GetName() : TEXT("(none)"));
 		MatArr.Add(MakeShared<FJsonValueObject>(MatJson));
 	}
-	Result->SetArrayField(TEXT("materials"), MatArr);
+	OutJson->SetArrayField(TEXT("materials"), MatArr);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -190,11 +193,11 @@ FString FAgenticMCPServer::HandleSkelMeshGetBones(const FString& Body)
 		BoneArr.Add(MakeShared<FJsonValueObject>(BoneJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("skeletalMesh"), Mesh->GetName());
-	Result->SetNumberField(TEXT("boneCount"), BoneArr.Num());
-	Result->SetArrayField(TEXT("bones"), BoneArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("skeletalMesh"), Mesh->GetName());
+	OutJson->SetNumberField(TEXT("boneCount"), BoneArr.Num());
+	OutJson->SetArrayField(TEXT("bones"), BoneArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -243,11 +246,11 @@ FString FAgenticMCPServer::HandleSkelMeshGetMorphTargets(const FString& Body)
 		MorphArr.Add(MakeShared<FJsonValueObject>(MTJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("skeletalMesh"), Mesh->GetName());
-	Result->SetNumberField(TEXT("morphTargetCount"), MorphArr.Num());
-	Result->SetArrayField(TEXT("morphTargets"), MorphArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("skeletalMesh"), Mesh->GetName());
+	OutJson->SetNumberField(TEXT("morphTargetCount"), MorphArr.Num());
+	OutJson->SetArrayField(TEXT("morphTargets"), MorphArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -298,11 +301,11 @@ FString FAgenticMCPServer::HandleSkelMeshGetSockets(const FString& Body)
 		SocketArr.Add(MakeShared<FJsonValueObject>(SockJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("skeletalMesh"), Mesh->GetName());
-	Result->SetNumberField(TEXT("socketCount"), SocketArr.Num());
-	Result->SetArrayField(TEXT("sockets"), SocketArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("skeletalMesh"), Mesh->GetName());
+	OutJson->SetNumberField(TEXT("socketCount"), SocketArr.Num());
+	OutJson->SetArrayField(TEXT("sockets"), SocketArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -363,13 +366,13 @@ FString FAgenticMCPServer::HandleSkelMeshSetMorphTarget(const FString& Body)
 
 	SkelComp->SetMorphTarget(FName(*MorphTarget), (float)Weight);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("morphTarget"), MorphTarget);
-	Result->SetNumberField(TEXT("weight"), Weight);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("morphTarget"), MorphTarget);
+	OutJson->SetNumberField(TEXT("weight"), Weight);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -429,13 +432,13 @@ FString FAgenticMCPServer::HandleSkelMeshAddSocket(const FString& Body)
 	Mesh->GetMeshOnlySocketList().Add(NewSocket);
 	Mesh->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("socketName"), SocketName);
-	Result->SetStringField(TEXT("boneName"), BoneName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("socketName"), SocketName);
+	OutJson->SetStringField(TEXT("boneName"), BoneName);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -469,16 +472,27 @@ FString FAgenticMCPServer::HandleSkelMeshRemoveSocket(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Skeletal mesh not found: %s"), *MeshPath));
 	}
 
-	TArray<USkeletalMeshSocket*>& Sockets = Mesh->GetMeshOnlySocketList();
-	bool bRemoved = false;
-	for (int32 i = Sockets.Num() - 1; i >= 0; i--)
+	// UE 5.6: GetMeshOnlySocketList returns TArray<TObjectPtr<>> - need to work with it differently
+	const TArray<TObjectPtr<USkeletalMeshSocket>>& Sockets = Mesh->GetMeshOnlySocketList();
+	int32 RemoveIndex = INDEX_NONE;
+	for (int32 i = 0; i < Sockets.Num(); i++)
 	{
 		if (Sockets[i] && Sockets[i]->SocketName == FName(*SocketName))
 		{
-			Sockets.RemoveAt(i);
-			bRemoved = true;
+			RemoveIndex = i;
 			break;
 		}
+	}
+
+	bool bRemoved = false;
+	if (RemoveIndex != INDEX_NONE)
+	{
+		// Need to modify the socket list - get mutable version
+		Mesh->Modify();
+		// Remove via const_cast since there's no mutable accessor in 5.6
+		TArray<TObjectPtr<USkeletalMeshSocket>>& MutableSockets = const_cast<TArray<TObjectPtr<USkeletalMeshSocket>>&>(Sockets);
+		MutableSockets.RemoveAt(RemoveIndex);
+		bRemoved = true;
 	}
 
 	if (!bRemoved)
@@ -488,12 +502,12 @@ FString FAgenticMCPServer::HandleSkelMeshRemoveSocket(const FString& Body)
 
 	Mesh->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("removedSocket"), SocketName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("removedSocket"), SocketName);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -562,13 +576,13 @@ FString FAgenticMCPServer::HandleSkelMeshSetMaterial(const FString& Body)
 	SkelComp->SetMaterial(SlotIndex, Material);
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("slotIndex"), SlotIndex);
-	Result->SetStringField(TEXT("material"), MaterialPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("slotIndex"), SlotIndex);
+	OutJson->SetStringField(TEXT("material"), MaterialPath);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -611,12 +625,12 @@ FString FAgenticMCPServer::HandleSkelMeshSetPhysicsAsset(const FString& Body)
 	Mesh->SetPhysicsAsset(PhysAsset);
 	Mesh->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("meshPath"), MeshPath);
-	Result->SetStringField(TEXT("physicsAsset"), PhysicsAssetPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("meshPath"), MeshPath);
+	OutJson->SetStringField(TEXT("physicsAsset"), PhysicsAssetPath);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

@@ -7,6 +7,9 @@
 //   /api/snapshot-graph      - Take a snapshot of a graph for rollback
 //   /api/restore-graph       - Restore a graph from a snapshot (limited)
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/Blueprint.h"
 #include "EdGraph/EdGraph.h"
@@ -46,8 +49,8 @@ FString FAgenticMCPServer::HandleValidateBlueprint(const FString& Body)
 	FKismetEditorUtilities::CompileBlueprint(BP, CompileOpts, nullptr);
 
 	// Collect validation results
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
 
 	// Status
 	FString StatusStr;
@@ -58,7 +61,7 @@ FString FAgenticMCPServer::HandleValidateBlueprint(const FString& Body)
 		case BS_Dirty:      StatusStr = TEXT("dirty"); break;
 		default:            StatusStr = TEXT("unknown"); break;
 	}
-	Result->SetStringField(TEXT("status"), StatusStr);
+	OutJson->SetStringField(TEXT("status"), StatusStr);
 
 	// Check for unconnected pins and orphan nodes
 	TArray<UEdGraph*> AllGraphs;
@@ -115,13 +118,13 @@ FString FAgenticMCPServer::HandleValidateBlueprint(const FString& Body)
 	// Halve connections since we counted both directions
 	TotalConnections /= 2;
 
-	Result->SetNumberField(TEXT("totalNodes"), TotalNodes);
-	Result->SetNumberField(TEXT("totalConnections"), TotalConnections);
-	Result->SetNumberField(TEXT("graphCount"), AllGraphs.Num());
-	Result->SetArrayField(TEXT("warnings"), Warnings);
-	Result->SetBoolField(TEXT("isValid"), StatusStr != TEXT("error"));
+	OutJson->SetNumberField(TEXT("totalNodes"), TotalNodes);
+	OutJson->SetNumberField(TEXT("totalConnections"), TotalConnections);
+	OutJson->SetNumberField(TEXT("graphCount"), AllGraphs.Num());
+	OutJson->SetArrayField(TEXT("warnings"), Warnings);
+	OutJson->SetBoolField(TEXT("isValid"), StatusStr != TEXT("error"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -166,12 +169,12 @@ FString FAgenticMCPServer::HandleSnapshotGraph(const FString& Body)
 	PruneOldSnapshots();
 
 	// Build response
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("snapshotId"), Snapshot.SnapshotId);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("description"), Description);
-	Result->SetNumberField(TEXT("graphCount"), Snapshot.Graphs.Num());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("snapshotId"), Snapshot.SnapshotId);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetStringField(TEXT("description"), Description);
+	OutJson->SetNumberField(TEXT("graphCount"), Snapshot.Graphs.Num());
 
 	int32 TotalNodes = 0;
 	int32 TotalConnections = 0;
@@ -180,14 +183,14 @@ FString FAgenticMCPServer::HandleSnapshotGraph(const FString& Body)
 		TotalNodes += Pair.Value.Nodes.Num();
 		TotalConnections += Pair.Value.Connections.Num();
 	}
-	Result->SetNumberField(TEXT("totalNodes"), TotalNodes);
-	Result->SetNumberField(TEXT("totalConnections"), TotalConnections);
-	Result->SetNumberField(TEXT("activeSnapshots"), Snapshots.Num());
+	OutJson->SetNumberField(TEXT("totalNodes"), TotalNodes);
+	OutJson->SetNumberField(TEXT("totalConnections"), TotalConnections);
+	OutJson->SetNumberField(TEXT("activeSnapshots"), Snapshots.Num());
 
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Snapshot '%s' created for '%s' (%d nodes, %d connections)"),
 		*Snapshot.SnapshotId, *BlueprintName, TotalNodes, TotalConnections);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -267,12 +270,12 @@ FString FAgenticMCPServer::HandleRestoreGraph(const FString& Body)
 
 	SafeMarkStructurallyModified(BP, TEXT("Restore Graph"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("snapshotId"), SnapshotId);
-	Result->SetStringField(TEXT("blueprint"), Snapshot->BlueprintName);
-	Result->SetNumberField(TEXT("clearedNodes"), ClearedNodes);
-	Result->SetStringField(TEXT("note"),
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("snapshotId"), SnapshotId);
+	OutJson->SetStringField(TEXT("blueprint"), Snapshot->BlueprintName);
+	OutJson->SetNumberField(TEXT("clearedNodes"), ClearedNodes);
+	OutJson->SetStringField(TEXT("note"),
 		TEXT("Graph cleared. Snapshot node data is available but automatic "
 			 "node recreation requires using add-node and connect-pins for each node. "
 			 "Use the snapshot data as a reference for manual reconstruction."));
@@ -299,7 +302,7 @@ FString FAgenticMCPServer::HandleRestoreGraph(const FString& Body)
 
 		SnapshotGraphs.Add(MakeShared<FJsonValueObject>(GraphJson));
 	}
-	Result->SetArrayField(TEXT("snapshotGraphs"), SnapshotGraphs);
+	OutJson->SetArrayField(TEXT("snapshotGraphs"), SnapshotGraphs);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

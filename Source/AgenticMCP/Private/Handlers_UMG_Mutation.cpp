@@ -10,6 +10,9 @@
 //   umgBindEvent          - Bind a widget event to a function
 //   umgGetWidgetChildren  - Get children of a widget in the hierarchy
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
@@ -35,13 +38,13 @@
 #include "Components/SizeBox.h"
 #include "Components/ScaleBox.h"
 #include "WidgetBlueprint.h"
+#include "WidgetBlueprintFactory.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
-#include "Factories/WidgetBlueprintFactory.h"
 #include "UObject/SavePackage.h"
 
 // Helper: find a widget blueprint by name
@@ -49,10 +52,8 @@ static UWidgetBlueprint* FindWidgetBlueprintByName(const FString& Name)
 {
 	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	IAssetRegistry& AR = ARM.Get();
-
 	TArray<FAssetData> Assets;
 	AR.GetAssetsByClass(UWidgetBlueprint::StaticClass()->GetClassPathName(), Assets, true);
-
 	for (const FAssetData& Asset : Assets)
 	{
 		if (Asset.AssetName.ToString() == Name || Asset.GetObjectPathString().Contains(Name))
@@ -67,8 +68,7 @@ static UWidgetBlueprint* FindWidgetBlueprintByName(const FString& Name)
 static UWidget* FindWidgetInTree(UWidgetTree* Tree, const FString& WidgetName)
 {
 	if (!Tree) return nullptr;
-	Tree->ForEachWidget([](UWidget* Widget) {});  // ensure tree is walked
-
+	Tree->ForEachWidget([](UWidget* Widget) {});
 	UWidget* Found = Tree->FindWidget(FName(*WidgetName));
 	return Found;
 }
@@ -94,18 +94,18 @@ FString FAgenticMCPServer::HandleUMGCreateWidget(const FString& Body)
 
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
 	UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>();
-
 	UObject* NewAsset = AssetTools.CreateAsset(Name, Path, UWidgetBlueprint::StaticClass(), Factory);
+
 	if (!NewAsset)
 		return MakeErrorJson(TEXT("Failed to create widget blueprint"));
 
 	UWidgetBlueprint* WBP = Cast<UWidgetBlueprint>(NewAsset);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), WBP->GetName());
-	Result->SetStringField(TEXT("path"), WBP->GetPathName());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), WBP->GetName());
+	OutJson->SetStringField(TEXT("path"), WBP->GetPathName());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -144,6 +144,7 @@ FString FAgenticMCPServer::HandleUMGAddChild(const FString& Body)
 	{
 		ParentPanel = Cast<UPanelWidget>(FindWidgetInTree(Tree, ParentName));
 	}
+
 	if (!ParentPanel)
 		return MakeErrorJson(FString::Printf(TEXT("Parent widget '%s' not found or is not a panel widget"), *ParentName));
 
@@ -199,13 +200,13 @@ FString FAgenticMCPServer::HandleUMGAddChild(const FString& Body)
 	if (!Slot)
 		return MakeErrorJson(TEXT("Failed to add child to parent panel"));
 
-	// Set canvas slot properties if parent is a CanvasPanel
+	// Set slot properties for CanvasPanel
 	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
 	{
-		if (Json->HasField(TEXT("posX")) || Json->HasField(TEXT("posY")))
+		if (Json->HasField(TEXT("positionX")) || Json->HasField(TEXT("positionY")))
 		{
-			float PosX = Json->HasField(TEXT("posX")) ? (float)Json->GetNumberField(TEXT("posX")) : 0.f;
-			float PosY = Json->HasField(TEXT("posY")) ? (float)Json->GetNumberField(TEXT("posY")) : 0.f;
+			float PosX = Json->HasField(TEXT("positionX")) ? (float)Json->GetNumberField(TEXT("positionX")) : 0.f;
+			float PosY = Json->HasField(TEXT("positionY")) ? (float)Json->GetNumberField(TEXT("positionY")) : 0.f;
 			CanvasSlot->SetPosition(FVector2D(PosX, PosY));
 		}
 		if (Json->HasField(TEXT("sizeX")) || Json->HasField(TEXT("sizeY")))
@@ -218,17 +219,17 @@ FString FAgenticMCPServer::HandleUMGAddChild(const FString& Body)
 
 	WBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("widgetBlueprintName"), WBPName);
-	Result->SetStringField(TEXT("parentWidgetName"), ParentName);
-	Result->SetStringField(TEXT("childType"), ChildType);
-	Result->SetStringField(TEXT("childName"), ChildName);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("widgetBlueprintName"), WBPName);
+	OutJson->SetStringField(TEXT("childName"), ChildName);
+	OutJson->SetStringField(TEXT("childType"), ChildType);
+	OutJson->SetStringField(TEXT("parentName"), ParentName.IsEmpty() ? TEXT("root") : ParentName);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
-// umgRemoveChild - Remove a child widget
+// umgRemoveChild - Remove a child widget from the widget tree
 // Params: widgetBlueprintName, widgetName
 // ============================================================
 FString FAgenticMCPServer::HandleUMGRemoveChild(const FString& Body)
@@ -251,25 +252,32 @@ FString FAgenticMCPServer::HandleUMGRemoveChild(const FString& Body)
 	UWidget* Widget = FindWidgetInTree(Tree, WidgetName);
 	if (!Widget) return MakeErrorJson(FString::Printf(TEXT("Widget not found: %s"), *WidgetName));
 
+	// Cannot remove root
 	if (Widget == Tree->RootWidget)
-		return MakeErrorJson(TEXT("Cannot remove root widget"));
+		return MakeErrorJson(TEXT("Cannot remove the root widget"));
+
+	// Find parent and remove
+	UPanelWidget* Parent = Widget->GetParent();
+	if (Parent)
+	{
+		Parent->RemoveChild(Widget);
+	}
 
 	Tree->RemoveWidget(Widget);
 	WBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("widgetBlueprintName"), WBPName);
-	Result->SetStringField(TEXT("removedWidget"), WidgetName);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("widgetBlueprintName"), WBPName);
+	OutJson->SetStringField(TEXT("removedWidget"), WidgetName);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
 // umgSetWidgetProperty - Set a property on a widget
-// Params: widgetBlueprintName, widgetName,
-//         property (text, visibility, colorAndOpacity, renderOpacity,
-//                   isEnabled, toolTipText, percent, isChecked)
-//         value (string, number, bool, or object depending on property)
+// Params: widgetBlueprintName, widgetName, property, value
+// Supported properties: text, visibility, renderOpacity,
+//   isEnabled, toolTipText, percent, isChecked, colorAndOpacity
 // ============================================================
 FString FAgenticMCPServer::HandleUMGSetWidgetProperty(const FString& Body)
 {
@@ -404,21 +412,20 @@ FString FAgenticMCPServer::HandleUMGSetWidgetProperty(const FString& Body)
 
 	WBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("widgetBlueprintName"), WBPName);
-	Result->SetStringField(TEXT("widgetName"), WidgetName);
-	Result->SetStringField(TEXT("property"), Property);
-	Result->SetStringField(TEXT("setValue"), SetValue);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("widgetBlueprintName"), WBPName);
+	OutJson->SetStringField(TEXT("widgetName"), WidgetName);
+	OutJson->SetStringField(TEXT("property"), Property);
+	OutJson->SetStringField(TEXT("setValue"), SetValue);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
 // umgBindEvent - Bind a widget event to a Blueprint function
-// Params: widgetBlueprintName, widgetName, eventName,
-//         functionName
+// Params: widgetBlueprintName, widgetName, eventName, functionName
 // Note: This creates the binding metadata. The actual function
-//       must exist in the widget blueprint's event graph.
+// must exist in the widget blueprint's event graph.
 // ============================================================
 FString FAgenticMCPServer::HandleUMGBindEvent(const FString& Body)
 {
@@ -445,18 +452,18 @@ FString FAgenticMCPServer::HandleUMGBindEvent(const FString& Body)
 
 	WBP->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("widgetBlueprintName"), WBPName);
-	Result->SetStringField(TEXT("widgetName"), WidgetName);
-	Result->SetStringField(TEXT("eventName"), EventName);
-	Result->SetStringField(TEXT("functionName"), FunctionName);
-	Result->SetStringField(TEXT("note"),
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("widgetBlueprintName"), WBPName);
+	OutJson->SetStringField(TEXT("widgetName"), WidgetName);
+	OutJson->SetStringField(TEXT("eventName"), EventName);
+	OutJson->SetStringField(TEXT("functionName"), FunctionName);
+	OutJson->SetStringField(TEXT("note"),
 		FString::Printf(TEXT("To complete the binding, use 'addNode' to create a '%s' event node in the widget BP's event graph, "
 			"then connect it to a 'Call Function' node targeting '%s'. "
 			"Supported events: OnClicked, OnPressed, OnReleased, OnHovered, OnUnhovered, OnTextChanged, OnValueChanged."),
 			*EventName, *FunctionName));
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -502,24 +509,25 @@ FString FAgenticMCPServer::HandleUMGGetWidgetChildren(const FString& Body)
 			ChildJson->SetNumberField(TEXT("index"), i);
 			ChildJson->SetStringField(TEXT("name"), Child->GetName());
 			ChildJson->SetStringField(TEXT("class"), Child->GetClass()->GetName());
-			ChildJson->SetStringField(TEXT("visibility"),
-				StaticEnum<ESlateVisibility>()->GetNameStringByValue((int64)Child->GetVisibility()));
+			ChildJson->SetStringField(TEXT("visibility"), StaticEnum<ESlateVisibility>()->GetNameStringByValue((int64)Child->GetVisibility()));
 			ChildJson->SetBoolField(TEXT("isPanel"), Child->IsA<UPanelWidget>());
+
 			if (UTextBlock* TB = Cast<UTextBlock>(Child))
 			{
 				ChildJson->SetStringField(TEXT("text"), TB->GetText().ToString());
 			}
+
 			ChildrenArr.Add(MakeShared<FJsonValueObject>(ChildJson));
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("widgetBlueprintName"), WBPName);
-	Result->SetStringField(TEXT("widgetName"), WidgetName);
-	Result->SetStringField(TEXT("widgetClass"), TargetWidget->GetClass()->GetName());
-	Result->SetBoolField(TEXT("isPanel"), TargetWidget->IsA<UPanelWidget>());
-	Result->SetNumberField(TEXT("childCount"), ChildrenArr.Num());
-	Result->SetArrayField(TEXT("children"), ChildrenArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("widgetBlueprintName"), WBPName);
+	OutJson->SetStringField(TEXT("widgetName"), WidgetName);
+	OutJson->SetStringField(TEXT("widgetClass"), TargetWidget->GetClass()->GetName());
+	OutJson->SetBoolField(TEXT("isPanel"), TargetWidget->IsA<UPanelWidget>());
+	OutJson->SetNumberField(TEXT("childCount"), ChildrenArr.Num());
+	OutJson->SetArrayField(TEXT("children"), ChildrenArr);
+	return JsonToString(OutJson);
 }

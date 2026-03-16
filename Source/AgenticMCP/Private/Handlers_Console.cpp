@@ -2,6 +2,9 @@
 // Console command handlers for AgenticMCP.
 // Provides: execute console command, get/set CVars, list CVars
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/Engine.h"
 #include "Engine/Console.h"
@@ -28,12 +31,12 @@ FString FAgenticMCPServer::HandleExecuteConsole(const TMap<FString, FString>& Pa
 		GEngine->Exec(GEditor ? GEditor->GetEditorWorldContext().World() : nullptr, *Command);
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("command"), Command);
-	Result->SetStringField(TEXT("message"), TEXT("Console command executed"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("command"), Command);
+	OutJson->SetStringField(TEXT("message"), TEXT("Console command executed"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleGetCVar(const TMap<FString, FString>& Params, const FString& Body)
@@ -56,36 +59,36 @@ FString FAgenticMCPServer::HandleGetCVar(const TMap<FString, FString>& Params, c
 		return MakeErrorJson(FString::Printf(TEXT("CVar '%s' not found"), *Name));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), Name);
-	Result->SetStringField(TEXT("value"), CVar->GetString());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), Name);
+	OutJson->SetStringField(TEXT("value"), CVar->GetString());
 
 	// Add type info
 	if (CVar->IsVariableInt())
 	{
-		Result->SetStringField(TEXT("type"), TEXT("int"));
-		Result->SetNumberField(TEXT("intValue"), CVar->GetInt());
+		OutJson->SetStringField(TEXT("type"), TEXT("int"));
+		OutJson->SetNumberField(TEXT("intValue"), CVar->GetInt());
 	}
 	else if (CVar->IsVariableFloat())
 	{
-		Result->SetStringField(TEXT("type"), TEXT("float"));
-		Result->SetNumberField(TEXT("floatValue"), CVar->GetFloat());
+		OutJson->SetStringField(TEXT("type"), TEXT("float"));
+		OutJson->SetNumberField(TEXT("floatValue"), CVar->GetFloat());
 	}
 	else if (CVar->IsVariableBool())
 	{
-		Result->SetStringField(TEXT("type"), TEXT("bool"));
-		Result->SetBoolField(TEXT("boolValue"), CVar->GetBool());
+		OutJson->SetStringField(TEXT("type"), TEXT("bool"));
+		OutJson->SetBoolField(TEXT("boolValue"), CVar->GetBool());
 	}
 	else
 	{
-		Result->SetStringField(TEXT("type"), TEXT("string"));
+		OutJson->SetStringField(TEXT("type"), TEXT("string"));
 	}
 
 	// Get help text
-	Result->SetStringField(TEXT("help"), CVar->GetHelp());
+	OutJson->SetStringField(TEXT("help"), CVar->GetHelp());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleSetCVar(const TMap<FString, FString>& Params, const FString& Body)
@@ -137,18 +140,19 @@ FString FAgenticMCPServer::HandleSetCVar(const TMap<FString, FString>& Params, c
 	// Set the value
 	CVar->Set(*NewValue, ECVF_SetByConsole);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), Name);
-	Result->SetStringField(TEXT("oldValue"), OldValue);
-	Result->SetStringField(TEXT("newValue"), CVar->GetString());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), Name);
+	OutJson->SetStringField(TEXT("oldValue"), OldValue);
+	OutJson->SetStringField(TEXT("newValue"), CVar->GetString());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleListCVars(const TMap<FString, FString>& Params, const FString& Body)
 {
-	if (!IConsoleManager::IsAvailable())
+	// UE 5.6: IConsoleManager::IsAvailable() removed - console manager is always available
+	if (!GEngine)
 	{
 		return MakeErrorJson(TEXT("Console manager not available"));
 	}
@@ -200,11 +204,11 @@ FString FAgenticMCPServer::HandleListCVars(const TMap<FString, FString>& Params,
 		TEXT("")
 	);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("count"), CVarArray.Num());
-	Result->SetStringField(TEXT("filter"), Filter);
-	Result->SetArrayField(TEXT("cvars"), CVarArray);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("count"), CVarArray.Num());
+	OutJson->SetStringField(TEXT("filter"), Filter);
+	OutJson->SetArrayField(TEXT("cvars"), CVarArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

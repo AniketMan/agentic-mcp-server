@@ -1,6 +1,9 @@
 // Handlers_Audio.cpp
 // Audio debugging and control endpoints for AgenticMCP
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -26,7 +29,7 @@ FString FAgenticMCPServer::HandleAudioGetStatus(const TMap<FString, FString>& Pa
 	{
 		return MakeErrorJson(TEXT("Engine not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> StatusObj = MakeShared<FJsonObject>();
 
 	if (FAudioDeviceManager* DeviceManager = FAudioDeviceManager::Get())
@@ -39,14 +42,14 @@ FString FAgenticMCPServer::HandleAudioGetStatus(const TMap<FString, FString>& Pa
 		StatusObj->SetBoolField(TEXT("audioDeviceManagerActive"), false);
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetObjectField(TEXT("status"), StatusObj);
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetObjectField(TEXT("status"), StatusObj);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioListActiveSounds(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!GEditor || !GEditor->GetEditorWorldContext().World())
 	{
@@ -72,10 +75,10 @@ FString FAgenticMCPServer::HandleAudioListActiveSounds(const TMap<FString, FStri
 		}
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetArrayField(TEXT("activeSounds"), SoundsArray);
-	Result->SetNumberField(TEXT("count"), SoundsArray.Num());
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetArrayField(TEXT("activeSounds"), SoundsArray);
+	OutJson->SetNumberField(TEXT("count"), SoundsArray.Num());
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioGetDeviceInfo(const TMap<FString, FString>& Params, const FString& Body)
@@ -84,7 +87,7 @@ FString FAgenticMCPServer::HandleAudioGetDeviceInfo(const TMap<FString, FString>
 	{
 		return MakeErrorJson(TEXT("Engine not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> DevicesArray;
 
 	if (FAudioDeviceManager* DeviceManager = FAudioDeviceManager::Get())
@@ -94,9 +97,9 @@ FString FAgenticMCPServer::HandleAudioGetDeviceInfo(const TMap<FString, FString>
 		DevicesArray.Add(MakeShared<FJsonValueObject>(MainDeviceObj));
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetArrayField(TEXT("devices"), DevicesArray);
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetArrayField(TEXT("devices"), DevicesArray);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioListSoundClasses(const TMap<FString, FString>& Params, const FString& Body)
@@ -105,7 +108,7 @@ FString FAgenticMCPServer::HandleAudioListSoundClasses(const TMap<FString, FStri
 	{
 		return MakeErrorJson(TEXT("Engine not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> ClassesArray;
 
 	for (TObjectIterator<USoundClass> It; It; ++It)
@@ -120,10 +123,10 @@ FString FAgenticMCPServer::HandleAudioListSoundClasses(const TMap<FString, FStri
 		}
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetArrayField(TEXT("soundClasses"), ClassesArray);
-	Result->SetNumberField(TEXT("count"), ClassesArray.Num());
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetArrayField(TEXT("soundClasses"), ClassesArray);
+	OutJson->SetNumberField(TEXT("count"), ClassesArray.Num());
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioSetVolume(const TMap<FString, FString>& Params, const FString& Body)
@@ -193,26 +196,26 @@ FString FAgenticMCPServer::HandleAudioSetVolume(const TMap<FString, FString>& Pa
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bFoundClass);
-	Result->SetStringField(TEXT("soundClass"), bFoundClass ? ActualClassName : SoundClassName);
-	Result->SetNumberField(TEXT("volume"), Volume);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bFoundClass);
+	OutJson->SetStringField(TEXT("soundClass"), bFoundClass ? ActualClassName : SoundClassName);
+	OutJson->SetNumberField(TEXT("volume"), Volume);
 	if (!bFoundClass)
 	{
 		UE_LOG(LogMCPAudio, Warning, TEXT("HandleAudioSetVolume: Sound class '%s' not found"), *SoundClassName);
-		Result->SetStringField(TEXT("warning"), FString::Printf(TEXT("Sound class '%s' not found. Volume not changed."), *SoundClassName));
+		OutJson->SetStringField(TEXT("warning"), FString::Printf(TEXT("Sound class '%s' not found. Volume not changed."), *SoundClassName));
 	}
 	else
 	{
 		UE_LOG(LogMCPAudio, Log, TEXT("HandleAudioSetVolume: SUCCESS - Set '%s' volume to %.2f"), *ActualClassName, Volume);
 	}
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 
 FString FAgenticMCPServer::HandleAudioGetStats(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> StatsObj = MakeShared<FJsonObject>();
 
 	if (!GEditor || !GEditor->GetEditorWorldContext().World())
@@ -240,9 +243,9 @@ FString FAgenticMCPServer::HandleAudioGetStats(const TMap<FString, FString>& Par
 	StatsObj->SetNumberField(TEXT("activeAudioComponents"), ActiveComponents);
 	StatsObj->SetNumberField(TEXT("playingComponents"), PlayingComponents);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetObjectField(TEXT("stats"), StatsObj);
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetObjectField(TEXT("stats"), StatsObj);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioPlaySound(const TMap<FString, FString>& Params, const FString& Body)
@@ -273,10 +276,10 @@ FString FAgenticMCPServer::HandleAudioPlaySound(const TMap<FString, FString>& Pa
 	UWorld* World = GEditor->GetEditorWorldContext().World();
 	UGameplayStatics::PlaySoundAtLocation(World, Sound, FVector::ZeroVector, 1.0f);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("sound"), SoundPath);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("sound"), SoundPath);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioStopSound(const TMap<FString, FString>& Params, const FString& Body)
@@ -310,10 +313,10 @@ FString FAgenticMCPServer::HandleAudioStopSound(const TMap<FString, FString>& Pa
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("stoppedCount"), StoppedCount);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("stoppedCount"), StoppedCount);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioSetListener(const TMap<FString, FString>& Params, const FString& Body)
@@ -382,27 +385,27 @@ FString FAgenticMCPServer::HandleAudioSetListener(const TMap<FString, FString>& 
 		UE_LOG(LogMCPAudio, Error, TEXT("HandleAudioSetListener: FAudioDeviceManager not available"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSuccess);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
 
 	TSharedRef<FJsonObject> LocJson = MakeShared<FJsonObject>();
 	LocJson->SetNumberField(TEXT("x"), ListenerLocation.X);
 	LocJson->SetNumberField(TEXT("y"), ListenerLocation.Y);
 	LocJson->SetNumberField(TEXT("z"), ListenerLocation.Z);
-	Result->SetObjectField(TEXT("location"), LocJson);
+	OutJson->SetObjectField(TEXT("location"), LocJson);
 
 	TSharedRef<FJsonObject> RotJson = MakeShared<FJsonObject>();
 	RotJson->SetNumberField(TEXT("pitch"), ListenerRotation.Pitch);
 	RotJson->SetNumberField(TEXT("yaw"), ListenerRotation.Yaw);
 	RotJson->SetNumberField(TEXT("roll"), ListenerRotation.Roll);
-	Result->SetObjectField(TEXT("rotation"), RotJson);
+	OutJson->SetObjectField(TEXT("rotation"), RotJson);
 
 	if (!bSuccess)
 	{
-		Result->SetStringField(TEXT("error"), TEXT("Failed to get audio device"));
+		OutJson->SetStringField(TEXT("error"), TEXT("Failed to get audio device"));
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleAudioDebugVisualize(const TMap<FString, FString>& Params, const FString& Body)
@@ -431,10 +434,10 @@ FString FAgenticMCPServer::HandleAudioDebugVisualize(const TMap<FString, FString
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("enabled"), bEnable);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("enabled"), bEnable);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -465,11 +468,11 @@ FString FAgenticMCPServer::HandleAudioCreateSoundCue(const FString& Body)
 	Package->MarkPackageDirty();
 	FAssetRegistryModule::AssetCreated(Cue);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("path"), Path);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("path"), Path);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- audioSetAttenuation ---
@@ -533,11 +536,11 @@ FString FAgenticMCPServer::HandleAudioSetAttenuation(const FString& Body)
 
 	FoundActor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("fieldsChanged"), Changed);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- audioCreateAmbientSound ---
@@ -568,7 +571,7 @@ FString FAgenticMCPServer::HandleAudioCreateAmbientSound(const FString& Body)
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	FTransform SpawnTransform(FRotator::ZeroRotator, Location);
-	AAmbientSound* AmbientActor = World->SpawnActor<AAmbientSound>(AAmbientSound::StaticClass(), &SpawnTransform, SpawnParams);
+	AAmbientSound* AmbientActor = World->SpawnActor<AAmbientSound>(AAmbientSound::StaticClass(), SpawnTransform, SpawnParams);
 	if (!AmbientActor)
 		return MakeErrorJson(TEXT("Failed to spawn AmbientSound actor"));
 
@@ -585,11 +588,11 @@ FString FAgenticMCPServer::HandleAudioCreateAmbientSound(const FString& Body)
 	if (Json->TryGetStringField(TEXT("label"), Label) && !Label.IsEmpty())
 		AmbientActor->SetActorLabel(Label);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("actor"), AmbientActor->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("actor"), AmbientActor->GetName());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- audioCreateAudioVolume ---
@@ -614,7 +617,7 @@ FString FAgenticMCPServer::HandleAudioCreateAudioVolume(const FString& Body)
 
 	FActorSpawnParameters SpawnParams;
 	FTransform VolumeTransform(FRotator::ZeroRotator, Location);
-	AAudioVolume* Volume = World->SpawnActor<AAudioVolume>(AAudioVolume::StaticClass(), &VolumeTransform, SpawnParams);
+	AAudioVolume* Volume = World->SpawnActor<AAudioVolume>(AAudioVolume::StaticClass(), VolumeTransform, SpawnParams);
 	if (!Volume)
 		return MakeErrorJson(TEXT("Failed to spawn AudioVolume"));
 
@@ -626,9 +629,9 @@ FString FAgenticMCPServer::HandleAudioCreateAudioVolume(const FString& Body)
 	if (Json->TryGetStringField(TEXT("label"), Label) && !Label.IsEmpty())
 		Volume->SetActorLabel(Label);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("actor"), Volume->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("actor"), Volume->GetName());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }

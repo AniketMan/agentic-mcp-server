@@ -1,6 +1,9 @@
 // Handlers_PixelStreaming.cpp
 // PixelStreaming control endpoints for AgenticMCP
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -21,23 +24,23 @@ FString FAgenticMCPServer::HandlePixelStreamingGetStatus(const TMap<FString, FSt
 	{
 		return MakeErrorJson(TEXT("PixelStreaming module not loaded"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	bool bModuleLoaded = FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming"));
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("pixelStreamingModuleLoaded"), bModuleLoaded);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("pixelStreamingModuleLoaded"), bModuleLoaded);
 
 	if (bModuleLoaded)
 	{
-		Result->SetStringField(TEXT("status"), TEXT("available"));
+		OutJson->SetStringField(TEXT("status"), TEXT("available"));
 	}
 	else
 	{
-		Result->SetStringField(TEXT("status"), TEXT("unavailable"));
+		OutJson->SetStringField(TEXT("status"), TEXT("unavailable"));
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -46,7 +49,7 @@ FString FAgenticMCPServer::HandlePixelStreamingGetStatus(const TMap<FString, FSt
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingStart(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
 	{
@@ -68,11 +71,11 @@ FString FAgenticMCPServer::HandlePixelStreamingStart(const TMap<FString, FString
 		GEngine->Exec(World, *Command);
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("PixelStreaming start requested"));
-	Result->SetStringField(TEXT("signallingUrl"), SignallingUrl);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("PixelStreaming start requested"));
+	OutJson->SetStringField(TEXT("signallingUrl"), SignallingUrl);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -81,7 +84,7 @@ FString FAgenticMCPServer::HandlePixelStreamingStart(const TMap<FString, FString
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingStop(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
 	{
@@ -94,10 +97,10 @@ FString FAgenticMCPServer::HandlePixelStreamingStop(const TMap<FString, FString>
 		GEngine->Exec(World, TEXT("PixelStreaming.Stop"));
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("PixelStreaming stop requested"));
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("PixelStreaming stop requested"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -109,15 +112,15 @@ FString FAgenticMCPServer::HandlePixelStreamingListStreamers(const TMap<FString,
 	if (!GEditor)
 		return MakeErrorJson(TEXT("Editor not available"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> StreamersArray;
 
 	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
 	{
-		Result->SetBoolField(TEXT("success"), false);
-		Result->SetStringField(TEXT("error"), TEXT("PixelStreaming module is not loaded"));
-		Result->SetBoolField(TEXT("moduleLoaded"), false);
-		return JsonToString(Result);
+		OutJson->SetBoolField(TEXT("success"), false);
+		OutJson->SetStringField(TEXT("error"), TEXT("PixelStreaming module is not loaded"));
+		OutJson->SetBoolField(TEXT("moduleLoaded"), false);
+		return JsonToString(OutJson);
 	}
 
 	// Query PixelStreaming module for actual streamer info
@@ -152,12 +155,12 @@ FString FAgenticMCPServer::HandlePixelStreamingListStreamers(const TMap<FString,
 	}
 	StreamersArray.Add(MakeShared<FJsonValueObject>(StreamerObj));
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("moduleLoaded"), true);
-	Result->SetArrayField(TEXT("streamers"), StreamersArray);
-	Result->SetNumberField(TEXT("count"), StreamersArray.Num());
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("moduleLoaded"), true);
+	OutJson->SetArrayField(TEXT("streamers"), StreamersArray);
+	OutJson->SetNumberField(TEXT("count"), StreamersArray.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -166,7 +169,7 @@ FString FAgenticMCPServer::HandlePixelStreamingListStreamers(const TMap<FString,
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingGetCodec(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
 	{
@@ -176,10 +179,10 @@ FString FAgenticMCPServer::HandlePixelStreamingGetCodec(const TMap<FString, FStr
 	TSharedRef<FJsonObject> CodecInfo = MakeShared<FJsonObject>();
 	CodecInfo->SetStringField(TEXT("codec"), TEXT("H264"));
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetObjectField(TEXT("codecInfo"), CodecInfo);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetObjectField(TEXT("codecInfo"), CodecInfo);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -209,11 +212,11 @@ FString FAgenticMCPServer::HandlePixelStreamingSetCodec(const TMap<FString, FStr
 		GEngine->Exec(World, *Command);
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("codec"), Codec);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("codec"), Codec);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -225,15 +228,15 @@ FString FAgenticMCPServer::HandlePixelStreamingListPlayers(const TMap<FString, F
 	if (!GEditor)
 		return MakeErrorJson(TEXT("Editor not available"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> PlayersArray;
 
 	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
 	{
-		Result->SetBoolField(TEXT("success"), false);
-		Result->SetStringField(TEXT("error"), TEXT("PixelStreaming module is not loaded"));
-		Result->SetBoolField(TEXT("moduleLoaded"), false);
-		return JsonToString(Result);
+		OutJson->SetBoolField(TEXT("success"), false);
+		OutJson->SetStringField(TEXT("error"), TEXT("PixelStreaming module is not loaded"));
+		OutJson->SetBoolField(TEXT("moduleLoaded"), false);
+		return JsonToString(OutJson);
 	}
 
 	// Get player/connection info from console variables and stats
@@ -280,11 +283,11 @@ FString FAgenticMCPServer::HandlePixelStreamingListPlayers(const TMap<FString, F
 		PlayersArray.Add(MakeShared<FJsonValueObject>(PlayerObj));
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("moduleLoaded"), true);
-	Result->SetBoolField(TEXT("isStreaming"), bIsStreaming);
-	Result->SetArrayField(TEXT("players"), PlayersArray);
-	Result->SetNumberField(TEXT("count"), PlayersArray.Num());
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("moduleLoaded"), true);
+	OutJson->SetBoolField(TEXT("isStreaming"), bIsStreaming);
+	OutJson->SetArrayField(TEXT("players"), PlayersArray);
+	OutJson->SetNumberField(TEXT("count"), PlayersArray.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

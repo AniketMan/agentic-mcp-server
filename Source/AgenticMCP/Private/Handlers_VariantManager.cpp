@@ -1,6 +1,9 @@
 // Handlers_VariantManager.cpp
 // Variant Manager handlers for AgenticMCP.
 // UE 5.6 target. Variant sets, variants, property captures.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"

@@ -18,6 +18,9 @@
 //   foliageRemove         - Remove foliage instances in radius
 //   foliageSetDensity     - Set density scaling for foliage type
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -76,10 +79,10 @@ FString FAgenticMCPServer::HandleLandscapeList(const FString& Body)
 		LandArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), LandArray.Num());
-	Result->SetArrayField(TEXT("landscapes"), LandArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), LandArray.Num());
+	OutJson->SetArrayField(TEXT("landscapes"), LandArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -107,10 +110,10 @@ FString FAgenticMCPServer::HandleLandscapeGetInfo(const FString& Body)
 	}
 	if (!Found) return MakeErrorJson(FString::Printf(TEXT("Landscape not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), Found->GetActorLabel());
-	Result->SetStringField(TEXT("class"), Found->GetClass()->GetName());
-	Result->SetNumberField(TEXT("componentCount"), Found->LandscapeComponents.Num());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), Found->GetActorLabel());
+	OutJson->SetStringField(TEXT("class"), Found->GetClass()->GetName());
+	OutJson->SetNumberField(TEXT("componentCount"), Found->LandscapeComponents.Num());
 
 	// Component size info
 	if (Found->LandscapeComponents.Num() > 0)
@@ -118,9 +121,9 @@ FString FAgenticMCPServer::HandleLandscapeGetInfo(const FString& Body)
 		ULandscapeComponent* FirstComp = Found->LandscapeComponents[0];
 		if (FirstComp)
 		{
-			Result->SetNumberField(TEXT("componentSizeQuads"), FirstComp->ComponentSizeQuads);
-			Result->SetNumberField(TEXT("subsectionSizeQuads"), FirstComp->SubsectionSizeQuads);
-			Result->SetNumberField(TEXT("numSubsections"), FirstComp->NumSubsections);
+			OutJson->SetNumberField(TEXT("componentSizeQuads"), FirstComp->ComponentSizeQuads);
+			OutJson->SetNumberField(TEXT("subsectionSizeQuads"), FirstComp->SubsectionSizeQuads);
+			OutJson->SetNumberField(TEXT("numSubsections"), FirstComp->NumSubsections);
 		}
 	}
 
@@ -134,10 +137,10 @@ FString FAgenticMCPServer::HandleLandscapeGetInfo(const FString& Body)
 		LayerJson->SetStringField(TEXT("layerInfoName"), LayerSetting.LayerInfoObj->GetName());
 		LayerArr.Add(MakeShared<FJsonValueObject>(LayerJson));
 	}
-	Result->SetArrayField(TEXT("layers"), LayerArr);
-	Result->SetNumberField(TEXT("layerCount"), LayerArr.Num());
+	OutJson->SetArrayField(TEXT("layers"), LayerArr);
+	OutJson->SetNumberField(TEXT("layerCount"), LayerArr.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -184,11 +187,11 @@ FString FAgenticMCPServer::HandleLandscapeGetLayers(const FString& Body)
 		LayerArr.Add(MakeShared<FJsonValueObject>(LayerJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("landscape"), Found->GetActorLabel());
-	Result->SetNumberField(TEXT("layerCount"), LayerArr.Num());
-	Result->SetArrayField(TEXT("layers"), LayerArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("landscape"), Found->GetActorLabel());
+	OutJson->SetNumberField(TEXT("layerCount"), LayerArr.Num());
+	OutJson->SetArrayField(TEXT("layers"), LayerArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -219,10 +222,10 @@ FString FAgenticMCPServer::HandleFoliageList(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("foliageTypeCount"), FoliageArr.Num());
-	Result->SetArrayField(TEXT("foliageTypes"), FoliageArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("foliageTypeCount"), FoliageArr.Num());
+	OutJson->SetArrayField(TEXT("foliageTypes"), FoliageArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -254,20 +257,21 @@ FString FAgenticMCPServer::HandleFoliageGetStats(const FString& Body)
 			Entry->SetStringField(TEXT("name"), FoliageType->GetName());
 			Entry->SetNumberField(TEXT("instanceCount"), Count);
 
-			// Density and scaling info from the foliage type
+		// Density and scaling info from the foliage type
 			Entry->SetNumberField(TEXT("density"), FoliageType->Density);
-			Entry->SetNumberField(TEXT("minScale"), FoliageType->MinScale_DEPRECATED);
-			Entry->SetNumberField(TEXT("maxScale"), FoliageType->MaxScale_DEPRECATED);
+			// UE 5.6: MinScale_DEPRECATED/MaxScale_DEPRECATED replaced with ProceduralScale
+			Entry->SetNumberField(TEXT("minScale"), FoliageType->ProceduralScale.Min);
+			Entry->SetNumberField(TEXT("maxScale"), FoliageType->ProceduralScale.Max);
 
 			TypeArr.Add(MakeShared<FJsonValueObject>(Entry));
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("totalTypes"), TotalTypes);
-	Result->SetNumberField(TEXT("totalInstances"), TotalInstances);
-	Result->SetArrayField(TEXT("types"), TypeArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("totalTypes"), TotalTypes);
+	OutJson->SetNumberField(TEXT("totalInstances"), TotalInstances);
+	OutJson->SetArrayField(TEXT("types"), TypeArr);
+	return JsonToString(OutJson);
 }
 // ============================================================================
 // LANDSCAPE + FOLIAGE MUTATION HANDLERS
@@ -412,16 +416,16 @@ FString FAgenticMCPServer::HandleLandscapeSculpt(const FString& Body)
 	// Write back
 	LandscapeEdit.SetHeightData(ReadX1, ReadY1, ReadX2, ReadY2, HeightData.GetData(), 0, true);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("mode"), Mode);
-	Result->SetNumberField(TEXT("modifiedQuads"), ModifiedCount);
-	Result->SetNumberField(TEXT("centerX"), CenterX);
-	Result->SetNumberField(TEXT("centerY"), CenterY);
-	Result->SetNumberField(TEXT("radius"), RadiusInQuads);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("mode"), Mode);
+	OutJson->SetNumberField(TEXT("modifiedQuads"), ModifiedCount);
+	OutJson->SetNumberField(TEXT("centerX"), CenterX);
+	OutJson->SetNumberField(TEXT("centerY"), CenterY);
+	OutJson->SetNumberField(TEXT("radius"), RadiusInQuads);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -527,14 +531,14 @@ FString FAgenticMCPServer::HandleLandscapePaint(const FString& Body)
 	FLandscapeEditDataInterface LandscapeEdit(LandscapeInfo);
 	LandscapeEdit.SetAlphaData(TargetLayer, X1, Y1, X2, Y2, WeightData.GetData(), 0);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("layer"), LayerName);
-	Result->SetNumberField(TEXT("centerX"), CenterX);
-	Result->SetNumberField(TEXT("centerY"), CenterY);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("layer"), LayerName);
+	OutJson->SetNumberField(TEXT("centerX"), CenterX);
+	OutJson->SetNumberField(TEXT("centerY"), CenterY);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -589,13 +593,13 @@ FString FAgenticMCPServer::HandleLandscapeAddLayer(const FString& Body)
 	Package->MarkPackageDirty();
 	FAssetRegistryModule::AssetCreated(LayerInfo);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("layerName"), LayerName);
-	Result->SetStringField(TEXT("assetPath"), FullPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("layerName"), LayerName);
+	OutJson->SetStringField(TEXT("assetPath"), FullPath);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -662,12 +666,12 @@ FString FAgenticMCPServer::HandleLandscapeRemoveLayer(const FString& Body)
 
 	Landscape->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("removedLayer"), LayerName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("removedLayer"), LayerName);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -766,14 +770,14 @@ FString FAgenticMCPServer::HandleLandscapeImportHeightmap(const FString& Body)
 	FLandscapeEditDataInterface LandscapeEdit(LandscapeInfo);
 	LandscapeEdit.SetHeightData(MinX, MinY, MaxX, MaxY, HeightData.GetData(), 0, true);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("file"), FilePath);
-	Result->SetNumberField(TEXT("width"), LandscapeWidth);
-	Result->SetNumberField(TEXT("height"), LandscapeHeight);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("file"), FilePath);
+	OutJson->SetNumberField(TEXT("width"), LandscapeWidth);
+	OutJson->SetNumberField(TEXT("height"), LandscapeHeight);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -846,14 +850,14 @@ FString FAgenticMCPServer::HandleLandscapeExportHeightmap(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Failed to write file: %s"), *FilePath));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("file"), FilePath);
-	Result->SetNumberField(TEXT("width"), Width);
-	Result->SetNumberField(TEXT("height"), Height);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("file"), FilePath);
+	OutJson->SetNumberField(TEXT("width"), Width);
+	OutJson->SetNumberField(TEXT("height"), Height);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -946,26 +950,28 @@ FString FAgenticMCPServer::HandleFoliageAdd(const FString& Body)
 
 		FFoliageInstance Instance;
 		Instance.Location = FVector((*Coords)[0]->AsNumber(), (*Coords)[1]->AsNumber(), (*Coords)[2]->AsNumber());
-		Instance.DrawScale3D = FVector(Scale, Scale, Scale);
+		// UE 5.6: DrawScale3D is FVector3f, need explicit conversion
+		Instance.DrawScale3D = FVector3f(Scale, Scale, Scale);
 
 		if (bRandomRotation)
 		{
 			Instance.Rotation = FRotator(0.0f, FMath::FRandRange(0.0f, 360.0f), 0.0f);
 		}
 
-		FoliageInfo->AddInstance(IFA, FoliageType, Instance);
+		// UE 5.6: AddInstance signature changed to (UFoliageType*, FFoliageInstance&, UActorComponent*)
+		FoliageInfo->AddInstance(FoliageType, Instance, nullptr);
 		AddedCount++;
 	}
 
 	IFA->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("instancesAdded"), AddedCount);
-	Result->SetStringField(TEXT("foliageType"), FoliageTypePath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("instancesAdded"), AddedCount);
+	OutJson->SetStringField(TEXT("foliageType"), FoliageTypePath);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -1031,7 +1037,9 @@ FString FAgenticMCPServer::HandleFoliageRemove(const FString& Body)
 			}
 		}
 
-		FFoliageInfo* Info = Pair.Value.Get();
+		// UE 5.6: Pair.Value.Get() returns const FFoliageInfo& - use address-of and const_cast
+		const FFoliageInfo& ConstInfoRef = Pair.Value.Get();
+		FFoliageInfo* Info = const_cast<FFoliageInfo*>(&ConstInfoRef);
 		if (!Info)
 		{
 			continue;
@@ -1047,21 +1055,23 @@ FString FAgenticMCPServer::HandleFoliageRemove(const FString& Body)
 		}
 
 		// Remove in reverse order to preserve indices
+		// UE 5.6: RemoveInstances signature changed to (TArrayView<int32>, bool)
 		for (int32 i = InstancesToRemove.Num() - 1; i >= 0; i--)
 		{
-			Info->RemoveInstances(IFA, {InstancesToRemove[i]}, true);
+			TArray<int32> SingleInstance = { InstancesToRemove[i] };
+			Info->RemoveInstances(SingleInstance, true);
 			RemovedCount++;
 		}
 	}
 
 	IFA->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("instancesRemoved"), RemovedCount);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("instancesRemoved"), RemovedCount);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -1131,12 +1141,12 @@ FString FAgenticMCPServer::HandleFoliageSetDensity(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Foliage type not found for mesh: %s"), *FoliageTypePath));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("foliageType"), FoliageTypePath);
-	Result->SetNumberField(TEXT("density"), Density);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("foliageType"), FoliageTypePath);
+	OutJson->SetNumberField(TEXT("density"), Density);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

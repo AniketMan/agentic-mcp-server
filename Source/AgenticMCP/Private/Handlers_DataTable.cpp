@@ -2,6 +2,9 @@
 // DataTable read/write handlers for AgenticMCP
 // Allows reading and modifying UDataTable assets
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -12,7 +15,7 @@
 
 FString FAgenticMCPServer::HandleDataTableRead(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -44,13 +47,13 @@ FString FAgenticMCPServer::HandleDataTableRead(const TMap<FString, FString>& Par
 		return MakeErrorJson(FString::Printf(TEXT("DataTable not found: %s"), *TablePath));
 	}
 
-	Result->SetStringField(TEXT("name"), DataTable->GetName());
-	Result->SetStringField(TEXT("path"), DataTable->GetPathName());
-	Result->SetStringField(TEXT("rowStructName"), DataTable->GetRowStructPathName().ToString());
+	OutJson->SetStringField(TEXT("name"), DataTable->GetName());
+	OutJson->SetStringField(TEXT("path"), DataTable->GetPathName());
+	OutJson->SetStringField(TEXT("rowStructName"), DataTable->GetRowStructPathName().ToString());
 
 	// Get all row names
 	TArray<FName> RowNames = DataTable->GetRowNames();
-	Result->SetNumberField(TEXT("rowCount"), RowNames.Num());
+	OutJson->SetNumberField(TEXT("rowCount"), RowNames.Num());
 
 	// Export rows as JSON
 	TArray<TSharedPtr<FJsonValue>> RowsArray;
@@ -134,14 +137,14 @@ FString FAgenticMCPServer::HandleDataTableRead(const TMap<FString, FString>& Par
 		RowsArray.Add(MakeShared<FJsonValueObject>(RowObj));
 	}
 
-	Result->SetArrayField(TEXT("rows"), RowsArray);
+	OutJson->SetArrayField(TEXT("rows"), RowsArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleDataTableWrite(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -270,19 +273,19 @@ FString FAgenticMCPServer::HandleDataTableWrite(const TMap<FString, FString>& Pa
 		}
 	}
 
-	Result->SetBoolField(TEXT("success"), PropertiesModified > 0);
-	Result->SetStringField(TEXT("dataTable"), DataTable->GetName());
-	Result->SetStringField(TEXT("rowName"), RowName);
-	Result->SetNumberField(TEXT("propertiesModified"), PropertiesModified);
+	OutJson->SetBoolField(TEXT("success"), PropertiesModified > 0);
+	OutJson->SetStringField(TEXT("dataTable"), DataTable->GetName());
+	OutJson->SetStringField(TEXT("rowName"), RowName);
+	OutJson->SetNumberField(TEXT("propertiesModified"), PropertiesModified);
 
 	TArray<TSharedPtr<FJsonValue>> ModifiedArray;
 	for (const FString& Prop : ModifiedProps)
 	{
 		ModifiedArray.Add(MakeShared<FJsonValueString>(Prop));
 	}
-	Result->SetArrayField(TEXT("modifiedProperties"), ModifiedArray);
+	OutJson->SetArrayField(TEXT("modifiedProperties"), ModifiedArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -360,12 +363,12 @@ FString FAgenticMCPServer::HandleDataTableAddRow(const FString& Body)
 	FMemory::Free(NewRow);
 	DataTable->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("rowName"), RowName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("rowName"), RowName);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -408,12 +411,12 @@ FString FAgenticMCPServer::HandleDataTableDeleteRow(const FString& Body)
 	DataTable->RemoveRow(FName(*RowName));
 	DataTable->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("deletedRow"), RowName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("deletedRow"), RowName);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -463,12 +466,12 @@ FString FAgenticMCPServer::HandleDataTableGetSchema(const FString& Body)
 		FieldsArr.Add(MakeShared<FJsonValueObject>(FieldObj));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("structName"), DataTable->GetRowStruct()->GetName());
-	Result->SetNumberField(TEXT("rowCount"), DataTable->GetRowMap().Num());
-	Result->SetArrayField(TEXT("fields"), FieldsArr);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("structName"), DataTable->GetRowStruct()->GetName());
+	OutJson->SetNumberField(TEXT("rowCount"), DataTable->GetRowMap().Num());
+	OutJson->SetArrayField(TEXT("fields"), FieldsArr);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

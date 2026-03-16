@@ -12,6 +12,9 @@
 //   /api/wait-ready       - Wait for assets/compile/render to complete
 //   /api/resolve-ref      - Resolve a short ref (a0, a1.c0) to actor/component name
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "Engine/Level.h"
@@ -313,14 +316,14 @@ FString FAgenticMCPServer::HandleSceneSnapshot(const FString& Body)
 
 	LastSnapshotTime = FPlatformTime::Seconds();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("worldName"), World->GetName());
-	Result->SetNumberField(TEXT("actorCount"), RefCounter);
-	Result->SetArrayField(TEXT("actors"), ActorsArray);
-	Result->SetStringField(TEXT("yamlSnapshot"), YamlSnapshot);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("worldName"), World->GetName());
+	OutJson->SetNumberField(TEXT("actorCount"), RefCounter);
+	OutJson->SetArrayField(TEXT("actors"), ActorsArray);
+	OutJson->SetStringField(TEXT("yamlSnapshot"), YamlSnapshot);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -459,16 +462,16 @@ FString FAgenticMCPServer::HandleScreenshot(const FString& Body)
 
 	LastScreenshotTime = CurrentTime;
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("width"), FinalWidth);
-	Result->SetNumberField(TEXT("height"), FinalHeight);
-	Result->SetStringField(TEXT("format"), Format);
-	Result->SetStringField(TEXT("mimeType"), Format == TEXT("png") ? TEXT("image/png") : TEXT("image/jpeg"));
-	Result->SetNumberField(TEXT("sizeBytes"), CompressedData.Num());
-	Result->SetStringField(TEXT("data"), Base64Data);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("width"), FinalWidth);
+	OutJson->SetNumberField(TEXT("height"), FinalHeight);
+	OutJson->SetStringField(TEXT("format"), Format);
+	OutJson->SetStringField(TEXT("mimeType"), Format == TEXT("png") ? TEXT("image/png") : TEXT("image/jpeg"));
+	OutJson->SetNumberField(TEXT("sizeBytes"), CompressedData.Num());
+	OutJson->SetStringField(TEXT("data"), Base64Data);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -510,13 +513,13 @@ FString FAgenticMCPServer::HandleFocusActor(const FString& Body)
 	// Focus camera on actor
 	GEditor->MoveViewportCamerasToActor(*Actor, false);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Camera focused on %s"), *Actor->GetActorLabel()));
-	Result->SetStringField(TEXT("actorName"), Actor->GetName());
-	Result->SetStringField(TEXT("actorLabel"), Actor->GetActorLabel());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Camera focused on %s"), *Actor->GetActorLabel()));
+	OutJson->SetStringField(TEXT("actorName"), Actor->GetName());
+	OutJson->SetStringField(TEXT("actorLabel"), Actor->GetActorLabel());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -564,13 +567,13 @@ FString FAgenticMCPServer::HandleSelectActor(const FString& Body)
 	}
 	GEditor->SelectActor(Actor, true, true);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Selected %s"), *Actor->GetActorLabel()));
-	Result->SetStringField(TEXT("actorName"), Actor->GetName());
-	Result->SetStringField(TEXT("actorLabel"), Actor->GetActorLabel());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Selected %s"), *Actor->GetActorLabel()));
+	OutJson->SetStringField(TEXT("actorName"), Actor->GetName());
+	OutJson->SetStringField(TEXT("actorLabel"), Actor->GetActorLabel());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -610,17 +613,17 @@ FString FAgenticMCPServer::HandleSetViewport(const FString& Body)
 	ViewportClient->SetViewRotation(NewRot);
 	ViewportClient->Invalidate();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("Viewport updated"));
-	Result->SetNumberField(TEXT("locationX"), NewLoc.X);
-	Result->SetNumberField(TEXT("locationY"), NewLoc.Y);
-	Result->SetNumberField(TEXT("locationZ"), NewLoc.Z);
-	Result->SetNumberField(TEXT("pitch"), NewRot.Pitch);
-	Result->SetNumberField(TEXT("yaw"), NewRot.Yaw);
-	Result->SetNumberField(TEXT("roll"), NewRot.Roll);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("Viewport updated"));
+	OutJson->SetNumberField(TEXT("locationX"), NewLoc.X);
+	OutJson->SetNumberField(TEXT("locationY"), NewLoc.Y);
+	OutJson->SetNumberField(TEXT("locationZ"), NewLoc.Z);
+	OutJson->SetNumberField(TEXT("pitch"), NewRot.Pitch);
+	OutJson->SetNumberField(TEXT("yaw"), NewRot.Yaw);
+	OutJson->SetNumberField(TEXT("roll"), NewRot.Roll);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -677,13 +680,13 @@ FString FAgenticMCPServer::HandleWaitReady(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Unknown condition: %s. Use 'assets', 'compile', or 'render'."), *Condition));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("ready"), bReady);
-	Result->SetStringField(TEXT("condition"), Condition);
-	Result->SetStringField(TEXT("message"), StatusMessage);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("ready"), bReady);
+	OutJson->SetStringField(TEXT("condition"), Condition);
+	OutJson->SetStringField(TEXT("message"), StatusMessage);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -711,28 +714,28 @@ FString FAgenticMCPServer::HandleResolveRef(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Ref not found: %s. Run sceneSnapshot first to populate refs."), *Ref));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("ref"), Ref);
-	Result->SetStringField(TEXT("name"), Obj->GetName());
-	Result->SetStringField(TEXT("class"), Obj->GetClass()->GetName());
-	Result->SetStringField(TEXT("pathName"), Obj->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("ref"), Ref);
+	OutJson->SetStringField(TEXT("name"), Obj->GetName());
+	OutJson->SetStringField(TEXT("class"), Obj->GetClass()->GetName());
+	OutJson->SetStringField(TEXT("pathName"), Obj->GetPathName());
 
 	if (AActor* Actor = Cast<AActor>(Obj))
 	{
-		Result->SetStringField(TEXT("type"), TEXT("Actor"));
-		Result->SetStringField(TEXT("label"), Actor->GetActorLabel());
+		OutJson->SetStringField(TEXT("type"), TEXT("Actor"));
+		OutJson->SetStringField(TEXT("label"), Actor->GetActorLabel());
 	}
 	else if (UActorComponent* Comp = Cast<UActorComponent>(Obj))
 	{
-		Result->SetStringField(TEXT("type"), TEXT("Component"));
+		OutJson->SetStringField(TEXT("type"), TEXT("Component"));
 		if (AActor* Owner = Comp->GetOwner())
 		{
-			Result->SetStringField(TEXT("ownerName"), Owner->GetName());
+			OutJson->SetStringField(TEXT("ownerName"), Owner->GetName());
 		}
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -837,16 +840,16 @@ FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
 
 		DrawDebugSphere(World, Location, Radius, 16, Color, false, Duration, 0, 2.0f);
 
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("id"), DrawId);
-		Result->SetStringField(TEXT("type"), TEXT("sphere"));
-		Result->SetNumberField(TEXT("x"), Location.X);
-		Result->SetNumberField(TEXT("y"), Location.Y);
-		Result->SetNumberField(TEXT("z"), Location.Z);
-		Result->SetNumberField(TEXT("radius"), Radius);
-		Result->SetNumberField(TEXT("duration"), Duration);
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("id"), DrawId);
+		OutJson->SetStringField(TEXT("type"), TEXT("sphere"));
+		OutJson->SetNumberField(TEXT("x"), Location.X);
+		OutJson->SetNumberField(TEXT("y"), Location.Y);
+		OutJson->SetNumberField(TEXT("z"), Location.Z);
+		OutJson->SetNumberField(TEXT("radius"), Radius);
+		OutJson->SetNumberField(TEXT("duration"), Duration);
+		return JsonToString(OutJson);
 	}
 	else if (Type == TEXT("line"))
 	{
@@ -882,11 +885,11 @@ FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
 		float Thickness = Json->HasField(TEXT("thickness")) ? Json->GetNumberField(TEXT("thickness")) : 2.0f;
 		DrawDebugLine(World, Start, End, Color, false, Duration, 0, Thickness);
 
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("id"), DrawId);
-		Result->SetStringField(TEXT("type"), TEXT("line"));
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("id"), DrawId);
+		OutJson->SetStringField(TEXT("type"), TEXT("line"));
+		return JsonToString(OutJson);
 	}
 	else if (Type == TEXT("text"))
 	{
@@ -910,12 +913,12 @@ FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
 		float Scale = Json->HasField(TEXT("scale")) ? Json->GetNumberField(TEXT("scale")) : 1.5f;
 		DrawDebugString(World, Location, Text, nullptr, Color, Duration, false, Scale);
 
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("id"), DrawId);
-		Result->SetStringField(TEXT("type"), TEXT("text"));
-		Result->SetStringField(TEXT("text"), Text);
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("id"), DrawId);
+		OutJson->SetStringField(TEXT("type"), TEXT("text"));
+		OutJson->SetStringField(TEXT("text"), Text);
+		return JsonToString(OutJson);
 	}
 	else if (Type == TEXT("box"))
 	{
@@ -943,11 +946,11 @@ FString FAgenticMCPServer::HandleDrawDebug(const FString& Body)
 
 		DrawDebugBox(World, Location, Extent, Color, false, Duration, 0, 2.0f);
 
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("id"), DrawId);
-		Result->SetStringField(TEXT("type"), TEXT("box"));
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("id"), DrawId);
+		OutJson->SetStringField(TEXT("type"), TEXT("box"));
+		return JsonToString(OutJson);
 	}
 
 	return MakeErrorJson(FString::Printf(TEXT("Unknown draw type: %s. Use sphere, line, text, or box."), *Type));
@@ -968,10 +971,10 @@ FString FAgenticMCPServer::HandleClearDebug(const FString& Body)
 
 	FlushPersistentDebugLines(World);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("Debug draws cleared."));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("Debug draws cleared."));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1131,15 +1134,15 @@ FString FAgenticMCPServer::HandleBlueprintSnapshot(const FString& Body)
 		YamlSnapshot += FString::Printf(TEXT("Function: %s (%d nodes)\n"), *Graph->GetName(), Graph->Nodes.Num());
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("blueprintName"), Blueprint->GetName());
-	Result->SetStringField(TEXT("blueprintClass"), Blueprint->GeneratedClass ? Blueprint->GeneratedClass->GetName() : TEXT("None"));
-	Result->SetStringField(TEXT("parentClass"), Blueprint->ParentClass ? Blueprint->ParentClass->GetName() : TEXT("None"));
-	Result->SetArrayField(TEXT("graphs"), GraphsArray);
-	Result->SetStringField(TEXT("yamlSnapshot"), YamlSnapshot);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("blueprintName"), Blueprint->GetName());
+	OutJson->SetStringField(TEXT("blueprintClass"), Blueprint->GeneratedClass ? Blueprint->GeneratedClass->GetName() : TEXT("None"));
+	OutJson->SetStringField(TEXT("parentClass"), Blueprint->ParentClass ? Blueprint->ParentClass->GetName() : TEXT("None"));
+	OutJson->SetArrayField(TEXT("graphs"), GraphsArray);
+	OutJson->SetStringField(TEXT("yamlSnapshot"), YamlSnapshot);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1172,11 +1175,11 @@ FString FAgenticMCPServer::HandleBeginTransaction(const FString& Body)
 	bInTransaction = true;
 	CurrentTransactionName = Name;
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Transaction started: %s"), *Name));
-	Result->SetStringField(TEXT("transactionName"), Name);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Transaction started: %s"), *Name));
+	OutJson->SetStringField(TEXT("transactionName"), Name);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1196,10 +1199,10 @@ FString FAgenticMCPServer::HandleEndTransaction(const FString& Body)
 	bInTransaction = false;
 	CurrentTransactionName.Empty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Transaction ended: %s"), *EndedName));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Transaction ended: %s"), *EndedName));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1234,11 +1237,11 @@ FString FAgenticMCPServer::HandleUndo(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), UndoneCount > 0);
-	Result->SetNumberField(TEXT("undoneCount"), UndoneCount);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Undone %d operation(s)"), UndoneCount));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), UndoneCount > 0);
+	OutJson->SetNumberField(TEXT("undoneCount"), UndoneCount);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Undone %d operation(s)"), UndoneCount));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1273,11 +1276,11 @@ FString FAgenticMCPServer::HandleRedo(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), RedoneCount > 0);
-	Result->SetNumberField(TEXT("redoneCount"), RedoneCount);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Redone %d operation(s)"), RedoneCount));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), RedoneCount > 0);
+	OutJson->SetNumberField(TEXT("redoneCount"), RedoneCount);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Redone %d operation(s)"), RedoneCount));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1333,13 +1336,13 @@ FString FAgenticMCPServer::HandleSaveState(const FString& Body)
 
 	SavedSnapshots.Add(Name, Snapshot);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), Name);
-	Result->SetNumberField(TEXT("actorCount"), Snapshot.ActorNames.Num());
-	Result->SetStringField(TEXT("timestamp"), Snapshot.Timestamp.ToString());
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Saved state '%s' with %d actors"), *Name, Snapshot.ActorNames.Num()));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), Name);
+	OutJson->SetNumberField(TEXT("actorCount"), Snapshot.ActorNames.Num());
+	OutJson->SetStringField(TEXT("timestamp"), Snapshot.Timestamp.ToString());
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Saved state '%s' with %d actors"), *Name, Snapshot.ActorNames.Num()));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1474,19 +1477,19 @@ FString FAgenticMCPServer::HandleDiffState(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("comparedTo"), Name);
-	Result->SetNumberField(TEXT("addedCount"), AddedArray.Num());
-	Result->SetNumberField(TEXT("removedCount"), RemovedArray.Num());
-	Result->SetNumberField(TEXT("modifiedCount"), ModifiedArray.Num());
-	Result->SetArrayField(TEXT("added"), AddedArray);
-	Result->SetArrayField(TEXT("removed"), RemovedArray);
-	Result->SetArrayField(TEXT("modified"), ModifiedArray);
-	Result->SetStringField(TEXT("diffYaml"), DiffYaml);
-	Result->SetBoolField(TEXT("hasChanges"), AddedArray.Num() > 0 || RemovedArray.Num() > 0 || ModifiedArray.Num() > 0);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("comparedTo"), Name);
+	OutJson->SetNumberField(TEXT("addedCount"), AddedArray.Num());
+	OutJson->SetNumberField(TEXT("removedCount"), RemovedArray.Num());
+	OutJson->SetNumberField(TEXT("modifiedCount"), ModifiedArray.Num());
+	OutJson->SetArrayField(TEXT("added"), AddedArray);
+	OutJson->SetArrayField(TEXT("removed"), RemovedArray);
+	OutJson->SetArrayField(TEXT("modified"), ModifiedArray);
+	OutJson->SetStringField(TEXT("diffYaml"), DiffYaml);
+	OutJson->SetBoolField(TEXT("hasChanges"), AddedArray.Num() > 0 || RemovedArray.Num() > 0 || ModifiedArray.Num() > 0);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1539,12 +1542,12 @@ FString FAgenticMCPServer::HandleRestoreState(const FString& Body)
 
 	GEditor->EndTransaction();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), Name);
-	Result->SetNumberField(TEXT("restoredCount"), RestoredCount);
-	Result->SetStringField(TEXT("message"), FString::Printf(TEXT("Restored %d actors to state '%s'"), RestoredCount, *Name));
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), Name);
+	OutJson->SetNumberField(TEXT("restoredCount"), RestoredCount);
+	OutJson->SetStringField(TEXT("message"), FString::Printf(TEXT("Restored %d actors to state '%s'"), RestoredCount, *Name));
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1569,11 +1572,11 @@ FString FAgenticMCPServer::HandleListStates(const FString& Body)
 		StatesArray.Add(MakeShared<FJsonValueObject>(StateJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("count"), StatesArray.Num());
-	Result->SetArrayField(TEXT("states"), StatesArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("count"), StatesArray.Num());
+	OutJson->SetArrayField(TEXT("states"), StatesArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1602,18 +1605,18 @@ FString FAgenticMCPServer::HandleGetCamera(const FString& Body)
 	FVector Location = ViewportClient.GetViewLocation();
 	FRotator Rotation = ViewportClient.GetViewRotation();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("x"), Location.X);
-	Result->SetNumberField(TEXT("y"), Location.Y);
-	Result->SetNumberField(TEXT("z"), Location.Z);
-	Result->SetNumberField(TEXT("pitch"), Rotation.Pitch);
-	Result->SetNumberField(TEXT("yaw"), Rotation.Yaw);
-	Result->SetNumberField(TEXT("roll"), Rotation.Roll);
-	Result->SetNumberField(TEXT("fov"), ViewportClient.ViewFOV);
-	Result->SetStringField(TEXT("viewMode"), ViewportClient.IsRealtime() ? TEXT("Realtime") : TEXT("Static"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("x"), Location.X);
+	OutJson->SetNumberField(TEXT("y"), Location.Y);
+	OutJson->SetNumberField(TEXT("z"), Location.Z);
+	OutJson->SetNumberField(TEXT("pitch"), Rotation.Pitch);
+	OutJson->SetNumberField(TEXT("yaw"), Rotation.Yaw);
+	OutJson->SetNumberField(TEXT("roll"), Rotation.Roll);
+	OutJson->SetNumberField(TEXT("fov"), ViewportClient.ViewFOV);
+	OutJson->SetStringField(TEXT("viewMode"), ViewportClient.IsRealtime() ? TEXT("Realtime") : TEXT("Static"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1675,11 +1678,11 @@ FString FAgenticMCPServer::HandleListViewports(const FString& Body)
 		ViewportsArray.Add(MakeShared<FJsonValueObject>(VpJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("count"), ViewportsArray.Num());
-	Result->SetArrayField(TEXT("viewports"), ViewportsArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("count"), ViewportsArray.Num());
+	OutJson->SetArrayField(TEXT("viewports"), ViewportsArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1726,9 +1729,9 @@ FString FAgenticMCPServer::HandleGetSelection(const FString& Body)
 		SelectedArray.Add(MakeShared<FJsonValueObject>(ActorJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("count"), SelectedArray.Num());
-	Result->SetArrayField(TEXT("selected"), SelectedArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("count"), SelectedArray.Num());
+	OutJson->SetArrayField(TEXT("selected"), SelectedArray);
+	return JsonToString(OutJson);
 }

@@ -14,6 +14,12 @@ public class AgenticMCP : ModuleRules
 		// OculusXR, PCG, etc.) may not be present in every project.
 		bPrecompile = false;
 
+		// UE 5.6: Disable warnings-as-errors for this module
+		// C4459 (declaration hides global) triggers due to InterchangeCore headers
+		bWarningsAsErrors = false;
+		bEnableUndefinedIdentifierWarnings = false;
+		UnsafeTypeCastWarningLevel = WarningLevel.Off;
+
 		// ---- Public dependencies (headers exposed to other modules) ----
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
@@ -55,12 +61,15 @@ public class AgenticMCP : ModuleRules
 			"AnimGraph",          // Animation Blueprint graph nodes
 			"AnimGraphRuntime",   // Animation state machine runtime
 			"UMG",                // UMG Widget Blueprint support
+			"UMGEditor",          // UMG Widget Blueprint editor support
 			"SourceControl",      // Source control integration
 			"AIModule",           // AI controllers, behavior tree runtime
 			"GameplayTasks",      // Gameplay task system (used by AI)
-			"BehaviorTreeEditor",  // Behavior Tree editor APIs (node graph editing)
+			// "BehaviorTreeEditor",  // UE 5.6: Removed - AIGraph.h no longer available
 			"ToolMenus",          // Editor tool menus and settings access
 			"DeveloperSettings",  // UDeveloperSettings access
+			"EngineSettings",     // UGameMapsSettings, UGeneralProjectSettings
+			"Projects",           // IPluginManager for plugin info
 			"MaterialEditor",     // Material editor APIs
 			"MovieRenderPipelineCore", // Movie Render Pipeline (sequencer render)
 			"PropertyEditor",     // Property editing for settings

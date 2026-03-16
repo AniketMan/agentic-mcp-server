@@ -3,18 +3,27 @@
 // Exposes Touch Pro haptic feedback and OculusXR spatial audio APIs
 // UE 5.6 target. Requires OculusXR plugins enabled.
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Components/AudioComponent.h" // UE 5.6: Required for UAudioComponent complete type
 
 // OculusXR includes
 #include "OculusXRFunctionLibrary.h"
 #include "OculusXRInputFunctionLibrary.h"
 #include "OculusXRHMDTypes.h"
+// UE 5.6 / OculusXR SDK: OculusXRHapticsPlayerComponent.h may not exist
+// Wrap in conditional include to prevent build failure
+#if __has_include("OculusXRHapticsPlayerComponent.h")
 #include "OculusXRHapticsPlayerComponent.h"
+#endif
+#include "EngineUtils.h" // UE 5.6: Required for TActorIterator
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPMetaXRAudioHaptics, Log, All);
 
@@ -60,20 +69,22 @@ FString FAgenticMCPServer::HandleXRPlayHapticEffect(const TMap<FString, FString>
     EControllerHand ControllerHand = Hand.Equals(TEXT("Left"), ESearchCase::IgnoreCase)
         ? EControllerHand::Left : EControllerHand::Right;
 
-    PC->PlayHapticEffect(nullptr, ControllerHand, Amplitude, Frequency);
+    // UE 5.6: PlayHapticEffect signature is (HapticEffect, Hand, Scale, bLoop)
+    // Using Amplitude as Scale; Frequency is not directly supported via this API
+    PC->PlayHapticEffect(nullptr, ControllerHand, Amplitude, false);
 
     // Note: PlayHapticEffect with nullptr curve triggers a simple constant vibration.
     // For more complex patterns, a UHapticFeedbackEffect_Curve asset would be needed.
 
-    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetBoolField(TEXT("success"), true);
-    Result->SetStringField(TEXT("hand"), Hand);
-    Result->SetNumberField(TEXT("frequency"), Frequency);
-    Result->SetNumberField(TEXT("amplitude"), Amplitude);
-    Result->SetNumberField(TEXT("duration"), Duration);
-    Result->SetStringField(TEXT("message"), TEXT("Haptic effect triggered"));
+    TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+    OutJson->SetBoolField(TEXT("success"), true);
+    OutJson->SetStringField(TEXT("hand"), Hand);
+    OutJson->SetNumberField(TEXT("frequency"), Frequency);
+    OutJson->SetNumberField(TEXT("amplitude"), Amplitude);
+    OutJson->SetNumberField(TEXT("duration"), Duration);
+    OutJson->SetStringField(TEXT("message"), TEXT("Haptic effect triggered"));
 
-    return JsonToString(Result);
+    return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -114,12 +125,12 @@ FString FAgenticMCPServer::HandleXRStopHapticEffect(const TMap<FString, FString>
         PC->StopHapticEffect(EControllerHand::Right);
     }
 
-    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetBoolField(TEXT("success"), true);
-    Result->SetStringField(TEXT("hand"), Hand);
-    Result->SetStringField(TEXT("message"), TEXT("Haptic effect stopped"));
+    TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+    OutJson->SetBoolField(TEXT("success"), true);
+    OutJson->SetStringField(TEXT("hand"), Hand);
+    OutJson->SetStringField(TEXT("message"), TEXT("Haptic effect stopped"));
 
-    return JsonToString(Result);
+    return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -134,7 +145,7 @@ FString FAgenticMCPServer::HandleXRGetHapticCapabilities(const TMap<FString, FSt
         return MakeErrorJson(TEXT("XR system not available"));
     }
 
-    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
     // Check controller types to determine haptic capabilities
     EOculusXRControllerType LeftType = UOculusXRFunctionLibrary::GetControllerType(EControllerHand::Left);
@@ -144,15 +155,15 @@ FString FAgenticMCPServer::HandleXRGetHapticCapabilities(const TMap<FString, FSt
     LeftObj->SetStringField(TEXT("controllerType"), UEnum::GetValueAsString(LeftType));
     LeftObj->SetBoolField(TEXT("tracked"), UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::LTouch));
     LeftObj->SetBoolField(TEXT("supportsHaptics"), true);
-    Result->SetObjectField(TEXT("left"), LeftObj);
+    OutJson->SetObjectField(TEXT("left"), LeftObj);
 
     TSharedRef<FJsonObject> RightObj = MakeShared<FJsonObject>();
     RightObj->SetStringField(TEXT("controllerType"), UEnum::GetValueAsString(RightType));
     RightObj->SetBoolField(TEXT("tracked"), UOculusXRFunctionLibrary::IsDeviceTracked(EOculusXRTrackedDeviceType::RTouch));
     RightObj->SetBoolField(TEXT("supportsHaptics"), true);
-    Result->SetObjectField(TEXT("right"), RightObj);
+    OutJson->SetObjectField(TEXT("right"), RightObj);
 
-    return JsonToString(Result);
+    return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -190,14 +201,14 @@ FString FAgenticMCPServer::HandleXRSetSpatialAudioEnabled(const TMap<FString, FS
         GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
     }
 
-    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetBoolField(TEXT("success"), true);
-    Result->SetBoolField(TEXT("spatialAudioEnabled"), bEnable);
-    Result->SetStringField(TEXT("note"),
+    TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+    OutJson->SetBoolField(TEXT("success"), true);
+    OutJson->SetBoolField(TEXT("spatialAudioEnabled"), bEnable);
+    OutJson->SetStringField(TEXT("note"),
         TEXT("OculusXR spatial audio requires the OculusXR Audio plugin enabled in Project Settings. "
              "Per-sound spatialization is configured via Attenuation Settings on individual Audio Components."));
 
-    return JsonToString(Result);
+    return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -207,30 +218,30 @@ FString FAgenticMCPServer::HandleXRSetSpatialAudioEnabled(const TMap<FString, FS
 // ============================================================
 FString FAgenticMCPServer::HandleXRGetSpatialAudioStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
-    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+    TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
     // Check if OculusXR Audio module is loaded
     bool bOculusAudioLoaded = FModuleManager::Get().IsModuleLoaded(TEXT("OculusXRAudio"));
-    Result->SetBoolField(TEXT("oculusXRAudioPluginLoaded"), bOculusAudioLoaded);
+    OutJson->SetBoolField(TEXT("oculusXRAudioPluginLoaded"), bOculusAudioLoaded);
 
     // Check if XR system is available
     bool bXRAvailable = GEngine && GEngine->XRSystem.IsValid();
-    Result->SetBoolField(TEXT("xrSystemAvailable"), bXRAvailable);
+    OutJson->SetBoolField(TEXT("xrSystemAvailable"), bXRAvailable);
 
     if (bXRAvailable)
     {
         // Report device info for audio context
         FString DeviceName = UOculusXRFunctionLibrary::GetDeviceName();
-        Result->SetStringField(TEXT("deviceName"), DeviceName);
+        OutJson->SetStringField(TEXT("deviceName"), DeviceName);
     }
 
-    Result->SetStringField(TEXT("spatializationPlugin"),
+    OutJson->SetStringField(TEXT("spatializationPlugin"),
         bOculusAudioLoaded ? TEXT("OculusXR Audio") : TEXT("Default (Built-in Spatialization)"));
 
-    Result->SetStringField(TEXT("configurationPath"),
+    OutJson->SetStringField(TEXT("configurationPath"),
         TEXT("Project Settings > Platforms > Meta XR > Audio"));
 
-    return JsonToString(Result);
+    return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -300,13 +311,13 @@ FString FAgenticMCPServer::HandleXRConfigureAudioAttenuation(const TMap<FString,
     AudioComp->bOverrideAttenuation = true;
     AudioComp->AttenuationOverrides = AttenuationSettings;
 
-    TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-    Result->SetBoolField(TEXT("success"), true);
-    Result->SetStringField(TEXT("actorName"), ActorName);
-    Result->SetNumberField(TEXT("minDistance"), MinDistance);
-    Result->SetNumberField(TEXT("maxDistance"), MaxDistance);
-    Result->SetBoolField(TEXT("spatialized"), bSpatialize);
-    Result->SetStringField(TEXT("message"), TEXT("Audio attenuation configured for spatial audio"));
+    TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+    OutJson->SetBoolField(TEXT("success"), true);
+    OutJson->SetStringField(TEXT("actorName"), ActorName);
+    OutJson->SetNumberField(TEXT("minDistance"), MinDistance);
+    OutJson->SetNumberField(TEXT("maxDistance"), MaxDistance);
+    OutJson->SetBoolField(TEXT("spatialized"), bSpatialize);
+    OutJson->SetStringField(TEXT("message"), TEXT("Audio attenuation configured for spatial audio"));
 
-    return JsonToString(Result);
+    return JsonToString(OutJson);
 }

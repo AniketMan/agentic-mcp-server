@@ -19,6 +19,9 @@
 //   /api/duplicate-nodes   - Duplicate nodes in a graph
 //   /api/set-node-comment  - Set comment text on a node
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/Blueprint.h"
 #include "Engine/World.h"
@@ -374,13 +377,13 @@ FString FAgenticMCPServer::HandleAddNode(const FString& Body)
 				{
 					// Already exists -- return it
 					TSharedPtr<FJsonObject> NodeState = SerializeNode(ExistingEvent);
-					TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-					Result->SetBoolField(TEXT("success"), true);
-					Result->SetBoolField(TEXT("alreadyExists"), true);
-					Result->SetStringField(TEXT("nodeId"), ExistingEvent->NodeGuid.ToString());
+					TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+					OutJson->SetBoolField(TEXT("success"), true);
+					OutJson->SetBoolField(TEXT("alreadyExists"), true);
+					OutJson->SetStringField(TEXT("nodeId"), ExistingEvent->NodeGuid.ToString());
 					if (NodeState.IsValid())
-						Result->SetObjectField(TEXT("node"), NodeState);
-					return JsonToString(Result);
+						OutJson->SetObjectField(TEXT("node"), NodeState);
+					return JsonToString(OutJson);
 				}
 			}
 		}
@@ -919,16 +922,16 @@ FString FAgenticMCPServer::HandleAddNode(const FString& Body)
 
 	// Build response with full node state
 	TSharedPtr<FJsonObject> NodeState = SerializeNode(NewNode);
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("graph"), DecodedGraphName);
-	Result->SetStringField(TEXT("nodeType"), NodeType);
-	Result->SetStringField(TEXT("nodeId"), NewNode->NodeGuid.ToString());
-	Result->SetBoolField(TEXT("saved"), bSaved);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetStringField(TEXT("graph"), DecodedGraphName);
+	OutJson->SetStringField(TEXT("nodeType"), NodeType);
+	OutJson->SetStringField(TEXT("nodeId"), NewNode->NodeGuid.ToString());
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
 	if (NodeState.IsValid())
-		Result->SetObjectField(TEXT("node"), NodeState);
-	return JsonToString(Result);
+		OutJson->SetObjectField(TEXT("node"), NodeState);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -971,12 +974,12 @@ FString FAgenticMCPServer::HandleDeleteNode(const FString& Body)
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Deleted node '%s' (%s) from '%s'"),
 		*NodeId, *NodeTitle, *BlueprintName);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("deletedNodeId"), NodeId);
-	Result->SetStringField(TEXT("deletedNodeTitle"), NodeTitle);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("deletedNodeId"), NodeId);
+	OutJson->SetStringField(TEXT("deletedNodeTitle"), NodeTitle);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1058,9 +1061,9 @@ FString FAgenticMCPServer::HandleConnectPins(const FString& Body)
 
 	bool bConnected = Schema->TryCreateConnection(SourcePin, TargetPin);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bConnected);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bConnected);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
 
 	if (!bConnected)
 	{
@@ -1068,20 +1071,20 @@ FString FAgenticMCPServer::HandleConnectPins(const FString& Body)
 			TEXT("Cannot connect %s (%s) to %s (%s) - types incompatible"),
 			*SourcePinName, *SourcePin->PinType.PinCategory.ToString(),
 			*TargetPinName, *TargetPin->PinType.PinCategory.ToString());
-		Result->SetStringField(TEXT("error"), Reason);
-		return JsonToString(Result);
+		OutJson->SetStringField(TEXT("error"), Reason);
+		return JsonToString(OutJson);
 	}
 
 	bool bSaved = SaveBlueprintPackage(BP);
-	Result->SetBoolField(TEXT("saved"), bSaved);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
 
 	// Return updated node states
 	TSharedPtr<FJsonObject> SrcState = SerializeNode(SourceNode);
 	TSharedPtr<FJsonObject> TgtState = SerializeNode(TargetNode);
-	if (SrcState.IsValid()) Result->SetObjectField(TEXT("updatedSourceNode"), SrcState);
-	if (TgtState.IsValid()) Result->SetObjectField(TEXT("updatedTargetNode"), TgtState);
+	if (SrcState.IsValid()) OutJson->SetObjectField(TEXT("updatedSourceNode"), SrcState);
+	if (TgtState.IsValid()) OutJson->SetObjectField(TEXT("updatedTargetNode"), TgtState);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1117,11 +1120,11 @@ FString FAgenticMCPServer::HandleDisconnectPin(const FString& Body)
 	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("disconnectedCount"), BrokenCount);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("disconnectedCount"), BrokenCount);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1196,12 +1199,12 @@ FString FAgenticMCPServer::HandleSetPinDefault(const FString& Body)
 	SafeMarkModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("pinName"), PinName);
-	Result->SetStringField(TEXT("newValue"), Pin->DefaultValue);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("pinName"), PinName);
+	OutJson->SetStringField(TEXT("newValue"), Pin->DefaultValue);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1235,12 +1238,12 @@ FString FAgenticMCPServer::HandleMoveNode(const FString& Body)
 	SafeMarkModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetNumberField(TEXT("posX"), Node->NodePosX);
-	Result->SetNumberField(TEXT("posY"), Node->NodePosY);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetNumberField(TEXT("posX"), Node->NodePosX);
+	OutJson->SetNumberField(TEXT("posY"), Node->NodePosY);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1273,11 +1276,11 @@ FString FAgenticMCPServer::HandleRefreshAllNodes(const FString& Body)
 
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1323,13 +1326,13 @@ FString FAgenticMCPServer::HandleCreateBlueprint(const FString& Body)
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Created Blueprint '%s' in '%s' (parent: %s)"),
 		*Name, *Path, *ParentClassName);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), Name);
-	Result->SetStringField(TEXT("path"), NewBP->GetPathName());
-	Result->SetStringField(TEXT("parentClass"), ParentClassName);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), Name);
+	OutJson->SetStringField(TEXT("path"), NewBP->GetPathName());
+	OutJson->SetStringField(TEXT("parentClass"), ParentClassName);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1394,12 +1397,12 @@ FString FAgenticMCPServer::HandleCreateGraph(const FString& Body)
 	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("graphName"), GraphName);
-	Result->SetStringField(TEXT("graphType"), GraphType);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("graphName"), GraphName);
+	OutJson->SetStringField(TEXT("graphType"), GraphType);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1429,11 +1432,11 @@ FString FAgenticMCPServer::HandleDeleteGraph(const FString& Body)
 	FBlueprintEditorUtils::RemoveGraph(BP, Graph);
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("deletedGraph"), GraphName);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("deletedGraph"), GraphName);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1468,12 +1471,12 @@ FString FAgenticMCPServer::HandleAddVariable(const FString& Body)
 	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("variableName"), VarName);
-	Result->SetStringField(TEXT("variableType"), TypeName);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("variableName"), VarName);
+	OutJson->SetStringField(TEXT("variableType"), TypeName);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1500,11 +1503,11 @@ FString FAgenticMCPServer::HandleRemoveVariable(const FString& Body)
 	SafeMarkStructurallyModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("removedVariable"), VarName);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("removedVariable"), VarName);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1562,13 +1565,13 @@ FString FAgenticMCPServer::HandleCompileBlueprint(const FString& Body)
 	}
 #endif
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), bSaved && BP->Status != BS_Error);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("status"), StatusStr);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	Result->SetArrayField(TEXT("diagnostics"), DiagnosticsArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSaved && BP->Status != BS_Error);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetStringField(TEXT("status"), StatusStr);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	OutJson->SetArrayField(TEXT("diagnostics"), DiagnosticsArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1604,13 +1607,13 @@ FString FAgenticMCPServer::HandleDuplicateNodes(const FString& Body)
 	// For now, we create new nodes of the same type at offset positions.
 	// This is a simplified implementation.
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("note"),
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetStringField(TEXT("note"),
 		TEXT("Node duplication creates new nodes at offset positions. "
 			 "Connections are not preserved. Use connect-pins to rewire."));
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1644,11 +1647,11 @@ FString FAgenticMCPServer::HandleSetNodeComment(const FString& Body)
 	SafeMarkModified(BP, TEXT("Blueprint Mutation"));
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("comment"), Comment);
-	Result->SetBoolField(TEXT("saved"), bSaved);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("comment"), Comment);
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -1706,11 +1709,11 @@ FString FAgenticMCPServer::HandleAddComponent(const FString& Body)
 	{
 		if (Node && Node->ComponentTemplate && Node->ComponentTemplate->GetClass() == ComponentClass)
 		{
-			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-			Result->SetBoolField(TEXT("success"), true);
-			Result->SetBoolField(TEXT("alreadyExists"), true);
-			Result->SetStringField(TEXT("componentName"), Node->GetVariableName().ToString());
-			return JsonToString(Result);
+			TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+			OutJson->SetBoolField(TEXT("success"), true);
+			OutJson->SetBoolField(TEXT("alreadyExists"), true);
+			OutJson->SetStringField(TEXT("componentName"), Node->GetVariableName().ToString());
+			return JsonToString(OutJson);
 		}
 	}
 
@@ -1731,12 +1734,12 @@ FString FAgenticMCPServer::HandleAddComponent(const FString& Body)
 	// Compile and save
 	bool bSaved = SaveBlueprintPackage(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("componentClass"), ComponentClassName);
-	Result->SetStringField(TEXT("componentName"), NewNode->GetVariableName().ToString());
-	Result->SetBoolField(TEXT("saved"), bSaved);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetStringField(TEXT("componentClass"), ComponentClassName);
+	OutJson->SetStringField(TEXT("componentName"), NewNode->GetVariableName().ToString());
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

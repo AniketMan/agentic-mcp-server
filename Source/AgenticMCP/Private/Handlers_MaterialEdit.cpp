@@ -9,6 +9,9 @@
 //   materialGetTextures   - Get all texture parameter values on a material
 //   materialListInstances - List all material instances of a parent material
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
@@ -69,10 +72,10 @@ FString FAgenticMCPServer::HandleMaterialList(const FString& Body)
 		MatArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), MatArray.Num());
-	Result->SetArrayField(TEXT("materials"), MatArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), MatArray.Num());
+	OutJson->SetArrayField(TEXT("materials"), MatArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -103,20 +106,20 @@ FString FAgenticMCPServer::HandleMaterialGetInfo(const FString& Body)
 	}
 	if (!MatInterface) return MakeErrorJson(FString::Printf(TEXT("Material not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), MatInterface->GetName());
-	Result->SetStringField(TEXT("path"), MatInterface->GetPathName());
-	Result->SetStringField(TEXT("class"), MatInterface->GetClass()->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), MatInterface->GetName());
+	OutJson->SetStringField(TEXT("path"), MatInterface->GetPathName());
+	OutJson->SetStringField(TEXT("class"), MatInterface->GetClass()->GetName());
 
 	UMaterial* BaseMaterial = MatInterface->GetMaterial();
 	if (BaseMaterial)
 	{
-		Result->SetStringField(TEXT("baseMaterial"), BaseMaterial->GetName());
-		Result->SetStringField(TEXT("shadingModel"), 
+		OutJson->SetStringField(TEXT("baseMaterial"), BaseMaterial->GetName());
+		OutJson->SetStringField(TEXT("shadingModel"), 
 			StaticEnum<EMaterialShadingModel>()->GetNameStringByValue((int64)BaseMaterial->GetShadingModels().GetFirstShadingModel()));
-		Result->SetStringField(TEXT("blendMode"),
+		OutJson->SetStringField(TEXT("blendMode"),
 			StaticEnum<EBlendMode>()->GetNameStringByValue((int64)BaseMaterial->BlendMode));
-		Result->SetBoolField(TEXT("twoSided"), BaseMaterial->IsTwoSided());
+		OutJson->SetBoolField(TEXT("twoSided"), BaseMaterial->IsTwoSided());
 	}
 
 	// Scalar parameters
@@ -133,7 +136,7 @@ FString FAgenticMCPServer::HandleMaterialGetInfo(const FString& Body)
 		PJson->SetNumberField(TEXT("value"), Value);
 		ScalarArr.Add(MakeShared<FJsonValueObject>(PJson));
 	}
-	Result->SetArrayField(TEXT("scalarParameters"), ScalarArr);
+	OutJson->SetArrayField(TEXT("scalarParameters"), ScalarArr);
 
 	// Vector parameters
 	TArray<TSharedPtr<FJsonValue>> VectorArr;
@@ -152,7 +155,7 @@ FString FAgenticMCPServer::HandleMaterialGetInfo(const FString& Body)
 		PJson->SetNumberField(TEXT("a"), Value.A);
 		VectorArr.Add(MakeShared<FJsonValueObject>(PJson));
 	}
-	Result->SetArrayField(TEXT("vectorParameters"), VectorArr);
+	OutJson->SetArrayField(TEXT("vectorParameters"), VectorArr);
 
 	// Texture parameters
 	TArray<TSharedPtr<FJsonValue>> TexArr;
@@ -168,9 +171,9 @@ FString FAgenticMCPServer::HandleMaterialGetInfo(const FString& Body)
 		PJson->SetStringField(TEXT("texture"), Tex ? Tex->GetName() : TEXT("(none)"));
 		TexArr.Add(MakeShared<FJsonValueObject>(PJson));
 	}
-	Result->SetArrayField(TEXT("textureParameters"), TexArr);
+	OutJson->SetArrayField(TEXT("textureParameters"), TexArr);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -216,12 +219,12 @@ FString FAgenticMCPServer::HandleMaterialCreate(const FString& Body)
 
 	UMaterialInstanceConstant* MIC = Cast<UMaterialInstanceConstant>(NewAsset);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("name"), MIC->GetName());
-	Result->SetStringField(TEXT("path"), MIC->GetPathName());
-	Result->SetStringField(TEXT("parentMaterial"), ParentMat->GetName());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("name"), MIC->GetName());
+	OutJson->SetStringField(TEXT("path"), MIC->GetPathName());
+	OutJson->SetStringField(TEXT("parentMaterial"), ParentMat->GetName());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -256,9 +259,9 @@ FString FAgenticMCPServer::HandleMaterialListInstances(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("parentMaterial"), ParentName);
-	Result->SetNumberField(TEXT("count"), InstanceArr.Num());
-	Result->SetArrayField(TEXT("instances"), InstanceArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("parentMaterial"), ParentName);
+	OutJson->SetNumberField(TEXT("count"), InstanceArr.Num());
+	OutJson->SetArrayField(TEXT("instances"), InstanceArr);
+	return JsonToString(OutJson);
 }

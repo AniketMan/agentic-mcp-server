@@ -8,6 +8,9 @@
 //   settingsGetRendering  - Get rendering settings (AA, GI, shadows, post-process)
 //   settingsGetPlugins    - List all enabled/disabled plugins
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
@@ -30,31 +33,32 @@ FString FAgenticMCPServer::HandleSettingsGetProject(const FString& Body)
 	{
 		return MakeErrorJson(TEXT("Project settings not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// General project settings
 	const UGeneralProjectSettings* ProjectSettings = GetDefault<UGeneralProjectSettings>();
 	if (ProjectSettings)
 	{
-		Result->SetStringField(TEXT("projectName"), ProjectSettings->ProjectName);
-		Result->SetStringField(TEXT("companyName"), ProjectSettings->CompanyName);
-		Result->SetStringField(TEXT("projectVersion"), ProjectSettings->ProjectVersion);
-		Result->SetStringField(TEXT("description"), ProjectSettings->Description);
+		OutJson->SetStringField(TEXT("projectName"), ProjectSettings->ProjectName);
+		OutJson->SetStringField(TEXT("companyName"), ProjectSettings->CompanyName);
+		OutJson->SetStringField(TEXT("projectVersion"), ProjectSettings->ProjectVersion);
+		OutJson->SetStringField(TEXT("description"), ProjectSettings->Description);
 	}
 
 	// Game maps settings
 	const UGameMapsSettings* MapsSettings = GetDefault<UGameMapsSettings>();
 	if (MapsSettings)
 	{
-		Result->SetStringField(TEXT("defaultGameMap"), MapsSettings->GetGameDefaultMap().ToString());
-		Result->SetStringField(TEXT("editorStartupMap"), MapsSettings->EditorStartupMap.ToString());
-		Result->SetStringField(TEXT("gameDefaultGameMode"), MapsSettings->GlobalDefaultGameMode.ToString());
+		// UE 5.6: GetGameDefaultMap() returns FString directly, use getter for game mode
+		OutJson->SetStringField(TEXT("defaultGameMap"), MapsSettings->GetGameDefaultMap());
+		OutJson->SetStringField(TEXT("editorStartupMap"), MapsSettings->EditorStartupMap.ToString());
+		OutJson->SetStringField(TEXT("gameDefaultGameMode"), MapsSettings->GetGlobalDefaultGameMode());
 	}
 
 	// Engine version
-	Result->SetStringField(TEXT("engineVersion"), FEngineVersion::Current().ToString());
+	OutJson->SetStringField(TEXT("engineVersion"), FEngineVersion::Current().ToString());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -62,26 +66,22 @@ FString FAgenticMCPServer::HandleSettingsGetProject(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSettingsGetEditor(const FString& Body)
 {
-	if (!GetMutableDefault<UEditorPerProjectUserSettings>())
-	{
-		return MakeErrorJson(TEXT("Editor settings not available"));
-	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Experimental settings
 	const UEditorExperimentalSettings* ExpSettings = GetDefault<UEditorExperimentalSettings>();
 	if (ExpSettings)
 	{
-		Result->SetBoolField(TEXT("proceduralFoliage"), ExpSettings->bProceduralFoliage);
+		OutJson->SetBoolField(TEXT("proceduralFoliage"), ExpSettings->bProceduralFoliage);
 	}
 
 	// Editor-specific info
-	Result->SetStringField(TEXT("projectDir"), FPaths::ProjectDir());
-	Result->SetStringField(TEXT("projectContentDir"), FPaths::ProjectContentDir());
-	Result->SetStringField(TEXT("projectSavedDir"), FPaths::ProjectSavedDir());
-	Result->SetStringField(TEXT("engineDir"), FPaths::EngineDir());
+	OutJson->SetStringField(TEXT("projectDir"), FPaths::ProjectDir());
+	OutJson->SetStringField(TEXT("projectContentDir"), FPaths::ProjectContentDir());
+	OutJson->SetStringField(TEXT("projectSavedDir"), FPaths::ProjectSavedDir());
+	OutJson->SetStringField(TEXT("engineDir"), FPaths::EngineDir());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -93,20 +93,19 @@ FString FAgenticMCPServer::HandleSettingsGetRendering(const FString& Body)
 	{
 		return MakeErrorJson(TEXT("Renderer settings not available"));
 	}
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	const URendererSettings* RenderSettings = GetDefault<URendererSettings>();
 	if (RenderSettings)
 	{
-		Result->SetBoolField(TEXT("mobileHDR"), RenderSettings->bMobileHDR);
-		Result->SetNumberField(TEXT("antiAliasingMethod"), (int32)RenderSettings->DefaultFeatureAntiAliasing);
-		Result->SetBoolField(TEXT("ambientOcclusion"), RenderSettings->DefaultFeatureAmbientOcclusion);
-		Result->SetBoolField(TEXT("autoExposure"), RenderSettings->DefaultFeatureAutoExposure);
-		Result->SetBoolField(TEXT("motionBlur"), RenderSettings->DefaultFeatureMotionBlur);
-		Result->SetBoolField(TEXT("bloom"), RenderSettings->DefaultFeatureBloom);
+		// UE 5.6: Several properties removed or renamed
+		// Only use properties that still exist
+		OutJson->SetNumberField(TEXT("antiAliasingMethod"), (int32)RenderSettings->DefaultFeatureAntiAliasing);
+		// DefaultFeatureAutoExposure is now an enum, convert to int
+		OutJson->SetNumberField(TEXT("autoExposure"), (int32)RenderSettings->DefaultFeatureAutoExposure);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -155,10 +154,10 @@ FString FAgenticMCPServer::HandleSettingsGetPlugins(const FString& Body)
 		PluginArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), PluginArr.Num());
-	Result->SetArrayField(TEXT("plugins"), PluginArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), PluginArr.Num());
+	OutJson->SetArrayField(TEXT("plugins"), PluginArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -193,12 +192,12 @@ FString FAgenticMCPServer::HandleSettingsSetProject(const FString& Body)
 
 	Settings->TryUpdateDefaultConfigFile();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("fieldsChanged"), Changed);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -231,12 +230,12 @@ FString FAgenticMCPServer::HandleSettingsSetEditor(const FString& Body)
 		if (CVar) { CVar->Set((float)NumVal); Changed++; }
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("fieldsChanged"), Changed);
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }
 
@@ -279,12 +278,12 @@ FString FAgenticMCPServer::HandleSettingsSetRendering(const FString& Body)
 		if (CVar) { CVar->Set(BoolVal ? 1 : 0); Changed++; }
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
-	Result->SetStringField(TEXT("note"), TEXT("Some settings require editor restart to take effect"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("fieldsChanged"), Changed);
+	OutJson->SetStringField(TEXT("note"), TEXT("Some settings require editor restart to take effect"));
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, Writer);
+	FJsonSerializer::Serialize(OutJson, Writer);
 	return Out;
 }

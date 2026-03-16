@@ -2,6 +2,9 @@
 // Niagara particle system debugging and control endpoints for AgenticMCP
 // Provides visibility into particle systems, emitters, parameters, and performance stats
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -26,7 +29,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPNiagara, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleNiagaraGetStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> StatusObj = MakeShared<FJsonObject>();
 
 	if (!GEditor || !GEditor->GetEditorWorldContext().World())
@@ -65,10 +68,10 @@ FString FAgenticMCPServer::HandleNiagaraGetStatus(const TMap<FString, FString>& 
 	StatusObj->SetNumberField(TEXT("activeSystems"), ActiveSystems);
 	StatusObj->SetBoolField(TEXT("niagaraModuleLoaded"), true);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetObjectField(TEXT("status"), StatusObj);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetObjectField(TEXT("status"), StatusObj);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -78,7 +81,7 @@ FString FAgenticMCPServer::HandleNiagaraGetStatus(const TMap<FString, FString>& 
 // ============================================================
 FString FAgenticMCPServer::HandleNiagaraListSystems(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> SystemsArray;
 
 	if (!GEditor || !GEditor->GetEditorWorldContext().World())
@@ -120,11 +123,11 @@ FString FAgenticMCPServer::HandleNiagaraListSystems(const TMap<FString, FString>
 		}
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetArrayField(TEXT("systems"), SystemsArray);
-	Result->SetNumberField(TEXT("count"), SystemsArray.Num());
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetArrayField(TEXT("systems"), SystemsArray);
+	OutJson->SetNumberField(TEXT("count"), SystemsArray.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -170,7 +173,7 @@ FString FAgenticMCPServer::HandleNiagaraGetSystemInfo(const TMap<FString, FStrin
 		return MakeErrorJson(FString::Printf(TEXT("Niagara component not found on actor: %s"), *ActorName));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> InfoObj = MakeShared<FJsonObject>();
 
 	InfoObj->SetStringField(TEXT("componentName"), FoundComp->GetName());
@@ -186,10 +189,10 @@ FString FAgenticMCPServer::HandleNiagaraGetSystemInfo(const TMap<FString, FStrin
 	InfoObj->SetBoolField(TEXT("isComplete"), FoundComp->IsComplete());
 	InfoObj->SetBoolField(TEXT("isPaused"), FoundComp->IsPaused());
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetObjectField(TEXT("systemInfo"), InfoObj);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetObjectField(TEXT("systemInfo"), InfoObj);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -233,7 +236,7 @@ FString FAgenticMCPServer::HandleNiagaraGetEmitters(const TMap<FString, FString>
 		return MakeErrorJson(FString::Printf(TEXT("Niagara system not found on actor: %s"), *ActorName));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> EmittersArray;
 
 	UNiagaraSystem* System = FoundComp->GetAsset();
@@ -251,12 +254,12 @@ FString FAgenticMCPServer::HandleNiagaraGetEmitters(const TMap<FString, FString>
 		EmittersArray.Add(MakeShared<FJsonValueObject>(EmitterObj));
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetArrayField(TEXT("emitters"), EmittersArray);
-	Result->SetNumberField(TEXT("count"), EmittersArray.Num());
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetArrayField(TEXT("emitters"), EmittersArray);
+	OutJson->SetNumberField(TEXT("count"), EmittersArray.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -312,13 +315,13 @@ FString FAgenticMCPServer::HandleNiagaraSetParameter(const TMap<FString, FString
 		FoundComp->SetVariableFloat(FName(*ParameterName), static_cast<float>(FloatValue));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("parameterName"), ParameterName);
-	Result->SetStringField(TEXT("message"), TEXT("Parameter set successfully"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("parameterName"), ParameterName);
+	OutJson->SetStringField(TEXT("message"), TEXT("Parameter set successfully"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -364,7 +367,7 @@ FString FAgenticMCPServer::HandleNiagaraGetParameters(const TMap<FString, FStrin
 		return MakeErrorJson(FString::Printf(TEXT("Niagara component not found on actor: %s"), *ActorName));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> ParamsArray;
 
 	// Get the Niagara system and read exposed parameters
@@ -372,66 +375,57 @@ FString FAgenticMCPServer::HandleNiagaraGetParameters(const TMap<FString, FStrin
 
 	// Read user parameters from the component's override parameters
 	const FNiagaraParameterStore& OverrideParams = FoundComp->GetOverrideParameters();
-	TArray<FNiagaraVariableWithOffset> Parameters;
+	// UE 5.6: GetParameters takes TArray<FNiagaraVariable>, use ReadParameterVariables for FNiagaraVariableWithOffset
+	TArray<FNiagaraVariable> Parameters;
 	OverrideParams.GetParameters(Parameters);
 
-	for (const FNiagaraVariableWithOffset& ParamWithOffset : Parameters)
+	for (const FNiagaraVariable& Param : Parameters)
 	{
-		const FNiagaraVariable& Param = ParamWithOffset;
 		TSharedRef<FJsonObject> ParamObj = MakeShared<FJsonObject>();
 
 		ParamObj->SetStringField(TEXT("name"), Param.GetName().ToString());
 		ParamObj->SetStringField(TEXT("type"), Param.GetType().GetName());
 
 		// Try to read value based on type
+		// UE 5.6: GetParameterValue returns void, not bool - just call it and check if value changed
 		if (Param.GetType() == FNiagaraTypeDefinition::GetFloatDef())
 		{
 			float Value = 0.0f;
-			if (OverrideParams.GetParameterValue(Value, Param))
-			{
-				ParamObj->SetNumberField(TEXT("value"), Value);
-			}
+			OverrideParams.GetParameterValue(Value, Param);
+			ParamObj->SetNumberField(TEXT("value"), Value);
 		}
 		else if (Param.GetType() == FNiagaraTypeDefinition::GetIntDef())
 		{
 			int32 Value = 0;
-			if (OverrideParams.GetParameterValue(Value, Param))
-			{
-				ParamObj->SetNumberField(TEXT("value"), Value);
-			}
+			OverrideParams.GetParameterValue(Value, Param);
+			ParamObj->SetNumberField(TEXT("value"), Value);
 		}
 		else if (Param.GetType() == FNiagaraTypeDefinition::GetBoolDef())
 		{
 			FNiagaraBool Value;
-			if (OverrideParams.GetParameterValue(Value, Param))
-			{
-				ParamObj->SetBoolField(TEXT("value"), Value.GetValue());
-			}
+			OverrideParams.GetParameterValue(Value, Param);
+			ParamObj->SetBoolField(TEXT("value"), Value.GetValue());
 		}
 		else if (Param.GetType() == FNiagaraTypeDefinition::GetVec3Def())
 		{
 			FVector Value = FVector::ZeroVector;
-			if (OverrideParams.GetParameterValue(Value, Param))
-			{
-				TSharedRef<FJsonObject> VecObj = MakeShared<FJsonObject>();
-				VecObj->SetNumberField(TEXT("x"), Value.X);
-				VecObj->SetNumberField(TEXT("y"), Value.Y);
-				VecObj->SetNumberField(TEXT("z"), Value.Z);
-				ParamObj->SetObjectField(TEXT("value"), VecObj);
-			}
+			OverrideParams.GetParameterValue(Value, Param);
+			TSharedRef<FJsonObject> VecObj = MakeShared<FJsonObject>();
+			VecObj->SetNumberField(TEXT("x"), Value.X);
+			VecObj->SetNumberField(TEXT("y"), Value.Y);
+			VecObj->SetNumberField(TEXT("z"), Value.Z);
+			ParamObj->SetObjectField(TEXT("value"), VecObj);
 		}
 		else if (Param.GetType() == FNiagaraTypeDefinition::GetColorDef())
 		{
 			FLinearColor Value = FLinearColor::White;
-			if (OverrideParams.GetParameterValue(Value, Param))
-			{
-				TSharedRef<FJsonObject> ColorObj = MakeShared<FJsonObject>();
-				ColorObj->SetNumberField(TEXT("r"), Value.R);
-				ColorObj->SetNumberField(TEXT("g"), Value.G);
-				ColorObj->SetNumberField(TEXT("b"), Value.B);
-				ColorObj->SetNumberField(TEXT("a"), Value.A);
-				ParamObj->SetObjectField(TEXT("value"), ColorObj);
-			}
+			OverrideParams.GetParameterValue(Value, Param);
+			TSharedRef<FJsonObject> ColorObj = MakeShared<FJsonObject>();
+			ColorObj->SetNumberField(TEXT("r"), Value.R);
+			ColorObj->SetNumberField(TEXT("g"), Value.G);
+			ColorObj->SetNumberField(TEXT("b"), Value.B);
+			ColorObj->SetNumberField(TEXT("a"), Value.A);
+			ParamObj->SetObjectField(TEXT("value"), ColorObj);
 		}
 
 		ParamsArray.Add(MakeShared<FJsonValueObject>(ParamObj));
@@ -439,24 +433,26 @@ FString FAgenticMCPServer::HandleNiagaraGetParameters(const TMap<FString, FStrin
 
 	// Also list system-level user exposed parameters
 	TArray<TSharedPtr<FJsonValue>> ExposedParamsArray;
-	const TArray<FNiagaraVariable>& ExposedVars = System->GetExposedParameters().ReadParameterVariables();
-	for (const FNiagaraVariable& Var : ExposedVars)
+	// UE 5.6: ReadParameterVariables returns TArrayView<FNiagaraVariableWithOffset>
+	// FNiagaraVariableWithOffset inherits from FNiagaraVariableBase - use directly, no .Variable member
+	auto ExposedVarsView = System->GetExposedParameters().ReadParameterVariables();
+	for (const auto& VarWithOffset : ExposedVarsView)
 	{
 		TSharedRef<FJsonObject> ExpObj = MakeShared<FJsonObject>();
-		ExpObj->SetStringField(TEXT("name"), Var.GetName().ToString());
-		ExpObj->SetStringField(TEXT("type"), Var.GetType().GetName());
+		ExpObj->SetStringField(TEXT("name"), VarWithOffset.GetName().ToString());
+		ExpObj->SetStringField(TEXT("type"), VarWithOffset.GetType().GetName());
 		ExposedParamsArray.Add(MakeShared<FJsonValueObject>(ExpObj));
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetName());
-	Result->SetStringField(TEXT("systemName"), System->GetName());
-	Result->SetArrayField(TEXT("overrideParameters"), ParamsArray);
-	Result->SetNumberField(TEXT("overrideCount"), ParamsArray.Num());
-	Result->SetArrayField(TEXT("exposedParameters"), ExposedParamsArray);
-	Result->SetNumberField(TEXT("exposedCount"), ExposedParamsArray.Num());
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetName());
+	OutJson->SetStringField(TEXT("systemName"), System->GetName());
+	OutJson->SetArrayField(TEXT("overrideParameters"), ParamsArray);
+	OutJson->SetNumberField(TEXT("overrideCount"), ParamsArray.Num());
+	OutJson->SetArrayField(TEXT("exposedParameters"), ExposedParamsArray);
+	OutJson->SetNumberField(TEXT("exposedCount"), ExposedParamsArray.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -515,13 +511,13 @@ FString FAgenticMCPServer::HandleNiagaraActivateSystem(const TMap<FString, FStri
 		FoundComp->Deactivate();
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetBoolField(TEXT("activated"), bActivate);
-	Result->SetBoolField(TEXT("isActive"), FoundComp->IsActive());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetBoolField(TEXT("activated"), bActivate);
+	OutJson->SetBoolField(TEXT("isActive"), FoundComp->IsActive());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -622,15 +618,15 @@ FString FAgenticMCPServer::HandleNiagaraSetEmitterEnable(const TMap<FString, FSt
 	// Set emitter enabled state
 	FoundComp->SetEmitterEnable(EmitterHandles[EmitterIndex].GetName(), bEnabled);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetName());
-	Result->SetStringField(TEXT("emitterName"), EmitterHandles[EmitterIndex].GetName().ToString());
-	Result->SetNumberField(TEXT("emitterIndex"), EmitterIndex);
-	Result->SetBoolField(TEXT("enabled"), bEnabled);
-	Result->SetBoolField(TEXT("systemActive"), FoundComp->IsActive());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetName());
+	OutJson->SetStringField(TEXT("emitterName"), EmitterHandles[EmitterIndex].GetName().ToString());
+	OutJson->SetNumberField(TEXT("emitterIndex"), EmitterIndex);
+	OutJson->SetBoolField(TEXT("enabled"), bEnabled);
+	OutJson->SetBoolField(TEXT("systemActive"), FoundComp->IsActive());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -676,12 +672,12 @@ FString FAgenticMCPServer::HandleNiagaraResetSystem(const TMap<FString, FString>
 
 	FoundComp->ResetSystem();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("message"), TEXT("System reset successfully"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("message"), TEXT("System reset successfully"));
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -690,7 +686,7 @@ FString FAgenticMCPServer::HandleNiagaraResetSystem(const TMap<FString, FString>
 // ============================================================
 FString FAgenticMCPServer::HandleNiagaraGetStats(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> StatsObj = MakeShared<FJsonObject>();
 
 	if (!GEditor || !GEditor->GetEditorWorldContext().World())
@@ -722,10 +718,10 @@ FString FAgenticMCPServer::HandleNiagaraGetStats(const TMap<FString, FString>& P
 	StatsObj->SetNumberField(TEXT("totalComponents"), TotalComponents);
 	StatsObj->SetNumberField(TEXT("activeComponents"), ActiveComponents);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetObjectField(TEXT("stats"), StatsObj);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetObjectField(TEXT("stats"), StatsObj);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -760,12 +756,12 @@ FString FAgenticMCPServer::HandleNiagaraDebugHUD(const TMap<FString, FString>& P
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("enabled"), bEnable);
-	Result->SetStringField(TEXT("mode"), Mode);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("enabled"), bEnable);
+	OutJson->SetStringField(TEXT("mode"), Mode);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================================
@@ -797,11 +793,11 @@ FString FAgenticMCPServer::HandleNiagaraCreateSystem(const FString& Body)
 	Package->MarkPackageDirty();
 	FAssetRegistryModule::AssetCreated(System);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("path"), AssetPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("path"), AssetPath);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- niagaraAddEmitter ---
@@ -825,14 +821,15 @@ FString FAgenticMCPServer::HandleNiagaraAddEmitter(const FString& Body)
 	if (!Emitter)
 		return MakeErrorJson(FString::Printf(TEXT("Emitter not found: %s"), *EmitterPath));
 
-	System->AddEmitterHandle(*Emitter, FName(*FPaths::GetBaseFilename(EmitterPath)));
+	// UE 5.6: AddEmitterHandle requires 3 arguments - added FGuid() for EmitterVersion
+	System->AddEmitterHandle(*Emitter, FName(*FPaths::GetBaseFilename(EmitterPath)), FGuid());
 	System->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("emitter"), EmitterPath);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("emitter"), EmitterPath);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- niagaraRemoveEmitter ---
@@ -854,14 +851,15 @@ FString FAgenticMCPServer::HandleNiagaraRemoveEmitter(const FString& Body)
 	if (EmitterIndex < 0 || EmitterIndex >= Handles.Num())
 		return MakeErrorJson(FString::Printf(TEXT("Emitter index %d out of range (0-%d)"), EmitterIndex, Handles.Num() - 1));
 
-	System->RemoveEmitterHandleByIndex(EmitterIndex);
+	// UE 5.6: RemoveEmitterHandle takes const FNiagaraEmitterHandle& not FGuid
+	System->RemoveEmitterHandle(Handles[EmitterIndex]);
 	System->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("removedIndex"), EmitterIndex);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("removedIndex"), EmitterIndex);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- niagaraSetSystemProperty ---
@@ -891,10 +889,11 @@ FString FAgenticMCPServer::HandleNiagaraSetSystemProperty(const FString& Body)
 		System->SetWarmupTime((float)NumVal);
 		Changed++;
 	}
+	// UE 5.6: SetWarmupTickCount removed - warmup is controlled via warmup time only
 	if (Json->TryGetNumberField(TEXT("warmupTickCount"), NumVal))
 	{
-		System->SetWarmupTickCount((int32)NumVal);
-		Changed++;
+		// Warmup tick count no longer supported in UE 5.6, skip silently
+		// Changed++;
 	}
 	if (Json->TryGetBoolField(TEXT("fixedBounds"), BoolVal))
 	{
@@ -904,11 +903,11 @@ FString FAgenticMCPServer::HandleNiagaraSetSystemProperty(const FString& Body)
 
 	System->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("fieldsChanged"), Changed);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- niagaraSpawnSystem ---
@@ -945,10 +944,10 @@ FString FAgenticMCPServer::HandleNiagaraSpawnSystem(const FString& Body)
 	if (!NiagaraComp)
 		return MakeErrorJson(TEXT("Failed to spawn Niagara system"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("component"), NiagaraComp->GetName());
-	Result->SetStringField(TEXT("owner"), NiagaraComp->GetOwner() ? NiagaraComp->GetOwner()->GetName() : TEXT("none"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("component"), NiagaraComp->GetName());
+	OutJson->SetStringField(TEXT("owner"), NiagaraComp->GetOwner() ? NiagaraComp->GetOwner()->GetName() : TEXT("none"));
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }

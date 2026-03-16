@@ -2,6 +2,9 @@
 // Blueprint Event Graph editing handlers for AgenticMCP.
 // Allows creating/editing Blueprint function graphs, adding nodes, wiring pins.
 // UE 5.6 target.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/Blueprint.h"
 #include "EdGraph/EdGraph.h"
@@ -38,7 +41,7 @@ FString FAgenticMCPServer::HandleBPCreateBlueprint(const FString& Body)
 
 	if (ParentClass.IsEmpty()) ParentClass = TEXT("Actor");
 
-	UClass* Parent = FindObject<UClass>(ANY_PACKAGE, *ParentClass);
+	UClass* Parent = FindObject<UClass>(nullptr, *ParentClass);
 	if (!Parent) Parent = AActor::StaticClass();
 
 	FString AssetName = FPaths::GetBaseFilename(Path);
@@ -53,12 +56,12 @@ FString FAgenticMCPServer::HandleBPCreateBlueprint(const FString& Body)
 	FAssetRegistryModule::AssetCreated(BP);
 	Package->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("path"), Path);
-	Result->SetStringField(TEXT("parentClass"), Parent->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("path"), Path);
+	OutJson->SetStringField(TEXT("parentClass"), Parent->GetName());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpAddVariable ---
@@ -97,12 +100,12 @@ FString FAgenticMCPServer::HandleBPAddVariable(const FString& Body)
 
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("variable"), VarName);
-	Result->SetStringField(TEXT("type"), VarType);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("variable"), VarName);
+	OutJson->SetStringField(TEXT("type"), VarType);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpAddFunction ---
@@ -127,14 +130,14 @@ FString FAgenticMCPServer::HandleBPAddFunction(const FString& Body)
 	if (!NewGraph)
 		return MakeErrorJson(TEXT("Failed to create function graph"));
 
-	FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false, nullptr);
+	FBlueprintEditorUtils::AddFunctionGraph<UFunction>(BP, NewGraph, false, (UFunction*)nullptr);
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("function"), FuncName);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("function"), FuncName);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpAddNode ---
@@ -194,7 +197,7 @@ FString FAgenticMCPServer::HandleBPAddNode(const FString& Body)
 	{
 		FString FunctionName = Json->GetStringField(TEXT("functionName"));
 		UK2Node_CallFunction* CallNode = NewObject<UK2Node_CallFunction>(Graph);
-		UFunction* Func = FindObject<UFunction>(ANY_PACKAGE, *FunctionName);
+		UFunction* Func = FindObject<UFunction>(nullptr, *FunctionName);
 		if (Func)
 			CallNode->SetFromFunction(Func);
 		NewNode = CallNode;
@@ -239,12 +242,12 @@ FString FAgenticMCPServer::HandleBPAddNode(const FString& Body)
 
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("nodeType"), NodeType);
-	Result->SetStringField(TEXT("nodeId"), NewNode->NodeGuid.ToString());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("nodeType"), NodeType);
+	OutJson->SetStringField(TEXT("nodeId"), NewNode->NodeGuid.ToString());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpConnectPins ---
@@ -305,10 +308,10 @@ FString FAgenticMCPServer::HandleBPConnectPins(const FString& Body)
 
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpCompile ---
@@ -328,11 +331,11 @@ FString FAgenticMCPServer::HandleBPCompile(const FString& Body)
 
 	bool bHasErrors = BP->Status == BS_Error;
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), bHasErrors ? TEXT("error") : TEXT("ok"));
-	Result->SetBoolField(TEXT("hasErrors"), bHasErrors);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), bHasErrors ? TEXT("error") : TEXT("ok"));
+	OutJson->SetBoolField(TEXT("hasErrors"), bHasErrors);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpGetGraph ---
@@ -391,10 +394,10 @@ FString FAgenticMCPServer::HandleBPGetGraph(const FString& Body)
 		GraphsArr.Add(MakeShared<FJsonValueObject>(GraphObj));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetArrayField(TEXT("graphs"), GraphsArr);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetArrayField(TEXT("graphs"), GraphsArr);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- bpDeleteNode ---
@@ -428,11 +431,11 @@ FString FAgenticMCPServer::HandleBPDeleteNode(const FString& Body)
 				Graph->RemoveNode(Node);
 				FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
-				TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-				Result->SetStringField(TEXT("status"), TEXT("ok"));
-				Result->SetStringField(TEXT("removedNode"), NodeId);
+				TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+				OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+				OutJson->SetStringField(TEXT("removedNode"), NodeId);
 				FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-				FJsonSerializer::Serialize(Result, W); return Out;
+				FJsonSerializer::Serialize(OutJson, W); return Out;
 			}
 		}
 	}

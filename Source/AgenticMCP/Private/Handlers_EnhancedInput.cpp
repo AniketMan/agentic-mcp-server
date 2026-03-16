@@ -1,6 +1,9 @@
 // Handlers_EnhancedInput.cpp
 // Enhanced Input system handlers for AgenticMCP.
 // UE 5.6 target. Input Actions, Mapping Contexts, Modifiers, Triggers.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -107,7 +110,8 @@ FString FAgenticMCPServer::HandleInputCreateAction(const FString& Body)
         return MakeErrorJson(TEXT("name is required"));
     }
 
-    UClass* FactoryClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("InputActionFactory"));
+    // UE 5.6: nullptr deprecated, use FindFirstObject with full script path
+    UClass* FactoryClass = FindFirstObject<UClass>(TEXT("/Script/EnhancedInputEditor.InputActionFactory"), EFindFirstObjectOptions::EnsureIfAmbiguous);
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("EnhancedInput plugin is not loaded."));
@@ -182,7 +186,8 @@ FString FAgenticMCPServer::HandleInputCreateMappingContext(const FString& Body)
         return MakeErrorJson(TEXT("name is required"));
     }
 
-    UClass* FactoryClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("InputMappingContextFactory"));
+    // UE 5.6: nullptr deprecated, use FindFirstObject with full script path
+    UClass* FactoryClass = FindFirstObject<UClass>(TEXT("/Script/EnhancedInputEditor.InputMappingContextFactory"), EFindFirstObjectOptions::EnsureIfAmbiguous);
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("EnhancedInput plugin is not loaded."));

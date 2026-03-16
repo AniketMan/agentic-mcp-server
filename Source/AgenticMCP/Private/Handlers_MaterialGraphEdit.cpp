@@ -12,6 +12,9 @@
 //   materialAssignToActor   - Assign a material to an actor's mesh component
 //   materialGetGraph        - Get the node graph of a material
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
@@ -261,15 +264,15 @@ FString FAgenticMCPServer::HandleMaterialAddNode(const FString& Body)
 	Material->PostEditChange();
 	Material->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetStringField(TEXT("nodeType"), NodeType);
-	Result->SetStringField(TEXT("expressionClass"), NewExpr->GetClass()->GetName());
-	Result->SetNumberField(TEXT("nodeIndex"), Material->GetExpressionCollection().Expressions.Num() - 1);
-	Result->SetNumberField(TEXT("posX"), PosX);
-	Result->SetNumberField(TEXT("posY"), PosY);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetStringField(TEXT("nodeType"), NodeType);
+	OutJson->SetStringField(TEXT("expressionClass"), NewExpr->GetClass()->GetName());
+	OutJson->SetNumberField(TEXT("nodeIndex"), Material->GetExpressionCollection().Expressions.Num() - 1);
+	OutJson->SetNumberField(TEXT("posX"), PosX);
+	OutJson->SetNumberField(TEXT("posY"), PosY);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -373,12 +376,12 @@ FString FAgenticMCPServer::HandleMaterialConnectPins(const FString& Body)
 		Material->PostEditChange();
 		Material->MarkPackageDirty();
 
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("materialName"), MatName);
-		Result->SetNumberField(TEXT("sourceNodeIndex"), SrcIdx);
-		Result->SetStringField(TEXT("targetInput"), TargetInput);
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("materialName"), MatName);
+		OutJson->SetNumberField(TEXT("sourceNodeIndex"), SrcIdx);
+		OutJson->SetStringField(TEXT("targetInput"), TargetInput);
+		return JsonToString(OutJson);
 	}
 
 	// Connect to another expression node's input
@@ -392,7 +395,8 @@ FString FAgenticMCPServer::HandleMaterialConnectPins(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("Target node index %d out of range (0-%d)"), TgtIdx, Expressions.Num() - 1));
 
 	UMaterialExpression* TgtExpr = Expressions[TgtIdx];
-	TArray<FExpressionInput*> Inputs = TgtExpr->GetInputs();
+	// UE 5.6: GetInputs() replaced with GetInputsView()
+	TArrayView<FExpressionInput*> Inputs = TgtExpr->GetInputsView();
 	if (TgtInputIdx < 0 || TgtInputIdx >= Inputs.Num())
 		return MakeErrorJson(FString::Printf(TEXT("Target input index %d out of range (0-%d)"), TgtInputIdx, Inputs.Num() - 1));
 
@@ -402,14 +406,14 @@ FString FAgenticMCPServer::HandleMaterialConnectPins(const FString& Body)
 	Material->PostEditChange();
 	Material->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetNumberField(TEXT("sourceNodeIndex"), SrcIdx);
-	Result->SetNumberField(TEXT("sourceOutputIndex"), SrcOutputIdx);
-	Result->SetNumberField(TEXT("targetNodeIndex"), TgtIdx);
-	Result->SetNumberField(TEXT("targetInputIndex"), TgtInputIdx);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetNumberField(TEXT("sourceNodeIndex"), SrcIdx);
+	OutJson->SetNumberField(TEXT("sourceOutputIndex"), SrcOutputIdx);
+	OutJson->SetNumberField(TEXT("targetNodeIndex"), TgtIdx);
+	OutJson->SetNumberField(TEXT("targetInputIndex"), TgtInputIdx);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -450,11 +454,11 @@ FString FAgenticMCPServer::HandleMaterialDisconnectPin(const FString& Body)
 		Material->PostEditChange();
 		Material->MarkPackageDirty();
 
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("materialName"), MatName);
-		Result->SetStringField(TEXT("disconnectedInput"), TargetInput);
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("materialName"), MatName);
+		OutJson->SetStringField(TEXT("disconnectedInput"), TargetInput);
+		return JsonToString(OutJson);
 	}
 
 	// Disconnect an expression node's input
@@ -466,7 +470,8 @@ FString FAgenticMCPServer::HandleMaterialDisconnectPin(const FString& Body)
 	if (NodeIdx < 0 || NodeIdx >= Expressions.Num())
 		return MakeErrorJson(FString::Printf(TEXT("Node index %d out of range"), NodeIdx));
 
-	TArray<FExpressionInput*> Inputs = Expressions[NodeIdx]->GetInputs();
+	// UE 5.6: GetInputs() replaced with GetInputsView()
+	TArrayView<FExpressionInput*> Inputs = Expressions[NodeIdx]->GetInputsView();
 	if (InputIdx < 0 || InputIdx >= Inputs.Num())
 		return MakeErrorJson(FString::Printf(TEXT("Input index %d out of range"), InputIdx));
 
@@ -476,12 +481,12 @@ FString FAgenticMCPServer::HandleMaterialDisconnectPin(const FString& Body)
 	Material->PostEditChange();
 	Material->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetNumberField(TEXT("nodeIndex"), NodeIdx);
-	Result->SetNumberField(TEXT("inputIndex"), InputIdx);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetNumberField(TEXT("nodeIndex"), NodeIdx);
+	OutJson->SetNumberField(TEXT("inputIndex"), InputIdx);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -510,12 +515,12 @@ FString FAgenticMCPServer::HandleMaterialSetTextureParam(const FString& Body)
 	MIC->SetTextureParameterValueEditorOnly(FMaterialParameterInfo(FName(*ParamName)), Tex);
 	MIC->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetStringField(TEXT("parameterName"), ParamName);
-	Result->SetStringField(TEXT("textureName"), Tex->GetName());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetStringField(TEXT("parameterName"), ParamName);
+	OutJson->SetStringField(TEXT("textureName"), Tex->GetName());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -542,12 +547,12 @@ FString FAgenticMCPServer::HandleMaterialSetScalar(const FString& Body)
 	MIC->SetScalarParameterValueEditorOnly(FMaterialParameterInfo(FName(*ParamName)), Value);
 	MIC->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetStringField(TEXT("parameterName"), ParamName);
-	Result->SetNumberField(TEXT("value"), Value);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetStringField(TEXT("parameterName"), ParamName);
+	OutJson->SetNumberField(TEXT("value"), Value);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -576,15 +581,15 @@ FString FAgenticMCPServer::HandleMaterialSetVector(const FString& Body)
 	MIC->SetVectorParameterValueEditorOnly(FMaterialParameterInfo(FName(*ParamName)), FLinearColor(R, G, B, A));
 	MIC->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetStringField(TEXT("parameterName"), ParamName);
-	Result->SetNumberField(TEXT("r"), R);
-	Result->SetNumberField(TEXT("g"), G);
-	Result->SetNumberField(TEXT("b"), B);
-	Result->SetNumberField(TEXT("a"), A);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetStringField(TEXT("parameterName"), ParamName);
+	OutJson->SetNumberField(TEXT("r"), R);
+	OutJson->SetNumberField(TEXT("g"), G);
+	OutJson->SetNumberField(TEXT("b"), B);
+	OutJson->SetNumberField(TEXT("a"), A);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -634,13 +639,13 @@ FString FAgenticMCPServer::HandleMaterialAssignToActor(const FString& Body)
 	MeshComp->SetMaterial(SlotIndex, MatInterface);
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetNumberField(TEXT("slotIndex"), SlotIndex);
-	Result->SetNumberField(TEXT("totalSlots"), MeshComp->GetNumMaterials());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetNumberField(TEXT("slotIndex"), SlotIndex);
+	OutJson->SetNumberField(TEXT("totalSlots"), MeshComp->GetNumMaterials());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -684,7 +689,8 @@ FString FAgenticMCPServer::HandleMaterialGetGraph(const FString& Body)
 
 		// Input connections
 		TArray<TSharedPtr<FJsonValue>> InputsArr;
-		TArray<FExpressionInput*> Inputs = Expr->GetInputs();
+		// UE 5.6: GetInputs() replaced with GetInputsView()
+		TArrayView<FExpressionInput*> Inputs = Expr->GetInputsView();
 		for (int32 j = 0; j < Inputs.Num(); ++j)
 		{
 			TSharedRef<FJsonObject> InputJson = MakeShared<FJsonObject>();
@@ -736,13 +742,13 @@ FString FAgenticMCPServer::HandleMaterialGetGraph(const FString& Body)
 		ReportConnection(TEXT("SubsurfaceColor"), EditorData->SubsurfaceColor);
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), MatName);
-	Result->SetNumberField(TEXT("nodeCount"), NodesArr.Num());
-	Result->SetArrayField(TEXT("nodes"), NodesArr);
-	Result->SetObjectField(TEXT("materialOutputConnections"), OutputsJson);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), MatName);
+	OutJson->SetNumberField(TEXT("nodeCount"), NodesArr.Num());
+	OutJson->SetArrayField(TEXT("nodes"), NodesArr);
+	OutJson->SetObjectField(TEXT("materialOutputConnections"), OutputsJson);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -804,12 +810,12 @@ FString FAgenticMCPServer::HandleMaterialCreateInstance(const FString& Body)
 	// Notify asset registry
 	FAssetRegistryModule::AssetCreated(MIC);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("instanceName"), MIC->GetName());
-	Result->SetStringField(TEXT("instancePath"), MIC->GetPathName());
-	Result->SetStringField(TEXT("parentMaterial"), ParentMat->GetName());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("instanceName"), MIC->GetName());
+	OutJson->SetStringField(TEXT("instancePath"), MIC->GetPathName());
+	OutJson->SetStringField(TEXT("parentMaterial"), ParentMat->GetName());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -884,12 +890,12 @@ FString FAgenticMCPServer::HandleMaterialDeleteNode(const FString& Body)
 	Material->PostEditChange();
 	Material->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("materialName"), Material->GetName());
-	Result->SetStringField(TEXT("removedNode"), RemovedName);
-	Result->SetStringField(TEXT("removedClass"), RemovedClass);
-	Result->SetNumberField(TEXT("removedIndex"), FoundIndex);
-	Result->SetNumberField(TEXT("remainingExpressions"), Material->GetExpressions().Num());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("materialName"), Material->GetName());
+	OutJson->SetStringField(TEXT("removedNode"), RemovedName);
+	OutJson->SetStringField(TEXT("removedClass"), RemovedClass);
+	OutJson->SetNumberField(TEXT("removedIndex"), FoundIndex);
+	OutJson->SetNumberField(TEXT("remainingExpressions"), Material->GetExpressions().Num());
+	return JsonToString(OutJson);
 }

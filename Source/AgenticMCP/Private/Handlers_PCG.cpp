@@ -12,6 +12,9 @@
 //   pcgSetSeed            - Set the seed on a PCG component
 //   pcgSetGraphParameter  - Set an exposed parameter on a PCG graph instance
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -71,10 +74,10 @@ FString FAgenticMCPServer::HandlePCGListGraphs(const FString& Body)
 		GraphArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), GraphArray.Num());
-	Result->SetArrayField(TEXT("graphs"), GraphArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), GraphArray.Num());
+	OutJson->SetArrayField(TEXT("graphs"), GraphArray);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -114,9 +117,9 @@ FString FAgenticMCPServer::HandlePCGGetGraphInfo(const FString& Body)
 		return MakeErrorJson(FString::Printf(TEXT("PCG graph not found: %s"), *GraphName));
 
 	// Serialize graph info
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), FoundGraph->GetName());
-	Result->SetStringField(TEXT("path"), FoundGraph->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), FoundGraph->GetName());
+	OutJson->SetStringField(TEXT("path"), FoundGraph->GetPathName());
 
 	// Nodes
 	TArray<TSharedPtr<FJsonValue>> NodeArray;
@@ -125,7 +128,8 @@ FString FAgenticMCPServer::HandlePCGGetGraphInfo(const FString& Body)
 		if (!Node) continue;
 		TSharedRef<FJsonObject> NodeJson = MakeShared<FJsonObject>();
 		NodeJson->SetStringField(TEXT("name"), Node->GetName());
-		NodeJson->SetStringField(TEXT("nodeTitle"), Node->GetNodeTitle().ToString());
+		// UE 5.6: GetNodeTitle requires EPCGNodeTitleType argument
+		NodeJson->SetStringField(TEXT("nodeTitle"), Node->GetNodeTitle(EPCGNodeTitleType::ListView).ToString());
 
 		if (const UPCGSettings* Settings = Node->GetSettings())
 		{
@@ -138,10 +142,10 @@ FString FAgenticMCPServer::HandlePCGGetGraphInfo(const FString& Body)
 
 		NodeArray.Add(MakeShared<FJsonValueObject>(NodeJson));
 	}
-	Result->SetArrayField(TEXT("nodes"), NodeArray);
-	Result->SetNumberField(TEXT("nodeCount"), NodeArray.Num());
+	OutJson->SetArrayField(TEXT("nodes"), NodeArray);
+	OutJson->SetNumberField(TEXT("nodeCount"), NodeArray.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -192,10 +196,10 @@ FString FAgenticMCPServer::HandlePCGListComponents(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), CompArray.Num());
-	Result->SetArrayField(TEXT("components"), CompArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), CompArray.Num());
+	OutJson->SetArrayField(TEXT("components"), CompArray);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -235,20 +239,21 @@ FString FAgenticMCPServer::HandlePCGGetComponent(const FString& Body)
 	if (!PCGComp)
 		return MakeErrorJson(FString::Printf(TEXT("Actor '%s' has no PCG component"), *ActorName));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
-	Result->SetStringField(TEXT("componentName"), PCGComp->GetName());
-	Result->SetBoolField(TEXT("isGenerated"), PCGComp->bGenerated);
-	Result->SetNumberField(TEXT("seed"), PCGComp->Seed);
-	Result->SetBoolField(TEXT("generateOnLoad"), PCGComp->bGenerateOnLoad);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
+	OutJson->SetStringField(TEXT("componentName"), PCGComp->GetName());
+	OutJson->SetBoolField(TEXT("isGenerated"), PCGComp->bGenerated);
+	OutJson->SetNumberField(TEXT("seed"), PCGComp->Seed);
+	// UE 5.6: bGenerateOnLoad property removed from UPCGComponent
+	// OutJson->SetBoolField(TEXT("generateOnLoad"), PCGComp->bGenerateOnLoad);
 
 	if (UPCGGraphInterface* GraphInterface = PCGComp->GetGraph())
 	{
-		Result->SetStringField(TEXT("graphName"), GraphInterface->GetName());
-		Result->SetStringField(TEXT("graphPath"), GraphInterface->GetPathName());
+		OutJson->SetStringField(TEXT("graphName"), GraphInterface->GetName());
+		OutJson->SetStringField(TEXT("graphPath"), GraphInterface->GetPathName());
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -290,12 +295,12 @@ FString FAgenticMCPServer::HandlePCGGenerate(const FString& Body)
 	// Trigger generation
 	PCGComp->Generate();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
-	Result->SetStringField(TEXT("action"), TEXT("generate"));
-	Result->SetBoolField(TEXT("isGenerated"), PCGComp->bGenerated);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
+	OutJson->SetStringField(TEXT("action"), TEXT("generate"));
+	OutJson->SetBoolField(TEXT("isGenerated"), PCGComp->bGenerated);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -336,12 +341,12 @@ FString FAgenticMCPServer::HandlePCGCleanup(const FString& Body)
 
 	PCGComp->Cleanup();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
-	Result->SetStringField(TEXT("action"), TEXT("cleanup"));
-	Result->SetBoolField(TEXT("isGenerated"), PCGComp->bGenerated);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
+	OutJson->SetStringField(TEXT("action"), TEXT("cleanup"));
+	OutJson->SetBoolField(TEXT("isGenerated"), PCGComp->bGenerated);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -387,12 +392,12 @@ FString FAgenticMCPServer::HandlePCGSetSeed(const FString& Body)
 	int32 OldSeed = PCGComp->Seed;
 	PCGComp->Seed = NewSeed;
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
-	Result->SetNumberField(TEXT("oldSeed"), OldSeed);
-	Result->SetNumberField(TEXT("newSeed"), NewSeed);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
+	OutJson->SetNumberField(TEXT("oldSeed"), OldSeed);
+	OutJson->SetNumberField(TEXT("newSeed"), NewSeed);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -465,13 +470,13 @@ FString FAgenticMCPServer::HandlePCGExecuteGraph(const FString& Body)
 
 	PCGComp->Generate();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
-	Result->SetStringField(TEXT("action"), TEXT("executeGraph"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), FoundActor->GetActorLabel());
+	OutJson->SetStringField(TEXT("action"), TEXT("executeGraph"));
 	if (PCGComp->GetGraph())
-		Result->SetStringField(TEXT("graphName"), PCGComp->GetGraph()->GetName());
-	return JsonToString(Result);
+		OutJson->SetStringField(TEXT("graphName"), PCGComp->GetGraph()->GetName());
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -520,7 +525,8 @@ FString FAgenticMCPServer::HandlePCGGetNodeSettings(const FString& Body)
 	for (int32 i = 0; i < Nodes.Num(); i++)
 	{
 		if (!Nodes[i]) continue;
-		if (!NodeName.IsEmpty() && (Nodes[i]->GetName() == NodeName || Nodes[i]->GetNodeTitle().ToString() == NodeName))
+		// UE 5.6: GetNodeTitle now requires EPCGNodeTitleType argument
+		if (!NodeName.IsEmpty() && (Nodes[i]->GetName() == NodeName || Nodes[i]->GetNodeTitle(EPCGNodeTitleType::ListView).ToString() == NodeName))
 		{
 			TargetNode = Nodes[i];
 			break;
@@ -535,17 +541,18 @@ FString FAgenticMCPServer::HandlePCGGetNodeSettings(const FString& Body)
 	if (!TargetNode)
 		return MakeErrorJson(TEXT("PCG node not found"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("nodeName"), TargetNode->GetName());
-	Result->SetStringField(TEXT("nodeTitle"), TargetNode->GetNodeTitle().ToString());
-	Result->SetNumberField(TEXT("posX"), TargetNode->PositionX);
-	Result->SetNumberField(TEXT("posY"), TargetNode->PositionY);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("nodeName"), TargetNode->GetName());
+	// UE 5.6: GetNodeTitle now requires EPCGNodeTitleType argument
+	OutJson->SetStringField(TEXT("nodeTitle"), TargetNode->GetNodeTitle(EPCGNodeTitleType::ListView).ToString());
+	OutJson->SetNumberField(TEXT("posX"), TargetNode->PositionX);
+	OutJson->SetNumberField(TEXT("posY"), TargetNode->PositionY);
 
 	const UPCGSettings* Settings = TargetNode->GetSettings();
 	if (Settings)
 	{
-		Result->SetStringField(TEXT("settingsClass"), Settings->GetClass()->GetName());
-		Result->SetNumberField(TEXT("seed"), Settings->GetSeed());
+		OutJson->SetStringField(TEXT("settingsClass"), Settings->GetClass()->GetName());
+		OutJson->SetNumberField(TEXT("seed"), Settings->GetSeed());
 
 		// Serialize all UPROPERTY fields via reflection
 		TArray<TSharedPtr<FJsonValue>> PropsArray;
@@ -565,10 +572,10 @@ FString FAgenticMCPServer::HandlePCGGetNodeSettings(const FString& Body)
 
 			PropsArray.Add(MakeShared<FJsonValueObject>(PropJson));
 		}
-		Result->SetArrayField(TEXT("properties"), PropsArray);
+		OutJson->SetArrayField(TEXT("properties"), PropsArray);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -620,7 +627,8 @@ FString FAgenticMCPServer::HandlePCGSetNodeSettings(const FString& Body)
 	for (int32 i = 0; i < Nodes.Num(); i++)
 	{
 		if (!Nodes[i]) continue;
-		if (!NodeName.IsEmpty() && (Nodes[i]->GetName() == NodeName || Nodes[i]->GetNodeTitle().ToString() == NodeName))
+		// UE 5.6: GetNodeTitle now requires EPCGNodeTitleType argument
+		if (!NodeName.IsEmpty() && (Nodes[i]->GetName() == NodeName || Nodes[i]->GetNodeTitle(EPCGNodeTitleType::ListView).ToString() == NodeName))
 		{
 			TargetNode = Nodes[i];
 			break;
@@ -660,13 +668,13 @@ FString FAgenticMCPServer::HandlePCGSetNodeSettings(const FString& Body)
 	Settings->PostEditChange();
 	FoundGraph->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("graphName"), FoundGraph->GetName());
-	Result->SetStringField(TEXT("nodeName"), TargetNode->GetName());
-	Result->SetStringField(TEXT("propertyName"), PropertyName);
-	Result->SetStringField(TEXT("propertyValue"), PropertyValue);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("graphName"), FoundGraph->GetName());
+	OutJson->SetStringField(TEXT("nodeName"), TargetNode->GetName());
+	OutJson->SetStringField(TEXT("propertyName"), PropertyName);
+	OutJson->SetStringField(TEXT("propertyValue"), PropertyValue);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -692,7 +700,13 @@ FString FAgenticMCPServer::HandlePCGAddNode(const FString& Body)
 	if (!Graph)
 		return MakeErrorJson(FString::Printf(TEXT("PCG Graph not found: %s"), *GraphPath));
 
-	UClass* SettingsClass = FindObject<UClass>(ANY_PACKAGE, *NodeClass);
+	// UE 5.6: nullptr deprecated - use nullptr with full class path
+	UClass* SettingsClass = FindObject<UClass>(nullptr, *FString::Printf(TEXT("/Script/PCG.%s"), *NodeClass));
+	if (!SettingsClass)
+	{
+		// Try without path prefix
+		SettingsClass = FindFirstObject<UClass>(*NodeClass, EFindFirstObjectOptions::None);
+	}
 	if (!SettingsClass)
 		return MakeErrorJson(FString::Printf(TEXT("Node class not found: %s"), *NodeClass));
 
@@ -712,11 +726,11 @@ FString FAgenticMCPServer::HandlePCGAddNode(const FString& Body)
 
 	Graph->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("nodeId"), NewNode->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("nodeId"), NewNode->GetName());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- pcgRemoveNode ---
@@ -741,11 +755,11 @@ FString FAgenticMCPServer::HandlePCGRemoveNode(const FString& Body)
 			Graph->RemoveNode(Node);
 			Graph->MarkPackageDirty();
 
-			TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-			Result->SetStringField(TEXT("status"), TEXT("ok"));
-			Result->SetStringField(TEXT("removed"), NodeName);
+			TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+			OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+			OutJson->SetStringField(TEXT("removed"), NodeName);
 			FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-			FJsonSerializer::Serialize(Result, W); return Out;
+			FJsonSerializer::Serialize(OutJson, W); return Out;
 		}
 	}
 
@@ -783,16 +797,17 @@ FString FAgenticMCPServer::HandlePCGConnectNodes(const FString& Body)
 	if (!TgtNode)
 		return MakeErrorJson(FString::Printf(TEXT("Target node not found: %s"), *TargetNode));
 
-	bool bConnected = Graph->AddEdge(SrcNode, FName(*SourcePin), TgtNode, FName(*TargetPin));
-	if (!bConnected)
+	// UE 5.6: AddEdge returns UPCGNode* instead of bool - check for non-null
+	UPCGNode* ResultNode = Graph->AddEdge(SrcNode, FName(*SourcePin), TgtNode, FName(*TargetPin));
+	if (!ResultNode)
 		return MakeErrorJson(TEXT("Failed to connect nodes"));
 
 	Graph->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- pcgCreateGraph ---
@@ -819,9 +834,9 @@ FString FAgenticMCPServer::HandlePCGCreateGraph(const FString& Body)
 	Package->MarkPackageDirty();
 	FAssetRegistryModule::AssetCreated(Graph);
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("path"), Path);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("path"), Path);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }

@@ -3,11 +3,14 @@
 // Provides visibility into UI widgets, widget blueprints, and HUD components.
 //
 // Endpoints:
-//   umgListWidgets        - List all Widget Blueprint assets
-//   umgGetWidgetTree      - Get the widget hierarchy tree of a Widget Blueprint
+//   umgListWidgets - List all Widget Blueprint assets
+//   umgGetWidgetTree - Get the widget hierarchy tree of a Widget Blueprint
 //   umgGetWidgetProperties - Get properties of a specific widget in a Widget Blueprint
-//   umgListHUDs           - List all HUD actors in the level
+//   umgListHUDs - List all HUD actors in the level
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Dom/JsonValue.h"
@@ -64,10 +67,10 @@ FString FAgenticMCPServer::HandleUMGListWidgets(const FString& Body)
 		WidgetArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), WidgetArr.Num());
-	Result->SetArrayField(TEXT("widgetBlueprints"), WidgetArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), WidgetArr.Num());
+	OutJson->SetArrayField(TEXT("widgetBlueprints"), WidgetArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -141,22 +144,22 @@ FString FAgenticMCPServer::HandleUMGGetWidgetTree(const FString& Body)
 	UWidgetTree* Tree = WBP->WidgetTree;
 	if (!Tree) return MakeErrorJson(TEXT("Widget Blueprint has no widget tree"));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), WBP->GetName());
-	Result->SetStringField(TEXT("path"), WBP->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), WBP->GetName());
+	OutJson->SetStringField(TEXT("path"), WBP->GetPathName());
 
 	UWidget* RootWidget = Tree->RootWidget;
 	if (RootWidget)
 	{
-		Result->SetObjectField(TEXT("rootWidget"), SerializeWidget(RootWidget));
+		OutJson->SetObjectField(TEXT("rootWidget"), SerializeWidget(RootWidget));
 	}
 
 	// All widgets flat list
 	TArray<UWidget*> AllWidgets;
 	Tree->GetAllWidgets(AllWidgets);
-	Result->SetNumberField(TEXT("totalWidgetCount"), AllWidgets.Num());
+	OutJson->SetNumberField(TEXT("totalWidgetCount"), AllWidgets.Num());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -206,40 +209,40 @@ FString FAgenticMCPServer::HandleUMGGetWidgetProperties(const FString& Body)
 	}
 	if (!FoundWidget) return MakeErrorJson(FString::Printf(TEXT("Widget not found: %s"), *WidgetName));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), FoundWidget->GetName());
-	Result->SetStringField(TEXT("class"), FoundWidget->GetClass()->GetName());
-	Result->SetStringField(TEXT("visibility"), StaticEnum<ESlateVisibility>()->GetNameStringByValue((int64)FoundWidget->GetVisibility()));
-	Result->SetBoolField(TEXT("isEnabled"), FoundWidget->GetIsEnabled());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), FoundWidget->GetName());
+	OutJson->SetStringField(TEXT("class"), FoundWidget->GetClass()->GetName());
+	OutJson->SetStringField(TEXT("visibility"), StaticEnum<ESlateVisibility>()->GetNameStringByValue((int64)FoundWidget->GetVisibility()));
+	OutJson->SetBoolField(TEXT("isEnabled"), FoundWidget->GetIsEnabled());
 
 	// Render transform
 	FWidgetTransform RenderTransform = FoundWidget->GetRenderTransform();
-	Result->SetNumberField(TEXT("renderTranslationX"), RenderTransform.Translation.X);
-	Result->SetNumberField(TEXT("renderTranslationY"), RenderTransform.Translation.Y);
-	Result->SetNumberField(TEXT("renderAngle"), RenderTransform.Angle);
-	Result->SetNumberField(TEXT("renderScaleX"), RenderTransform.Scale.X);
-	Result->SetNumberField(TEXT("renderScaleY"), RenderTransform.Scale.Y);
+	OutJson->SetNumberField(TEXT("renderTranslationX"), RenderTransform.Translation.X);
+	OutJson->SetNumberField(TEXT("renderTranslationY"), RenderTransform.Translation.Y);
+	OutJson->SetNumberField(TEXT("renderAngle"), RenderTransform.Angle);
+	OutJson->SetNumberField(TEXT("renderScaleX"), RenderTransform.Scale.X);
+	OutJson->SetNumberField(TEXT("renderScaleY"), RenderTransform.Scale.Y);
 
 	// Type-specific properties
 	if (UTextBlock* TB = Cast<UTextBlock>(FoundWidget))
 	{
-		Result->SetStringField(TEXT("text"), TB->GetText().ToString());
-		Result->SetNumberField(TEXT("fontSize"), TB->GetFont().Size);
+		OutJson->SetStringField(TEXT("text"), TB->GetText().ToString());
+		OutJson->SetNumberField(TEXT("fontSize"), TB->GetFont().Size);
 	}
 	else if (UProgressBar* PB = Cast<UProgressBar>(FoundWidget))
 	{
-		Result->SetNumberField(TEXT("percent"), PB->GetPercent());
+		OutJson->SetNumberField(TEXT("percent"), PB->GetPercent());
 	}
 	else if (UImage* Img = Cast<UImage>(FoundWidget))
 	{
-		Result->SetStringField(TEXT("widgetType"), TEXT("Image"));
+		OutJson->SetStringField(TEXT("widgetType"), TEXT("Image"));
 	}
 	else if (UButton* Btn = Cast<UButton>(FoundWidget))
 	{
-		Result->SetBoolField(TEXT("isInteractionEnabled"), Btn->GetIsEnabled());
+		OutJson->SetBoolField(TEXT("isInteractionEnabled"), Btn->GetIsEnabled());
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -261,8 +264,8 @@ FString FAgenticMCPServer::HandleUMGListHUDs(const FString& Body)
 		HUDArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), HUDArr.Num());
-	Result->SetArrayField(TEXT("huds"), HUDArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), HUDArr.Num());
+	OutJson->SetArrayField(TEXT("huds"), HUDArr);
+	return JsonToString(OutJson);
 }

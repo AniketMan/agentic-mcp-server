@@ -1,6 +1,9 @@
 // Handlers_MassEntity.cpp
 // Mass Entity Framework handlers for AgenticMCP.
 // UE 5.6 target. Entity configs, processors, traits.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"

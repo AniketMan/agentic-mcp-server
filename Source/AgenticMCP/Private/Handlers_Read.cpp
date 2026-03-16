@@ -13,6 +13,9 @@
 //   /api/list-properties  - List UProperties on a class
 //   /api/get-pin-info     - Introspect pin types and connections
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/Blueprint.h"
 #include "Engine/World.h"
@@ -42,7 +45,7 @@ FString FAgenticMCPServer::HandleList(const TMap<FString, FString>& Params)
 	FString Filter = Params.Contains(TEXT("filter")) ? Params[TEXT("filter")] : TEXT("");
 	FString Type = Params.Contains(TEXT("type")) ? Params[TEXT("type")] : TEXT("all");
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	// Blueprints
 	if (Type == TEXT("all") || Type == TEXT("blueprint"))
@@ -60,7 +63,7 @@ FString FAgenticMCPServer::HandleList(const TMap<FString, FString>& Params)
 			Entry->SetStringField(TEXT("path"), Asset.PackageName.ToString());
 			BPArray.Add(MakeShared<FJsonValueObject>(Entry));
 		}
-		Result->SetArrayField(TEXT("blueprints"), BPArray);
+		OutJson->SetArrayField(TEXT("blueprints"), BPArray);
 	}
 
 	// Maps (level blueprints)
@@ -79,10 +82,10 @@ FString FAgenticMCPServer::HandleList(const TMap<FString, FString>& Params)
 			Entry->SetStringField(TEXT("path"), Asset.PackageName.ToString());
 			MapArray.Add(MakeShared<FJsonValueObject>(Entry));
 		}
-		Result->SetArrayField(TEXT("maps"), MapArray);
+		OutJson->SetArrayField(TEXT("maps"), MapArray);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -108,8 +111,8 @@ FString FAgenticMCPServer::HandleGetBlueprint(const TMap<FString, FString>& Para
 		return MakeErrorJson(LoadError);
 	}
 
-	TSharedRef<FJsonObject> Result = SerializeBlueprint(BP);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = SerializeBlueprint(BP);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -143,8 +146,8 @@ FString FAgenticMCPServer::HandleGetGraph(const TMap<FString, FString>& Params)
 	// If no graph name specified, return all graphs
 	if (GraphName.IsEmpty())
 	{
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetStringField(TEXT("blueprint"), BlueprintName);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
 
 		TArray<TSharedPtr<FJsonValue>> GraphArray;
 		for (UEdGraph* Graph : AllGraphs)
@@ -158,8 +161,8 @@ FString FAgenticMCPServer::HandleGetGraph(const TMap<FString, FString>& Params)
 				}
 			}
 		}
-		Result->SetArrayField(TEXT("graphs"), GraphArray);
-		return JsonToString(Result);
+		OutJson->SetArrayField(TEXT("graphs"), GraphArray);
+		return JsonToString(OutJson);
 	}
 
 	// Find specific graph
@@ -194,10 +197,10 @@ FString FAgenticMCPServer::HandleGetGraph(const TMap<FString, FString>& Params)
 		return MakeErrorJson(TEXT("Failed to serialize graph"));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetObjectField(TEXT("graph"), GraphJson);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetObjectField(TEXT("graph"), GraphJson);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -257,11 +260,11 @@ FString FAgenticMCPServer::HandleSearch(const TMap<FString, FString>& Params)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("query"), Query);
-	Result->SetNumberField(TEXT("count"), Count);
-	Result->SetArrayField(TEXT("results"), Results);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("query"), Query);
+	OutJson->SetNumberField(TEXT("count"), Count);
+	OutJson->SetArrayField(TEXT("results"), Results);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -311,12 +314,12 @@ FString FAgenticMCPServer::HandleFindReferences(const TMap<FString, FString>& Pa
 		RefArray.Add(MakeShared<FJsonValueString>(Ref.PackageName.ToString()));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("asset"), AssetName);
-	Result->SetStringField(TEXT("packagePath"), PackagePath);
-	Result->SetNumberField(TEXT("referencerCount"), RefArray.Num());
-	Result->SetArrayField(TEXT("referencers"), RefArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("asset"), AssetName);
+	OutJson->SetStringField(TEXT("packagePath"), PackagePath);
+	OutJson->SetNumberField(TEXT("referencerCount"), RefArray.Num());
+	OutJson->SetArrayField(TEXT("referencers"), RefArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -379,10 +382,10 @@ FString FAgenticMCPServer::HandleListClasses(const FString& Body)
 		Count++;
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), Count);
-	Result->SetArrayField(TEXT("classes"), ClassArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), Count);
+	OutJson->SetArrayField(TEXT("classes"), ClassArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -456,11 +459,11 @@ FString FAgenticMCPServer::HandleListFunctions(const FString& Body)
 		FuncArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("className"), ClassName);
-	Result->SetNumberField(TEXT("count"), FuncArray.Num());
-	Result->SetArrayField(TEXT("functions"), FuncArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("className"), ClassName);
+	OutJson->SetNumberField(TEXT("count"), FuncArray.Num());
+	OutJson->SetArrayField(TEXT("functions"), FuncArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -510,11 +513,11 @@ FString FAgenticMCPServer::HandleListProperties(const FString& Body)
 		PropArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("className"), ClassName);
-	Result->SetNumberField(TEXT("count"), PropArray.Num());
-	Result->SetArrayField(TEXT("properties"), PropArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("className"), ClassName);
+	OutJson->SetNumberField(TEXT("count"), PropArray.Num());
+	OutJson->SetArrayField(TEXT("properties"), PropArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -578,11 +581,11 @@ FString FAgenticMCPServer::HandleGetPinInfo(const FString& Body)
 		}
 
 		TSharedPtr<FJsonObject> PinJson = SerializePin(Pin);
-		TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-		Result->SetStringField(TEXT("blueprint"), BlueprintName);
-		Result->SetStringField(TEXT("nodeId"), NodeId);
-		Result->SetObjectField(TEXT("pin"), PinJson);
-		return JsonToString(Result);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+		OutJson->SetStringField(TEXT("nodeId"), NodeId);
+		OutJson->SetObjectField(TEXT("pin"), PinJson);
+		return JsonToString(OutJson);
 	}
 
 	// No pinName specified -- return all pins on the node
@@ -596,11 +599,11 @@ FString FAgenticMCPServer::HandleGetPinInfo(const FString& Body)
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("blueprint"), BlueprintName);
-	Result->SetStringField(TEXT("nodeId"), NodeId);
-	Result->SetStringField(TEXT("nodeTitle"),
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
+	OutJson->SetStringField(TEXT("nodeId"), NodeId);
+	OutJson->SetStringField(TEXT("nodeTitle"),
 		Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
-	Result->SetArrayField(TEXT("pins"), PinArray);
-	return JsonToString(Result);
+	OutJson->SetArrayField(TEXT("pins"), PinArray);
+	return JsonToString(OutJson);
 }

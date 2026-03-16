@@ -10,6 +10,9 @@
 //   aiListControllers     - List all AI controllers in the level with their BT/BB assignments
 //   aiGetEQSQueries       - List all Environment Query assets
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -77,10 +80,10 @@ FString FAgenticMCPServer::HandleAIListBehaviorTrees(const FString& Body)
 		BTArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), BTArray.Num());
-	Result->SetArrayField(TEXT("behaviorTrees"), BTArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), BTArray.Num());
+	OutJson->SetArrayField(TEXT("behaviorTrees"), BTArray);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -195,21 +198,21 @@ FString FAgenticMCPServer::HandleAIGetBehaviorTree(const FString& Body)
 	}
 	if (!BT) return MakeErrorJson(FString::Printf(TEXT("Behavior Tree not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), BT->GetName());
-	Result->SetStringField(TEXT("path"), BT->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), BT->GetName());
+	OutJson->SetStringField(TEXT("path"), BT->GetPathName());
 
 	if (BT->BlackboardAsset)
 	{
-		Result->SetStringField(TEXT("blackboard"), BT->BlackboardAsset->GetName());
+		OutJson->SetStringField(TEXT("blackboard"), BT->BlackboardAsset->GetName());
 	}
 
 	if (BT->RootNode)
 	{
-		Result->SetObjectField(TEXT("rootNode"), SerializeBTNode(BT->RootNode));
+		OutJson->SetObjectField(TEXT("rootNode"), SerializeBTNode(BT->RootNode));
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -236,10 +239,10 @@ FString FAgenticMCPServer::HandleAIListBlackboards(const FString& Body)
 		BBArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), BBArray.Num());
-	Result->SetArrayField(TEXT("blackboards"), BBArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), BBArray.Num());
+	OutJson->SetArrayField(TEXT("blackboards"), BBArray);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -274,13 +277,13 @@ FString FAgenticMCPServer::HandleAIGetBlackboard(const FString& Body)
 	}
 	if (!BB) return MakeErrorJson(FString::Printf(TEXT("Blackboard not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), BB->GetName());
-	Result->SetStringField(TEXT("path"), BB->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), BB->GetName());
+	OutJson->SetStringField(TEXT("path"), BB->GetPathName());
 
 	if (BB->Parent)
 	{
-		Result->SetStringField(TEXT("parent"), BB->Parent->GetName());
+		OutJson->SetStringField(TEXT("parent"), BB->Parent->GetName());
 	}
 
 	TArray<TSharedPtr<FJsonValue>> KeyArray;
@@ -295,10 +298,10 @@ FString FAgenticMCPServer::HandleAIGetBlackboard(const FString& Body)
 		KeyJson->SetBoolField(TEXT("instanceSynced"), Key.bInstanceSynced);
 		KeyArray.Add(MakeShared<FJsonValueObject>(KeyJson));
 	}
-	Result->SetNumberField(TEXT("keyCount"), KeyArray.Num());
-	Result->SetArrayField(TEXT("keys"), KeyArray);
+	OutJson->SetNumberField(TEXT("keyCount"), KeyArray.Num());
+	OutJson->SetArrayField(TEXT("keys"), KeyArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -347,10 +350,10 @@ FString FAgenticMCPServer::HandleAIListControllers(const FString& Body)
 		ControllerArr.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), ControllerArr.Num());
-	Result->SetArrayField(TEXT("controllers"), ControllerArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), ControllerArr.Num());
+	OutJson->SetArrayField(TEXT("controllers"), ControllerArr);
+	return JsonToString(OutJson);
 #endif
 }
 
@@ -377,9 +380,9 @@ FString FAgenticMCPServer::HandleAIGetEQSQueries(const FString& Body)
 		EQSArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), EQSArray.Num());
-	Result->SetArrayField(TEXT("queries"), EQSArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), EQSArray.Num());
+	OutJson->SetArrayField(TEXT("queries"), EQSArray);
+	return JsonToString(OutJson);
 #endif
 }

@@ -10,6 +10,9 @@
 //   componentSetVisibility    - Set visibility on a component
 //   componentSetCollision     - Set collision profile/response on a component
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "GameFramework/Actor.h"
 #include "Components/ActorComponent.h"
@@ -150,12 +153,12 @@ FString FAgenticMCPServer::HandleComponentList(const FString& Body)
 		CompArr.Add(MakeShared<FJsonValueObject>(CompJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetNumberField(TEXT("componentCount"), CompArr.Num());
-	Result->SetArrayField(TEXT("components"), CompArr);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetNumberField(TEXT("componentCount"), CompArr.Num());
+	OutJson->SetArrayField(TEXT("components"), CompArr);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -190,12 +193,12 @@ FString FAgenticMCPServer::HandleComponentRemove(const FString& Body)
 	Comp->DestroyComponent();
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("removedComponent"), CompName);
-	Result->SetStringField(TEXT("removedClass"), ClassName);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("removedComponent"), CompName);
+	OutJson->SetStringField(TEXT("removedClass"), ClassName);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -265,18 +268,18 @@ FString FAgenticMCPServer::HandleComponentSetProperty(const FString& Body)
 	Comp->PreEditChange(Prop);
 	void* PropAddr = Prop->ContainerPtrToValuePtr<void>(Comp);
 	Prop->ImportText_Direct(*ValueStr, PropAddr, Comp, PPF_None);
-	Comp->PostEditChangeProperty(FPropertyChangedEvent(Prop));
+	FPropertyChangedEvent PropertyChangedEvent(Prop); Comp->PostEditChangeProperty(PropertyChangedEvent);
 
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("componentName"), CompName);
-	Result->SetStringField(TEXT("propertyName"), PropName);
-	Result->SetStringField(TEXT("setValue"), ValueStr);
-	Result->SetStringField(TEXT("propertyType"), Prop->GetCPPType());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("componentName"), CompName);
+	OutJson->SetStringField(TEXT("propertyName"), PropName);
+	OutJson->SetStringField(TEXT("setValue"), ValueStr);
+	OutJson->SetStringField(TEXT("propertyType"), Prop->GetCPPType());
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -328,20 +331,20 @@ FString FAgenticMCPServer::HandleComponentSetTransform(const FString& Body)
 
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("componentName"), CompName);
-	Result->SetNumberField(TEXT("lx"), LX);
-	Result->SetNumberField(TEXT("ly"), LY);
-	Result->SetNumberField(TEXT("lz"), LZ);
-	Result->SetNumberField(TEXT("rx"), RX);
-	Result->SetNumberField(TEXT("ry"), RY);
-	Result->SetNumberField(TEXT("rz"), RZ);
-	Result->SetNumberField(TEXT("sx"), SX);
-	Result->SetNumberField(TEXT("sy"), SY);
-	Result->SetNumberField(TEXT("sz"), SZ);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("componentName"), CompName);
+	OutJson->SetNumberField(TEXT("lx"), LX);
+	OutJson->SetNumberField(TEXT("ly"), LY);
+	OutJson->SetNumberField(TEXT("lz"), LZ);
+	OutJson->SetNumberField(TEXT("rx"), RX);
+	OutJson->SetNumberField(TEXT("ry"), RY);
+	OutJson->SetNumberField(TEXT("rz"), RZ);
+	OutJson->SetNumberField(TEXT("sx"), SX);
+	OutJson->SetNumberField(TEXT("sy"), SY);
+	OutJson->SetNumberField(TEXT("sz"), SZ);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -376,13 +379,13 @@ FString FAgenticMCPServer::HandleComponentSetVisibility(const FString& Body)
 	SceneComp->SetVisibility(bVisible, bPropagate);
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("componentName"), CompName);
-	Result->SetBoolField(TEXT("visible"), bVisible);
-	Result->SetBoolField(TEXT("propagateToChildren"), bPropagate);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("componentName"), CompName);
+	OutJson->SetBoolField(TEXT("visible"), bVisible);
+	OutJson->SetBoolField(TEXT("propagateToChildren"), bPropagate);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -432,12 +435,12 @@ FString FAgenticMCPServer::HandleComponentSetCollision(const FString& Body)
 
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actorName"), ActorName);
-	Result->SetStringField(TEXT("componentName"), CompName);
-	Result->SetStringField(TEXT("collisionProfile"), PrimComp->GetCollisionProfileName().ToString());
-	Result->SetBoolField(TEXT("simulatePhysics"), PrimComp->IsSimulatingPhysics());
-	Result->SetBoolField(TEXT("generateOverlapEvents"), PrimComp->GetGenerateOverlapEvents());
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actorName"), ActorName);
+	OutJson->SetStringField(TEXT("componentName"), CompName);
+	OutJson->SetStringField(TEXT("collisionProfile"), PrimComp->GetCollisionProfileName().ToString());
+	OutJson->SetBoolField(TEXT("simulatePhysics"), PrimComp->IsSimulatingPhysics());
+	OutJson->SetBoolField(TEXT("generateOverlapEvents"), PrimComp->GetGenerateOverlapEvents());
+	return JsonToString(OutJson);
 }

@@ -2,6 +2,9 @@
 // Collision/physics trace handlers for AgenticMCP
 // Performs line traces and collision queries
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -15,7 +18,7 @@
 
 FString FAgenticMCPServer::HandleCollisionTrace(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -114,22 +117,22 @@ FString FAgenticMCPServer::HandleCollisionTrace(const TMap<FString, FString>& Pa
 	}
 
 	// Build result
-	Result->SetBoolField(TEXT("hit"), bHit);
+	OutJson->SetBoolField(TEXT("hit"), bHit);
 
 	TSharedRef<FJsonObject> StartObj = MakeShared<FJsonObject>();
 	StartObj->SetNumberField(TEXT("x"), Start.X);
 	StartObj->SetNumberField(TEXT("y"), Start.Y);
 	StartObj->SetNumberField(TEXT("z"), Start.Z);
-	Result->SetObjectField(TEXT("traceStart"), StartObj);
+	OutJson->SetObjectField(TEXT("traceStart"), StartObj);
 
 	TSharedRef<FJsonObject> EndObj = MakeShared<FJsonObject>();
 	EndObj->SetNumberField(TEXT("x"), End.X);
 	EndObj->SetNumberField(TEXT("y"), End.Y);
 	EndObj->SetNumberField(TEXT("z"), End.Z);
-	Result->SetObjectField(TEXT("traceEnd"), EndObj);
+	OutJson->SetObjectField(TEXT("traceEnd"), EndObj);
 
-	Result->SetStringField(TEXT("channel"), TraceChannel);
-	Result->SetNumberField(TEXT("traceDistance"), FVector::Dist(Start, End));
+	OutJson->SetStringField(TEXT("channel"), TraceChannel);
+	OutJson->SetNumberField(TEXT("traceDistance"), FVector::Dist(Start, End));
 
 	if (bHit)
 	{
@@ -180,8 +183,8 @@ FString FAgenticMCPServer::HandleCollisionTrace(const TMap<FString, FString>& Pa
 			HitObj->SetNumberField(TEXT("faceIndex"), HitResult.FaceIndex);
 		}
 
-		Result->SetObjectField(TEXT("hitResult"), HitObj);
+		OutJson->SetObjectField(TEXT("hitResult"), HitObj);
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

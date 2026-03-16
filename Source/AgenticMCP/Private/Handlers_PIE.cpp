@@ -1,6 +1,9 @@
 // Handlers_PIE.cpp
 // Play-In-Editor (PIE) control and Console command endpoints for AgenticMCP
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -14,7 +17,7 @@
 
 FString FAgenticMCPServer::HandleStartPIE(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!GEditor)
 	{
@@ -23,10 +26,10 @@ FString FAgenticMCPServer::HandleStartPIE(const TMap<FString, FString>& Params, 
 
 	if (GEditor->PlayWorld)
 	{
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("message"), TEXT("PIE session already running"));
-		Result->SetBoolField(TEXT("alreadyRunning"), true);
-		return JsonToString(Result);
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("message"), TEXT("PIE session already running"));
+		OutJson->SetBoolField(TEXT("alreadyRunning"), true);
+		return JsonToString(OutJson);
 	}
 
 	TSharedPtr<FJsonObject> BodyJson;
@@ -56,15 +59,15 @@ FString FAgenticMCPServer::HandleStartPIE(const TMap<FString, FString>& Params, 
 
 	GEditor->RequestPlaySession(SessionParams);
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("PIE session starting"));
-	Result->SetStringField(TEXT("mode"), Mode);
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("PIE session starting"));
+	OutJson->SetStringField(TEXT("mode"), Mode);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleStopPIE(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!GEditor)
 	{
@@ -73,23 +76,23 @@ FString FAgenticMCPServer::HandleStopPIE(const TMap<FString, FString>& Params, c
 
 	if (!GEditor->PlayWorld)
 	{
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("message"), TEXT("No PIE session running"));
-		Result->SetBoolField(TEXT("wasRunning"), false);
-		return JsonToString(Result);
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("message"), TEXT("No PIE session running"));
+		OutJson->SetBoolField(TEXT("wasRunning"), false);
+		return JsonToString(OutJson);
 	}
 
 	GEditor->RequestEndPlayMap();
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("PIE session stopping"));
-	Result->SetBoolField(TEXT("wasRunning"), true);
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("PIE session stopping"));
+	OutJson->SetBoolField(TEXT("wasRunning"), true);
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandlePausePIE(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!GEditor)
 	{
@@ -113,15 +116,15 @@ FString FAgenticMCPServer::HandlePausePIE(const TMap<FString, FString>& Params, 
 
 	GEditor->PlayWorld->bDebugPauseExecution = bPause;
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetBoolField(TEXT("isPaused"), bPause);
-	Result->SetStringField(TEXT("message"), bPause ? TEXT("PIE paused") : TEXT("PIE resumed"));
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetBoolField(TEXT("isPaused"), bPause);
+	OutJson->SetStringField(TEXT("message"), bPause ? TEXT("PIE paused") : TEXT("PIE resumed"));
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleStepPIE(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!GEditor)
 	{
@@ -140,14 +143,14 @@ FString FAgenticMCPServer::HandleStepPIE(const TMap<FString, FString>& Params, c
 
 	GUnrealEd->PlaySessionSingleStepped();
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("message"), TEXT("Single step executed"));
-	return JsonToString(Result);
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("message"), TEXT("Single step executed"));
+	return JsonToString(OutJson);
 }
 
 FString FAgenticMCPServer::HandleGetPIEState(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	if (!GEditor)
 	{
@@ -157,14 +160,14 @@ FString FAgenticMCPServer::HandleGetPIEState(const TMap<FString, FString>& Param
 	bool bIsRunning = GEditor->PlayWorld != nullptr;
 	bool bIsPaused = bIsRunning && GEditor->PlayWorld->bDebugPauseExecution;
 
-	Result->SetBoolField(TEXT("isRunning"), bIsRunning);
-	Result->SetBoolField(TEXT("isPaused"), bIsPaused);
+	OutJson->SetBoolField(TEXT("isRunning"), bIsRunning);
+	OutJson->SetBoolField(TEXT("isPaused"), bIsPaused);
 
 	if (bIsRunning && GEditor->PlayWorld)
 	{
-		Result->SetNumberField(TEXT("timeSeconds"), GEditor->PlayWorld->GetTimeSeconds());
-		Result->SetNumberField(TEXT("realTimeSeconds"), GEditor->PlayWorld->GetRealTimeSeconds());
+		OutJson->SetNumberField(TEXT("timeSeconds"), GEditor->PlayWorld->GetTimeSeconds());
+		OutJson->SetNumberField(TEXT("realTimeSeconds"), GEditor->PlayWorld->GetRealTimeSeconds());
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

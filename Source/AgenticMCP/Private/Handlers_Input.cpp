@@ -2,6 +2,9 @@
 // Input simulation handlers for AgenticMCP
 // Allows sending keyboard/mouse input to PIE session
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -12,7 +15,7 @@
 
 FString FAgenticMCPServer::HandleSimulateInput(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -69,27 +72,27 @@ FString FAgenticMCPServer::HandleSimulateInput(const TMap<FString, FString>& Par
 			FKeyEvent KeyUpEvent(Key, ModifierKeys, 0, false, 0, 0);
 			SlateApp.ProcessKeyUpEvent(KeyUpEvent);
 
-			Result->SetBoolField(TEXT("success"), true);
-			Result->SetStringField(TEXT("action"), TEXT("press"));
+			OutJson->SetBoolField(TEXT("success"), true);
+			OutJson->SetStringField(TEXT("action"), TEXT("press"));
 		}
 		else if (Action.Equals(TEXT("down"), ESearchCase::IgnoreCase))
 		{
 			FKeyEvent KeyDownEvent(Key, ModifierKeys, 0, false, 0, 0);
 			SlateApp.ProcessKeyDownEvent(KeyDownEvent);
 
-			Result->SetBoolField(TEXT("success"), true);
-			Result->SetStringField(TEXT("action"), TEXT("down"));
+			OutJson->SetBoolField(TEXT("success"), true);
+			OutJson->SetStringField(TEXT("action"), TEXT("down"));
 		}
 		else if (Action.Equals(TEXT("up"), ESearchCase::IgnoreCase))
 		{
 			FKeyEvent KeyUpEvent(Key, ModifierKeys, 0, false, 0, 0);
 			SlateApp.ProcessKeyUpEvent(KeyUpEvent);
 
-			Result->SetBoolField(TEXT("success"), true);
-			Result->SetStringField(TEXT("action"), TEXT("up"));
+			OutJson->SetBoolField(TEXT("success"), true);
+			OutJson->SetStringField(TEXT("action"), TEXT("up"));
 		}
 
-		Result->SetStringField(TEXT("key"), Key.ToString());
+		OutJson->SetStringField(TEXT("key"), Key.ToString());
 	}
 	else if (InputType.Equals(TEXT("mouse"), ESearchCase::IgnoreCase))
 	{
@@ -114,15 +117,15 @@ FString FAgenticMCPServer::HandleSimulateInput(const TMap<FString, FString>& Par
 		SlateApp.ProcessMouseButtonDownEvent(nullptr, MouseEvent);
 		SlateApp.ProcessMouseButtonUpEvent(MouseEvent);
 
-		Result->SetBoolField(TEXT("success"), true);
-		Result->SetStringField(TEXT("action"), TEXT("click"));
-		Result->SetNumberField(TEXT("x"), X);
-		Result->SetNumberField(TEXT("y"), Y);
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("action"), TEXT("click"));
+		OutJson->SetNumberField(TEXT("x"), X);
+		OutJson->SetNumberField(TEXT("y"), Y);
 	}
 	else
 	{
 		return MakeErrorJson(FString::Printf(TEXT("Unknown input type: %s. Use 'key' or 'mouse'"), *InputType));
 	}
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

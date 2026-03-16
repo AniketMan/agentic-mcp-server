@@ -1,6 +1,9 @@
 // Handlers_Lighting.cpp
 // Lighting creation and configuration handlers for AgenticMCP.
 // UE 5.6 target.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Engine/World.h"
 #include "Editor.h"
@@ -61,16 +64,17 @@ FString FAgenticMCPServer::HandleLightCreate(const FString& Body)
 	FTransform SpawnTransform(Rotation, Location);
 	AActor* LightActor = nullptr;
 
+	// UE 5.6: SpawnActor no longer takes FTransform pointer, use reference
 	if (Type == TEXT("point"))
-		LightActor = World->SpawnActor<APointLight>(APointLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<APointLight>(APointLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("spot"))
-		LightActor = World->SpawnActor<ASpotLight>(ASpotLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ASpotLight>(ASpotLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("directional"))
-		LightActor = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("rect"))
-		LightActor = World->SpawnActor<ARectLight>(ARectLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ARectLight>(ARectLight::StaticClass(), SpawnTransform, SpawnParams);
 	else if (Type == TEXT("sky"))
-		LightActor = World->SpawnActor<ASkyLight>(ASkyLight::StaticClass(), &SpawnTransform, SpawnParams);
+		LightActor = World->SpawnActor<ASkyLight>(ASkyLight::StaticClass(), SpawnTransform, SpawnParams);
 	else
 		return MakeErrorJson(TEXT("Invalid type. Use: point, spot, directional, rect, sky"));
 
@@ -99,12 +103,12 @@ FString FAgenticMCPServer::HandleLightCreate(const FString& Body)
 			(float)(*ColorArray)[2]->AsNumber()));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetStringField(TEXT("type"), Type);
-	Result->SetStringField(TEXT("actor"), LightActor->GetName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetStringField(TEXT("type"), Type);
+	OutJson->SetStringField(TEXT("actor"), LightActor->GetName());
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- lightSetProperties ---
@@ -176,11 +180,11 @@ FString FAgenticMCPServer::HandleLightSetProperties(const FString& Body)
 
 	Actor->MarkPackageDirty();
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("status"), TEXT("ok"));
-	Result->SetNumberField(TEXT("fieldsChanged"), Changed);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
+	OutJson->SetNumberField(TEXT("fieldsChanged"), Changed);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
 
 // --- lightList ---
@@ -222,9 +226,9 @@ FString FAgenticMCPServer::HandleLightList(const FString& Body)
 		LightsArr.Add(MakeShared<FJsonValueObject>(LightObj));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), LightsArr.Num());
-	Result->SetArrayField(TEXT("lights"), LightsArr);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), LightsArr.Num());
+	OutJson->SetArrayField(TEXT("lights"), LightsArr);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(Result, W); return Out;
+	FJsonSerializer::Serialize(OutJson, W); return Out;
 }

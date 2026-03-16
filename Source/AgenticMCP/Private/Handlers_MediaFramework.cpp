@@ -1,6 +1,9 @@
 // Handlers_MediaFramework.cpp
 // Media Framework handlers for AgenticMCP.
 // UE 5.6 target. Media Player, Media Source, Media Texture.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"

@@ -2,6 +2,9 @@
 // Material parameter handlers for AgenticMCP
 // Controls material instance parameters on actors
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -18,7 +21,7 @@
 
 FString FAgenticMCPServer::HandleMaterialSetParam(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 
 	TSharedPtr<FJsonObject> BodyJson;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
@@ -105,7 +108,7 @@ FString FAgenticMCPServer::HandleMaterialSetParam(const TMap<FString, FString>& 
 		DynMat->SetScalarParameterValue(FName(*ParamName), Value);
 		bSuccess = true;
 		ParamType = TEXT("scalar");
-		Result->SetNumberField(TEXT("value"), Value);
+		OutJson->SetNumberField(TEXT("value"), Value);
 	}
 	else if (BodyJson->HasField(TEXT("vector")) || BodyJson->HasField(TEXT("color")))
 	{
@@ -136,7 +139,7 @@ FString FAgenticMCPServer::HandleMaterialSetParam(const TMap<FString, FString>& 
 			ColorArray.Add(MakeShared<FJsonValueNumber>(Color.G));
 			ColorArray.Add(MakeShared<FJsonValueNumber>(Color.B));
 			ColorArray.Add(MakeShared<FJsonValueNumber>(Color.A));
-			Result->SetArrayField(TEXT("value"), ColorArray);
+			OutJson->SetArrayField(TEXT("value"), ColorArray);
 		}
 		else
 		{
@@ -152,7 +155,7 @@ FString FAgenticMCPServer::HandleMaterialSetParam(const TMap<FString, FString>& 
 			DynMat->SetTextureParameterValue(FName(*ParamName), Texture);
 			bSuccess = true;
 			ParamType = TEXT("texture");
-			Result->SetStringField(TEXT("value"), Texture->GetPathName());
+			OutJson->SetStringField(TEXT("value"), Texture->GetPathName());
 		}
 		else
 		{
@@ -168,7 +171,7 @@ FString FAgenticMCPServer::HandleMaterialSetParam(const TMap<FString, FString>& 
 			DynMat->SetScalarParameterValue(FName(*ParamName), Value);
 			bSuccess = true;
 			ParamType = TEXT("scalar");
-			Result->SetNumberField(TEXT("value"), Value);
+			OutJson->SetNumberField(TEXT("value"), Value);
 		}
 	}
 
@@ -177,12 +180,12 @@ FString FAgenticMCPServer::HandleMaterialSetParam(const TMap<FString, FString>& 
 		return MakeErrorJson(TEXT("Provide 'scalar', 'vector', 'color', or 'texture' field with value"));
 	}
 
-	Result->SetBoolField(TEXT("success"), true);
-	Result->SetStringField(TEXT("actor"), TargetActor->GetName());
-	Result->SetStringField(TEXT("paramName"), ParamName);
-	Result->SetStringField(TEXT("paramType"), ParamType);
-	Result->SetNumberField(TEXT("materialIndex"), MaterialIndex);
-	Result->SetStringField(TEXT("material"), DynMat->GetName());
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actor"), TargetActor->GetName());
+	OutJson->SetStringField(TEXT("paramName"), ParamName);
+	OutJson->SetStringField(TEXT("paramType"), ParamType);
+	OutJson->SetNumberField(TEXT("materialIndex"), MaterialIndex);
+	OutJson->SetStringField(TEXT("material"), DynMat->GetName());
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }

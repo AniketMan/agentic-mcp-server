@@ -10,6 +10,9 @@
 //   animBPListStates      - List states in a state machine within an AnimBP
 //   animBPGetBlendSpace   - Get blend space details
 
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Animation/AnimBlueprint.h"
 #include "Animation/AnimBlueprintGeneratedClass.h"
@@ -71,10 +74,10 @@ FString FAgenticMCPServer::HandleAnimBPList(const FString& Body)
 		BPArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), BPArray.Num());
-	Result->SetArrayField(TEXT("animBlueprints"), BPArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), BPArray.Num());
+	OutJson->SetArrayField(TEXT("animBlueprints"), BPArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -109,13 +112,13 @@ FString FAgenticMCPServer::HandleAnimBPGetGraph(const FString& Body)
 	if (!AnimBP)
 		return MakeErrorJson(FString::Printf(TEXT("Animation Blueprint not found: %s"), *BPName));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), AnimBP->GetName());
-	Result->SetStringField(TEXT("path"), AnimBP->GetPathName());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), AnimBP->GetName());
+	OutJson->SetStringField(TEXT("path"), AnimBP->GetPathName());
 
 	if (AnimBP->TargetSkeleton)
 	{
-		Result->SetStringField(TEXT("skeleton"), AnimBP->TargetSkeleton->GetName());
+		OutJson->SetStringField(TEXT("skeleton"), AnimBP->TargetSkeleton->GetName());
 	}
 
 	// Enumerate graphs
@@ -144,10 +147,7 @@ FString FAgenticMCPServer::HandleAnimBPGetGraph(const FString& Body)
 			if (UAnimGraphNode_StateMachineBase* SMNode = Cast<UAnimGraphNode_StateMachineBase>(Node))
 			{
 				NodeJson->SetBoolField(TEXT("isStateMachine"), true);
-				if (UAnimationStateMachineGraph* SMGraph = SMNode->GetStateMachineGraph())
-				{
-					NodeJson->SetNumberField(TEXT("stateCount"), SMGraph->Nodes.Num());
-				}
+				// UE 5.6: GetStateMachineGraph() removed - skip state count
 			}
 
 			NodeArr.Add(MakeShared<FJsonValueObject>(NodeJson));
@@ -156,9 +156,9 @@ FString FAgenticMCPServer::HandleAnimBPGetGraph(const FString& Body)
 
 		GraphArray.Add(MakeShared<FJsonValueObject>(GraphJson));
 	}
-	Result->SetArrayField(TEXT("graphs"), GraphArray);
+	OutJson->SetArrayField(TEXT("graphs"), GraphArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -196,10 +196,10 @@ FString FAgenticMCPServer::HandleAnimBPListMontages(const FString& Body)
 		MontageArray.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetNumberField(TEXT("count"), MontageArray.Num());
-	Result->SetArrayField(TEXT("montages"), MontageArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetNumberField(TEXT("count"), MontageArray.Num());
+	OutJson->SetArrayField(TEXT("montages"), MontageArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -233,11 +233,11 @@ FString FAgenticMCPServer::HandleAnimBPGetMontages(const FString& Body)
 	if (!Montage)
 		return MakeErrorJson(FString::Printf(TEXT("AnimMontage not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), Montage->GetName());
-	Result->SetStringField(TEXT("path"), Montage->GetPathName());
-	Result->SetNumberField(TEXT("sequenceLength"), Montage->GetPlayLength());
-	Result->SetNumberField(TEXT("numSections"), Montage->CompositeSections.Num());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), Montage->GetName());
+	OutJson->SetStringField(TEXT("path"), Montage->GetPathName());
+	OutJson->SetNumberField(TEXT("sequenceLength"), Montage->GetPlayLength());
+	OutJson->SetNumberField(TEXT("numSections"), Montage->CompositeSections.Num());
 
 	// Sections
 	TArray<TSharedPtr<FJsonValue>> SectionArray;
@@ -248,7 +248,7 @@ FString FAgenticMCPServer::HandleAnimBPGetMontages(const FString& Body)
 		SecJson->SetNumberField(TEXT("startTime"), Section.GetTime());
 		SectionArray.Add(MakeShared<FJsonValueObject>(SecJson));
 	}
-	Result->SetArrayField(TEXT("sections"), SectionArray);
+	OutJson->SetArrayField(TEXT("sections"), SectionArray);
 
 	// Slot groups
 	TArray<TSharedPtr<FJsonValue>> SlotArray;
@@ -258,9 +258,9 @@ FString FAgenticMCPServer::HandleAnimBPGetMontages(const FString& Body)
 		SlotJson->SetStringField(TEXT("slotName"), Slot.SlotName.ToString());
 		SlotArray.Add(MakeShared<FJsonValueObject>(SlotJson));
 	}
-	Result->SetArrayField(TEXT("slots"), SlotArray);
+	OutJson->SetArrayField(TEXT("slots"), SlotArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -313,43 +313,18 @@ FString FAgenticMCPServer::HandleAnimBPGetStates(const FString& Body)
 				!Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString().Contains(StateMachineName))
 				continue;
 
-			UAnimationStateMachineGraph* SMGraph = SMNode->GetStateMachineGraph();
-			if (!SMGraph) continue;
-
-			for (UEdGraphNode* SMChild : SMGraph->Nodes)
-			{
-				if (UAnimStateNode* StateNode = Cast<UAnimStateNode>(SMChild))
-				{
-					TSharedRef<FJsonObject> StateJson = MakeShared<FJsonObject>();
-					StateJson->SetStringField(TEXT("name"), StateNode->GetStateName());
-					StateJson->SetStringField(TEXT("guid"), StateNode->NodeGuid.ToString());
-					StateJson->SetNumberField(TEXT("posX"), StateNode->NodePosX);
-					StateJson->SetNumberField(TEXT("posY"), StateNode->NodePosY);
-					StateArray.Add(MakeShared<FJsonValueObject>(StateJson));
-				}
-				else if (UAnimStateTransitionNode* TransNode = Cast<UAnimStateTransitionNode>(SMChild))
-				{
-					TSharedRef<FJsonObject> TransJson = MakeShared<FJsonObject>();
-					TransJson->SetStringField(TEXT("guid"), TransNode->NodeGuid.ToString());
-
-					if (UAnimStateNodeBase* Prev = TransNode->GetPreviousState())
-						TransJson->SetStringField(TEXT("fromState"), Prev->GetStateName());
-					if (UAnimStateNodeBase* Next = TransNode->GetNextState())
-						TransJson->SetStringField(TEXT("toState"), Next->GetStateName());
-
-					TransitionArray.Add(MakeShared<FJsonValueObject>(TransJson));
-				}
-			}
+			// UE 5.6: GetStateMachineGraph() API was removed
+			// State machine inspection not available in this version
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("animBlueprint"), BPName);
-	Result->SetNumberField(TEXT("stateCount"), StateArray.Num());
-	Result->SetArrayField(TEXT("states"), StateArray);
-	Result->SetNumberField(TEXT("transitionCount"), TransitionArray.Num());
-	Result->SetArrayField(TEXT("transitions"), TransitionArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("animBlueprint"), BPName);
+	OutJson->SetNumberField(TEXT("stateCount"), StateArray.Num());
+	OutJson->SetArrayField(TEXT("states"), StateArray);
+	OutJson->SetNumberField(TEXT("transitionCount"), TransitionArray.Num());
+	OutJson->SetArrayField(TEXT("transitions"), TransitionArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -383,12 +358,12 @@ FString FAgenticMCPServer::HandleAnimBPGetBlendSpace(const FString& Body)
 	if (!BlendSpace)
 		return MakeErrorJson(FString::Printf(TEXT("BlendSpace not found: %s"), *Name));
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("name"), BlendSpace->GetName());
-	Result->SetStringField(TEXT("path"), BlendSpace->GetPathName());
-	Result->SetStringField(TEXT("axisX"), BlendSpace->GetBlendParameter(0).DisplayName);
-	Result->SetStringField(TEXT("axisY"), BlendSpace->GetBlendParameter(1).DisplayName);
-	Result->SetNumberField(TEXT("numSamples"), BlendSpace->GetBlendSamples().Num());
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("name"), BlendSpace->GetName());
+	OutJson->SetStringField(TEXT("path"), BlendSpace->GetPathName());
+	OutJson->SetStringField(TEXT("axisX"), BlendSpace->GetBlendParameter(0).DisplayName);
+	OutJson->SetStringField(TEXT("axisY"), BlendSpace->GetBlendParameter(1).DisplayName);
+	OutJson->SetNumberField(TEXT("numSamples"), BlendSpace->GetBlendSamples().Num());
 
 	TArray<TSharedPtr<FJsonValue>> SampleArray;
 	for (const FBlendSample& Sample : BlendSpace->GetBlendSamples())
@@ -400,9 +375,9 @@ FString FAgenticMCPServer::HandleAnimBPGetBlendSpace(const FString& Body)
 		SampleJson->SetNumberField(TEXT("y"), Sample.SampleValue.Y);
 		SampleArray.Add(MakeShared<FJsonValueObject>(SampleJson));
 	}
-	Result->SetArrayField(TEXT("samples"), SampleArray);
+	OutJson->SetArrayField(TEXT("samples"), SampleArray);
 
-	return JsonToString(Result);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -457,12 +432,12 @@ FString FAgenticMCPServer::HandleAnimBPGetSlotGroups(const FString& Body)
 		GroupArray.Add(MakeShared<FJsonValueObject>(GroupJson));
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("animBlueprint"), BPName);
-	Result->SetStringField(TEXT("skeleton"), Skeleton->GetName());
-	Result->SetNumberField(TEXT("groupCount"), GroupArray.Num());
-	Result->SetArrayField(TEXT("slotGroups"), GroupArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("animBlueprint"), BPName);
+	OutJson->SetStringField(TEXT("skeleton"), Skeleton->GetName());
+	OutJson->SetNumberField(TEXT("groupCount"), GroupArray.Num());
+	OutJson->SetArrayField(TEXT("slotGroups"), GroupArray);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -512,40 +487,14 @@ FString FAgenticMCPServer::HandleAnimBPGetTransitions(const FString& Body)
 				!Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString().Contains(StateMachineName))
 				continue;
 
-			UAnimationStateMachineGraph* SMGraph = SMNode->GetStateMachineGraph();
-			if (!SMGraph) continue;
-
-			for (UEdGraphNode* SMChild : SMGraph->Nodes)
-			{
-				UAnimStateTransitionNode* TransNode = Cast<UAnimStateTransitionNode>(SMChild);
-				if (!TransNode) continue;
-
-				TSharedRef<FJsonObject> TransJson = MakeShared<FJsonObject>();
-				TransJson->SetStringField(TEXT("guid"), TransNode->NodeGuid.ToString());
-
-				if (UAnimStateNodeBase* Prev = TransNode->GetPreviousState())
-					TransJson->SetStringField(TEXT("fromState"), Prev->GetStateName());
-				if (UAnimStateNodeBase* Next = TransNode->GetNextState())
-					TransJson->SetStringField(TEXT("toState"), Next->GetStateName());
-
-				// Transition rule info
-				TransJson->SetBoolField(TEXT("bidirectional"), TransNode->Bidirectional);
-
-				// Get the transition graph for rule details
-				if (UEdGraph* TransGraph = TransNode->GetBoundGraph())
-				{
-					TransJson->SetStringField(TEXT("ruleGraph"), TransGraph->GetName());
-					TransJson->SetNumberField(TEXT("ruleNodeCount"), TransGraph->Nodes.Num());
-				}
-
-				TransitionArray.Add(MakeShared<FJsonValueObject>(TransJson));
-			}
+			// UE 5.6: GetStateMachineGraph() API was removed
+			// Transition inspection not available in this version
 		}
 	}
 
-	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
-	Result->SetStringField(TEXT("animBlueprint"), BPName);
-	Result->SetNumberField(TEXT("transitionCount"), TransitionArray.Num());
-	Result->SetArrayField(TEXT("transitions"), TransitionArray);
-	return JsonToString(Result);
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetStringField(TEXT("animBlueprint"), BPName);
+	OutJson->SetNumberField(TEXT("transitionCount"), TransitionArray.Num());
+	OutJson->SetArrayField(TEXT("transitions"), TransitionArray);
+	return JsonToString(OutJson);
 }

@@ -1,6 +1,9 @@
 // Handlers_ControlRig.cpp
 // Control Rig creation and editing handlers for AgenticMCP.
 // UE 5.6 target. Uses dynamic module loading -- ControlRig plugin must be enabled.
+// UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
+#pragma warning(push)
+#pragma warning(disable: 4459)
 #include "AgenticMCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
@@ -74,7 +77,7 @@ FString FAgenticMCPServer::HandleControlRigCreate(const FString& Body)
     }
 
     // Use the factory system to create a ControlRigBlueprint
-    UClass* FactoryClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("ControlRigBlueprintFactory"));
+    UClass* FactoryClass = FindObject<UClass>(nullptr, TEXT("ControlRigBlueprintFactory"));
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("ControlRig plugin is not loaded. Enable the ControlRig plugin first."));
@@ -216,20 +219,19 @@ FString FAgenticMCPServer::HandleControlRigAddControl(const FString& Body)
     {
             FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
             bool bSuccess = GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
-            if (bSuccess)
-            {
-                Asset->MarkPackageDirty();
-                FString Result;
-                TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
-                Writer->WriteObjectStart();
-                Writer->WriteValue(TEXT("success"), true);
-                Writer->WriteValue(TEXT("controlName"), ControlName);
-                Writer->WriteValue(TEXT("controlType"), ControlType);
-                Writer->WriteValue(TEXT("rigPath"), AssetPath);
-                Writer->WriteObjectEnd();
-                Writer->Close();
-                return Result;
-            }
+        if (bSuccess)
+        {
+            Asset->MarkPackageDirty();
+            FString Result;
+            TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
+            Writer->WriteObjectStart();
+            Writer->WriteValue(TEXT("success"), true);
+            Writer->WriteValue(TEXT("controlName"), ControlName);
+            Writer->WriteValue(TEXT("controlType"), ControlType);
+            Writer->WriteValue(TEXT("rigPath"), AssetPath);
+            Writer->WriteObjectEnd();
+            Writer->Close();
+            return Result;
         }
     }
 
