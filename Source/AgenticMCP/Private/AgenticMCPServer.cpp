@@ -63,6 +63,7 @@
 #include "IAssetTools.h"
 #include "Editor.h"
 #include "Subsystems/AssetEditorSubsystem.h"
+#include "UObject/GarbageCollection.h"
 
 // ============================================================
 // SEH wrappers for crash-safe compilation and saving (Windows only)
@@ -128,6 +129,42 @@ int32 TryRefreshAllNodesSEH(UBlueprint* BP)
 	__try
 	{
 		RefreshAllNodesInner(BP);
+		return 0;
+	}
+	__except (1)
+	{
+		return -1;
+	}
+}
+
+static void MarkStructurallyModifiedInner(UBlueprint* BP)
+{
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
+}
+
+int32 TryMarkStructurallyModifiedSEH(UBlueprint* BP)
+{
+	__try
+	{
+		MarkStructurallyModifiedInner(BP);
+		return 0;
+	}
+	__except (1)
+	{
+		return -1;
+	}
+}
+
+static void MarkModifiedInner(UBlueprint* BP)
+{
+	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
+}
+
+int32 TryMarkModifiedSEH(UBlueprint* BP)
+{
+	__try
+	{
+		MarkModifiedInner(BP);
 		return 0;
 	}
 	__except (1)
@@ -2809,6 +2846,13 @@ bool FAgenticMCPServer::ProcessOneRequest()
 		return false;
 	}
 
+	// FGCScopeGuard prevents garbage collection from running while we hold
+	// raw UObject pointers (UBlueprint*, UWorld*, AActor*) during handler
+	// dispatch. Without this, a GC pass triggered by blueprint compilation
+	// or level loading can invalidate the UWorld that owns a level blueprint,
+	// causing a null pointer crash in MarkBlueprintAsStructurallyModified.
+	FGCScopeGuard GCGuard;
+
 	// Dispatch to the registered handler with crash protection.
 	// If a handler throws or crashes, we still send an error response
 	// so the HTTP connection doesn't hang indefinitely.
@@ -2917,6 +2961,36 @@ bool FAgenticMCPServer::SafeMarkStructurallyModified(UBlueprint* BP, const TCHAR
 		return false;
 	}
 
+	// Level blueprint safety check: validate the entire ownership chain
+	// before attempting compilation. Level blueprints are owned by ULevel
+	// which is owned by UWorld. If either is pending kill or null, the
+	// compile will crash with a null pointer dereference.
+	ULevelScriptBlueprint* LevelBP = Cast<ULevelScriptBlueprint>(BP);
+	if (LevelBP)
+	{
+		ULevel* OwningLevel = LevelBP->GetLevel();
+		if (!OwningLevel || !IsValid(OwningLevel))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("AgenticMCP: Level blueprint '%s' has invalid owning level - "
+					 "marking dirty without recompile."),
+				*BP->GetName());
+			BP->MarkPackageDirty();
+			return false;
+		}
+
+		UWorld* OwningWorld = OwningLevel->GetWorld();
+		if (!OwningWorld || !IsValid(OwningWorld))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("AgenticMCP: Level blueprint '%s' has invalid owning world - "
+					 "marking dirty without recompile."),
+				*BP->GetName());
+			BP->MarkPackageDirty();
+			return false;
+		}
+	}
+
 	bool bSuccess = true;
 
 	// Create a slow task scope to prevent FText::Rebuild crashes
@@ -2927,6 +3001,20 @@ bool FAgenticMCPServer::SafeMarkStructurallyModified(UBlueprint* BP, const TCHAR
 	GEditor->BeginTransaction(
 		FText::FromString(FString::Printf(TEXT("AgenticMCP: %s"), TransactionDesc)));
 
+#if PLATFORM_WINDOWS
+	// Use SEH wrapper on Windows to catch access violations that C++ try/catch misses.
+	// MarkBlueprintAsStructurallyModified triggers a full recompile which can hit
+	// null pointers deep in the engine (FText::Rebuild, FLinkerLoad, etc.).
+	int32 SEHResult = TryMarkStructurallyModifiedSEH(BP);
+	if (SEHResult != 0)
+	{
+		bSuccess = false;
+		UE_LOG(LogTemp, Warning,
+			TEXT("AgenticMCP: MarkBlueprintAsStructurallyModified crashed (SEH) during '%s' on '%s' - "
+				 "node was created but compile deferred."),
+			TransactionDesc, *BP->GetName());
+	}
+#else
 	try
 	{
 		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(BP);
@@ -2939,13 +3027,14 @@ bool FAgenticMCPServer::SafeMarkStructurallyModified(UBlueprint* BP, const TCHAR
 				 "node was created but compile deferred. Blueprint may need manual recompile."),
 			TransactionDesc, *BP->GetName());
 	}
+#endif
 
 	GEditor->EndTransaction();
 
 	if (!bSuccess)
 	{
-		// Even if compile crashed, try to mark as just modified (no recompile)
-		// so the editor knows the BP is dirty
+		// Even if compile crashed, mark as dirty so the editor knows
+		// the BP needs attention
 		BP->MarkPackageDirty();
 	}
 
@@ -2967,6 +3056,16 @@ bool FAgenticMCPServer::SafeMarkModified(UBlueprint* BP, const TCHAR* Transactio
 	GEditor->BeginTransaction(
 		FText::FromString(FString::Printf(TEXT("AgenticMCP: %s"), TransactionDesc)));
 
+#if PLATFORM_WINDOWS
+	int32 SEHResult = TryMarkModifiedSEH(BP);
+	if (SEHResult != 0)
+	{
+		bSuccess = false;
+		UE_LOG(LogTemp, Warning,
+			TEXT("AgenticMCP: MarkBlueprintAsModified crashed (SEH) during '%s' on '%s'"),
+			TransactionDesc, *BP->GetName());
+	}
+#else
 	try
 	{
 		FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
@@ -2978,6 +3077,7 @@ bool FAgenticMCPServer::SafeMarkModified(UBlueprint* BP, const TCHAR* Transactio
 			TEXT("AgenticMCP: Blueprint modification crashed during '%s' on '%s'"),
 			TransactionDesc, *BP->GetName());
 	}
+#endif
 
 	GEditor->EndTransaction();
 

@@ -118,6 +118,7 @@ import {
 const CONFIG = {
   unrealMcpUrl: process.env.UNREAL_MCP_URL || "http://localhost:9847",
   requestTimeoutMs: parseInt(process.env.MCP_REQUEST_TIMEOUT_MS, 10) || 30000,
+  slowRequestTimeoutMs: parseInt(process.env.MCP_SLOW_REQUEST_TIMEOUT_MS, 10) || 120000,
   injectContext: process.env.INJECT_CONTEXT === "true",
   asyncEnabled: process.env.MCP_ASYNC_ENABLED !== "false",
   asyncTimeoutMs: parseInt(process.env.MCP_ASYNC_TIMEOUT_MS, 10) || 300000,
@@ -126,11 +127,25 @@ const CONFIG = {
   projectRoot: process.env.AGENTIC_PROJECT_ROOT || "",
 };
 
+// Tools that perform I/O-heavy or engine-blocking operations and need
+// a longer HTTP timeout than the default 30s.
+const SLOW_TOOLS = new Set([
+  "levelSave",
+  "compileBlueprint",
+  "importAsset",
+  "exportAsset",
+  "levelLoad",
+  "levelAddSublevel",
+  "packageProject",
+]);
+
 // Bind CONFIG values to library functions
 const fetchUnrealTools = () =>
   _fetchUnrealTools(CONFIG.unrealMcpUrl, CONFIG.requestTimeoutMs);
-const executeUnrealTool = (toolName, args) =>
-  _executeUnrealTool(CONFIG.unrealMcpUrl, CONFIG.requestTimeoutMs, toolName, args);
+const executeUnrealTool = (toolName, args) => {
+  const timeout = SLOW_TOOLS.has(toolName) ? CONFIG.slowRequestTimeoutMs : CONFIG.requestTimeoutMs;
+  return _executeUnrealTool(CONFIG.unrealMcpUrl, timeout, toolName, args);
+};
 const checkUnrealConnection = () =>
   _checkUnrealConnection(CONFIG.unrealMcpUrl, CONFIG.requestTimeoutMs);
 
@@ -682,9 +697,12 @@ async function executeLiveTool(request, toolName, args) {
         }
       : undefined;
 
+    const perRequestTimeout = SLOW_TOOLS.has(toolName)
+      ? CONFIG.slowRequestTimeoutMs
+      : CONFIG.requestTimeoutMs;
     return _executeUnrealToolAsync(
       CONFIG.unrealMcpUrl,
-      CONFIG.requestTimeoutMs,
+      perRequestTimeout,
       toolName,
       args,
       {
