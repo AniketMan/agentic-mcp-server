@@ -73,7 +73,6 @@ public class AgenticMCP : ModuleRules
 			"MaterialEditor",     // Material editor APIs
 			"MovieRenderPipelineCore", // Movie Render Pipeline (sequencer render)
 			"PropertyEditor",     // Property editing for settings
-			"EditorStyle",        // Editor style for widget inspection
 			"OculusXRHMD",        // Meta XR HMD APIs
 			"OculusXRInput",      // Meta XR Input/Hand tracking APIs
 			"ControlRig",         // Control Rig editing APIs

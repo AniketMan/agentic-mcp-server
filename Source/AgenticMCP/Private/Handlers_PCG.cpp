@@ -700,6 +700,7 @@ FString FAgenticMCPServer::HandlePCGAddNode(const FString& Body)
 	if (!Graph)
 		return MakeErrorJson(FString::Printf(TEXT("PCG Graph not found: %s"), *GraphPath));
 
+<<<<<<< HEAD
 	// UE 5.6: nullptr deprecated - use nullptr with full class path
 	UClass* SettingsClass = FindObject<UClass>(nullptr, *FString::Printf(TEXT("/Script/PCG.%s"), *NodeClass));
 	if (!SettingsClass)
@@ -707,6 +708,9 @@ FString FAgenticMCPServer::HandlePCGAddNode(const FString& Body)
 		// Try without path prefix
 		SettingsClass = FindFirstObject<UClass>(*NodeClass, EFindFirstObjectOptions::None);
 	}
+=======
+	UClass* SettingsClass = FindFirstObject<UClass>(*NodeClass, EFindFirstObjectOptions::NativeFirst);
+>>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	if (!SettingsClass)
 		return MakeErrorJson(FString::Printf(TEXT("Node class not found: %s"), *NodeClass));
 

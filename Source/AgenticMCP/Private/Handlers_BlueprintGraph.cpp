@@ -41,7 +41,11 @@ FString FAgenticMCPServer::HandleBPCreateBlueprint(const FString& Body)
 
 	if (ParentClass.IsEmpty()) ParentClass = TEXT("Actor");
 
+<<<<<<< HEAD
 	UClass* Parent = FindObject<UClass>(nullptr, *ParentClass);
+=======
+	UClass* Parent = FindFirstObject<UClass>(*ParentClass, EFindFirstObjectOptions::NativeFirst);
+>>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	if (!Parent) Parent = AActor::StaticClass();
 
 	FString AssetName = FPaths::GetBaseFilename(Path);
@@ -130,7 +134,15 @@ FString FAgenticMCPServer::HandleBPAddFunction(const FString& Body)
 	if (!NewGraph)
 		return MakeErrorJson(TEXT("Failed to create function graph"));
 
+<<<<<<< HEAD
 	FBlueprintEditorUtils::AddFunctionGraph<UFunction>(BP, NewGraph, false, (UFunction*)nullptr);
+=======
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+	FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false, static_cast<UFunction*>(nullptr));
+#else
+	FBlueprintEditorUtils::AddFunctionGraph(BP, NewGraph, false);
+#endif
+>>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	FBlueprintEditorUtils::MarkBlueprintAsModified(BP);
 
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
@@ -197,7 +209,11 @@ FString FAgenticMCPServer::HandleBPAddNode(const FString& Body)
 	{
 		FString FunctionName = Json->GetStringField(TEXT("functionName"));
 		UK2Node_CallFunction* CallNode = NewObject<UK2Node_CallFunction>(Graph);
+<<<<<<< HEAD
 		UFunction* Func = FindObject<UFunction>(nullptr, *FunctionName);
+=======
+		UFunction* Func = FindFirstObject<UFunction>(*FunctionName, EFindFirstObjectOptions::NativeFirst);
+>>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 		if (Func)
 			CallNode->SetFromFunction(Func);
 		NewNode = CallNode;

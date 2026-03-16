@@ -169,12 +169,20 @@ FString FAgenticMCPServer::HandleLoadLevel(const FString& Body)
 	ULevelStreaming* NewLevel = nullptr;
 
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 6
+<<<<<<< HEAD
 	// UE 5.6+ uses struct-based API with constructor
 	UEditorLevelUtils::FAddLevelToWorldParams AddParams(
 		ULevelStreamingDynamic::StaticClass(),
 		FName(*LevelPath)
 	);
 	NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
+=======
+		// UE 5.6+ uses struct-based API
+		UEditorLevelUtils::FAddLevelToWorldParams AddParams;
+		AddParams.LevelPackageName = *LevelPath;
+		AddParams.LevelStreamingClass = ULevelStreamingDynamic::StaticClass();
+		NewLevel = UEditorLevelUtils::AddLevelToWorld(World, AddParams);
+>>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 #else
 	// UE 5.4-5.5 uses the 3-param overload
 	NewLevel = EditorLevelUtils::AddLevelToWorld(
