@@ -20,14 +20,100 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Four inference endpoints -- one per role
-const VALIDATOR_URL  = process.env.LLAMA_VALIDATOR_URL  || 'http://localhost:8080';
-const WORKER_URL     = process.env.LLAMA_WORKER_URL     || 'http://localhost:8081';
-const QA_AUDITOR_URL = process.env.LLAMA_QA_AUDITOR_URL || 'http://localhost:8082';
-const SPATIAL_URL    = process.env.COSMOS_SPATIAL_URL    || 'http://localhost:8083';
 
-// Legacy fallback: if LLAMA_CPP_URL is set, use it for all roles
+// ---------------------------------------------------------------------------
+// Server Discovery
+// ---------------------------------------------------------------------------
+// Default port assignments (can be overridden via env vars).
+// The auto-detect logic below probes each port and falls back gracefully:
+//   - If all 4 are up: each role gets its dedicated server.
+//   - If only 1 is up: all roles share that single server.
+//   - If none are up:  isLLMAvailable() returns false, gatekeeper
+//     falls back to DIRECT mode (no inference, plan params passed through).
+
+const DEFAULT_PORTS = {
+  validator: process.env.LLAMA_VALIDATOR_URL  || 'http://localhost:8080',
+  worker:    process.env.LLAMA_WORKER_URL     || 'http://localhost:8081',
+  qa:        process.env.LLAMA_QA_AUDITOR_URL || 'http://localhost:8082',
+  spatial:   process.env.COSMOS_SPATIAL_URL    || 'http://localhost:8083',
+};
+
+// Legacy single-server override
 const LLAMA_CPP_URL = process.env.LLAMA_CPP_URL || null;
+
+// Resolved URLs after auto-detect (populated by discoverServers())
+const RESOLVED_URLS = { validator: null, worker: null, qa: null, spatial: null };
+let _discoveryDone = false;
+let _discoveryPromise = null;
+
+/**
+ * Probe a URL's /health endpoint. Returns true if server is up.
+ */
+async function probeHealth(url) {
+  try {
+    const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Auto-detect which inference servers are running.
+ * Called once lazily on first use. Results are cached.
+ */
+async function discoverServers() {
+  if (_discoveryDone) return;
+  if (_discoveryPromise) return _discoveryPromise;
+
+  _discoveryPromise = (async () => {
+    // If explicit single-server override, use it for everything
+    if (LLAMA_CPP_URL) {
+      const up = await probeHealth(LLAMA_CPP_URL);
+      if (up) {
+        for (const role of Object.keys(RESOLVED_URLS)) {
+          RESOLVED_URLS[role] = LLAMA_CPP_URL;
+        }
+        console.error(`[LLM-VALIDATOR] Single-server mode: all roles -> ${LLAMA_CPP_URL}`);
+      } else {
+        console.error(`[LLM-VALIDATOR] LLAMA_CPP_URL=${LLAMA_CPP_URL} is not responding.`);
+      }
+      _discoveryDone = true;
+      return;
+    }
+
+    // Probe all default ports in parallel
+    const roles = Object.keys(DEFAULT_PORTS);
+    const results = await Promise.all(roles.map(r => probeHealth(DEFAULT_PORTS[r])));
+    const liveUrls = [];
+
+    for (let i = 0; i < roles.length; i++) {
+      if (results[i]) {
+        RESOLVED_URLS[roles[i]] = DEFAULT_PORTS[roles[i]];
+        liveUrls.push(DEFAULT_PORTS[roles[i]]);
+        console.error(`[LLM-VALIDATOR] ${roles[i]} -> ${DEFAULT_PORTS[roles[i]]} (up)`);
+      } else {
+        console.error(`[LLM-VALIDATOR] ${roles[i]} -> ${DEFAULT_PORTS[roles[i]]} (down)`);
+      }
+    }
+
+    // Fallback: if some roles have no server, share whatever is alive
+    if (liveUrls.length > 0) {
+      const fallbackUrl = liveUrls[0];
+      for (const role of roles) {
+        if (!RESOLVED_URLS[role]) {
+          RESOLVED_URLS[role] = fallbackUrl;
+          console.error(`[LLM-VALIDATOR] ${role} -> ${fallbackUrl} (fallback)`);
+        }
+      }
+    }
+
+    _discoveryDone = true;
+  })();
+
+  return _discoveryPromise;
+}
+
 const CONFIDENCE_THRESHOLD = parseFloat(process.env.CONFIDENCE_THRESHOLD || '0.95');
 const MAX_RETRIES = parseInt(process.env.MAX_WORKER_RETRIES || '3', 10);
 
@@ -114,31 +200,20 @@ function loadContextForTool(toolName, toolDef) {
 
 /**
  * Get the URL for a specific role.
- * Falls back to LLAMA_CPP_URL if set (single-server mode).
+ * Auto-discovers on first call. Falls back to any live server.
  */
-function getUrlForRole(role = 'worker') {
-  if (LLAMA_CPP_URL) return LLAMA_CPP_URL;
-  switch (role) {
-    case 'validator':  return VALIDATOR_URL;
-    case 'qa':         return QA_AUDITOR_URL;
-    case 'spatial':    return SPATIAL_URL;
-    case 'worker':
-    default:           return WORKER_URL;
-  }
+async function getUrlForRole(role = 'worker') {
+  await discoverServers();
+  return RESOLVED_URLS[role] || RESOLVED_URLS['worker'] || DEFAULT_PORTS[role];
 }
 
 /**
- * Check if at least the Worker llama.cpp server is running.
- * The Worker is the minimum required for plan execution.
+ * Check if at least one llama.cpp server is running.
+ * Triggers auto-discovery if not done yet.
  */
 async function isLLMAvailable() {
-  try {
-    const url = getUrlForRole('worker');
-    const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) });
-    return resp.ok;
-  } catch {
-    return false;
-  }
+  await discoverServers();
+  return Object.values(RESOLVED_URLS).some(url => url !== null);
 }
 
 /**
