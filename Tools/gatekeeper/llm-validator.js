@@ -243,7 +243,7 @@ Respond with ONLY valid JSON. No explanation. No markdown.
 Format: {"toolName": "${step.tool}", "payload": {...}}`;
 
   try {
-    const url = getUrlForRole(role);
+    const url = await getUrlForRole(role);
     // Use /v1/chat/completions endpoint with system role for prompt injection
     const resp = await fetch(`${url}/v1/chat/completions`, {
       method: 'POST',
@@ -381,7 +381,7 @@ async function executeWithConfidenceGate(step, toolDef) {
  */
 async function runSpatialAnalysis(imageBase64, question) {
   const systemPrompt = ROLE_INSTRUCTIONS['spatial'] || 'You are a spatial reasoning agent. Analyze the image for physics, spatial, and lighting issues.';
-  const url = getUrlForRole('spatial');
+  const url = await getUrlForRole('spatial');
 
   try {
     const resp = await fetch(`${url}/v1/chat/completions`, {
@@ -419,7 +419,7 @@ async function runSpatialAnalysis(imageBase64, question) {
  */
 async function isSpatialAvailable() {
   try {
-    const url = getUrlForRole('spatial');
+    const url = await getUrlForRole('spatial');
     const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) });
     return resp.ok;
   } catch {
