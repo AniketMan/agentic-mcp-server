@@ -258,7 +258,7 @@ Format: {"toolName": "${step.tool}", "payload": {...}}`;
         max_tokens: 512,
         temperature: 0.1,  // near-deterministic
         top_p: 0.9,
-        stop: ['\n\n'],
+        // stop: ['\n\n'],  // REMOVED: was killing responses before JSON output
       }),
       signal: AbortSignal.timeout(30000),
     });
