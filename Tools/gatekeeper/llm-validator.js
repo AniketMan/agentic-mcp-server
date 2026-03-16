@@ -44,25 +44,30 @@ for (const [role, file] of [['validator', 'validator.md'], ['worker', 'worker.md
   }
 }
 
-// Map tool names to context file categories
+// Map tool names to context file categories (camelCase to match tool-registry.json)
 const TOOL_CONTEXT_MAP = {
   blueprint: 'blueprint', graph: 'blueprint', search: 'blueprint', references: 'blueprint',
-  add_node: 'blueprint', delete_node: 'blueprint', connect_pins: 'blueprint',
-  disconnect_pin: 'blueprint', set_pin_default: 'blueprint', move_node: 'blueprint',
-  compile_blueprint: 'blueprint', create_blueprint: 'blueprint', create_graph: 'blueprint',
-  add_variable: 'blueprint', remove_variable: 'blueprint', validate_blueprint: 'blueprint',
-  snapshot_graph: 'blueprint', restore_graph: 'blueprint', get_pin_info: 'blueprint',
-  list_actors: 'actor', get_actor: 'actor', spawn_actor: 'actor',
-  delete_actor: 'actor', set_actor_property: 'actor', set_actor_transform: 'actor',
-  list_levels: 'actor', load_level: 'actor', unload_level: 'actor',
-  screenshot: 'scene_awareness', move_camera: 'scene_awareness',
-  pcg_list: 'blueprint', pcg_inspect: 'blueprint', pcg_execute: 'blueprint',
-  anim_inspect: 'animation', anim_states: 'animation', anim_transitions: 'animation',
-  seq_create: 'level_sequence', seq_add_track: 'level_sequence', seq_get_tracks: 'level_sequence',
-  mat_list: 'material', mat_inspect: 'material', mat_create: 'material',
-  asset_import: 'assets', asset_inspect: 'assets', asset_duplicate: 'assets',
+  addNode: 'blueprint', deleteNode: 'blueprint', connectPins: 'blueprint',
+  disconnectPin: 'blueprint', setPinDefault: 'blueprint', moveNode: 'blueprint',
+  compileBlueprint: 'blueprint', createBlueprint: 'blueprint', createGraph: 'blueprint',
+  addVariable: 'blueprint', removeVariable: 'blueprint', validateBlueprint: 'blueprint',
+  snapshotGraph: 'blueprint', restoreGraph: 'blueprint', getPinInfo: 'blueprint',
+  listActors: 'actor', getActor: 'actor', spawnActor: 'actor',
+  deleteActor: 'actor', setActorProperty: 'actor', setActorTransform: 'actor',
+  listLevels: 'actor', loadLevel: 'actor', unloadLevel: 'actor',
+  screenshot: 'scene_awareness', moveCamera: 'scene_awareness',
+  pcgList: 'blueprint', pcgInspect: 'blueprint', pcgExecute: 'blueprint',
+  animInspect: 'animation', animStates: 'animation', animTransitions: 'animation',
+  seqCreate: 'level_sequence', seqAddTrack: 'level_sequence', seqGetTracks: 'level_sequence',
+  matList: 'material', matInspect: 'material', matCreate: 'material',
+  assetImport: 'assets', assetInspect: 'assets', assetDuplicate: 'assets',
   executePythonCapture: 'python_scripting', executeConsole: 'python_scripting',
 };
+
+// Normalize snake_case to camelCase for context lookups
+function snakeToCamel(s) {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
 
 /**
  * Load the relevant context documents for a given tool.
@@ -88,8 +93,9 @@ function loadContextForTool(toolName, toolDef) {
     }
   }
 
-  // 2. Load relevant context doc
-  const category = TOOL_CONTEXT_MAP[toolName];
+  // 2. Load relevant context doc (normalize snake_case -> camelCase)
+  const normalizedName = snakeToCamel(toolName);
+  const category = TOOL_CONTEXT_MAP[normalizedName] || TOOL_CONTEXT_MAP[toolName];
   if (category) {
     const contextPath = join(__dirname, '..', 'contexts', `${category}.md`);
     if (existsSync(contextPath)) {
@@ -287,8 +293,8 @@ async function executeWithConfidenceGate(step, toolDef) {
     attempts: MAX_RETRIES,
     max_confidence: bestResult?.confidence || 0,
     best_payload: bestResult?.payload,
-    context_used: Object.keys(TOOL_CONTEXT_MAP).includes(step.tool)
-      ? [`tool-registry:${step.tool}`, `contexts/${TOOL_CONTEXT_MAP[step.tool]}.md`]
+    context_used: Object.keys(TOOL_CONTEXT_MAP).includes(snakeToCamel(step.tool))
+      ? [`tool-registry:${step.tool}`, `contexts/${TOOL_CONTEXT_MAP[snakeToCamel(step.tool)]}.md`]
       : [`tool-registry:${step.tool}`],
   };
 }

@@ -22,22 +22,27 @@ import { selectTechnique, recordOutcome, TECHNIQUES, DIRECT_TOOLS } from './tech
 
 const UNREAL_MCP_URL = process.env.UNREAL_MCP_URL || 'http://localhost:9847';
 
+// Normalize snake_case to camelCase so both conventions match
+function snakeToCamel(s) {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 // Max concurrent tool calls per MCPTaskQueue constraint
 const MAX_CONCURRENT = parseInt(process.env.MCP_MAX_CONCURRENT || '4', 10);
 
 // Tools that must run alone -- never in parallel with anything
 const SEQUENTIAL_ONLY_TOOLS = new Set([
-  'open_level', 'delete_actors', 'execute_script',
-  'cleanup_scripts', 'run_console_command',
+  'openLevel', 'deleteActors', 'executeScript',
+  'cleanupScripts', 'runConsoleCommand',
 ]);
 
 // Read-only tools that are always safe to parallelize
 const READ_ONLY_TOOLS = new Set([
-  'asset_search', 'get_level_actors', 'blueprint_query',
-  'asset_dependencies', 'asset_referencers', 'capture_viewport',
-  'get_output_log', 'screenshot', 'list', 'listActors',
-  'getActorProperties', 'snapshotGraph', 'get_scene_plan',
-  'get_all_scene_plans', 'get_wiring_status', 'quantize_project',
+  'assetSearch', 'getLevelActors', 'blueprintQuery',
+  'assetDependencies', 'assetReferencers', 'captureViewport',
+  'getOutputLog', 'screenshot', 'list', 'listActors',
+  'getActorProperties', 'snapshotGraph', 'getScenePlan',
+  'getAllScenePlans', 'getWiringStatus', 'quantizeProject',
 ]);
 
 /**
@@ -89,12 +94,12 @@ function getTargetObject(step) {
  */
 function stepsConflict(a, b) {
   // Sequential-only tools conflict with everything
-  if (SEQUENTIAL_ONLY_TOOLS.has(a.tool) || SEQUENTIAL_ONLY_TOOLS.has(b.tool)) {
+  if (SEQUENTIAL_ONLY_TOOLS.has(snakeToCamel(a.tool)) || SEQUENTIAL_ONLY_TOOLS.has(snakeToCamel(b.tool))) {
     return true;
   }
 
   // Read-only tools never conflict
-  if (READ_ONLY_TOOLS.has(a.tool) && READ_ONLY_TOOLS.has(b.tool)) {
+  if (READ_ONLY_TOOLS.has(snakeToCamel(a.tool)) && READ_ONLY_TOOLS.has(snakeToCamel(b.tool))) {
     return false;
   }
 
@@ -158,7 +163,7 @@ function buildWaves(steps) {
 
       for (const step of ungrouped) {
         // Sequential-only tools always get their own wave
-        if (SEQUENTIAL_ONLY_TOOLS.has(step.tool)) {
+        if (SEQUENTIAL_ONLY_TOOLS.has(snakeToCamel(step.tool))) {
           if (wave.length === 0) {
             wave.push(step);
             // Sequential-only means nothing else in this wave
@@ -236,6 +241,8 @@ async function executeStep(step, { registry, llmAvailable, capturedGuids, onStep
   let technique;
 
   // Adaptive technique selection (ARCHON-inspired)
+  // Normalize tool name for registry lookup
+  const normalizedTool = snakeToCamel(step.tool);
   technique = selectTechnique(resolvedStep);
   console.error(`[GATEKEEPER] Step ${step.step_id} (${step.tool}): technique=${technique.name} reason=${technique.reason}`);
 
@@ -245,8 +252,8 @@ async function executeStep(step, { registry, llmAvailable, capturedGuids, onStep
     confidence = 1.0;
   } else if (technique.name === 'ENSEMBLE') {
     // ENSEMBLE: Worker + Validator both infer, require consensus
-    const toolDef = registry[step.tool];
-    const context = loadContextForTool(step.tool, toolDef);
+    const toolDef = registry[normalizedTool] || registry[step.tool];
+    const context = loadContextForTool(normalizedTool, toolDef);
 
     const [workerResult, validatorResult] = await Promise.all([
       runWorkerInference(resolvedStep, toolDef, context, 1, 'worker'),
@@ -305,7 +312,7 @@ async function executeStep(step, { registry, llmAvailable, capturedGuids, onStep
     }
   } else {
     // SINGLE or MULTI_PASS: standard Worker inference with confidence gating
-    const toolDef = registry[step.tool];
+    const toolDef = registry[normalizedTool] || registry[step.tool];
     const workerResult = await executeWithConfidenceGate(resolvedStep, toolDef);
 
     if (workerResult.action === 'escalate') {

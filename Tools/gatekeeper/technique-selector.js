@@ -18,47 +18,52 @@
  *   5. SPATIAL    -- Route to Cosmos Reason2 for visual/spatial analysis
  */
 
+// Normalize snake_case to camelCase so both conventions match
+function snakeToCamel(s) {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 // ---------------------------------------------------------------------------
 // Tool Complexity Classification
 // ---------------------------------------------------------------------------
 
 // Tools that need no inference -- just pass plan params through
 const DIRECT_TOOLS = new Set([
-  'get_level_actors', 'asset_search', 'blueprint_query',
-  'asset_dependencies', 'asset_referencers', 'capture_viewport',
-  'get_output_log', 'screenshot', 'list', 'listActors',
-  'getActorProperties', 'snapshotGraph', 'get_scene_plan',
-  'get_all_scene_plans', 'get_wiring_status', 'quantize_project',
+  'getLevelActors', 'assetSearch', 'blueprintQuery',
+  'assetDependencies', 'assetReferencers', 'captureViewport',
+  'getOutputLog', 'screenshot', 'list', 'listActors',
+  'getActorProperties', 'snapshotGraph', 'getScenePlan',
+  'getAllScenePlans', 'getWiringStatus', 'quantizeProject',
   'xrGetHapticCapabilities', 'xrGetSpatialAudioStatus',
 ]);
 
 // Tools with simple, well-defined params -- single pass is enough
 const SIMPLE_TOOLS = new Set([
-  'spawn_actor', 'move_actor', 'delete_actor', 'set_actor_property',
-  'set_actor_transform', 'set_actor_label', 'add_component',
-  'open_level', 'run_console_command', 'begin_transaction',
-  'end_transaction', 'xrPlayHapticEffect', 'xrStopHapticEffect',
+  'spawnActor', 'moveActor', 'deleteActor', 'setActorProperty',
+  'setActorTransform', 'setActorLabel', 'addComponent',
+  'openLevel', 'runConsoleCommand', 'beginTransaction',
+  'endTransaction', 'xrPlayHapticEffect', 'xrStopHapticEffect',
   'xrSetSpatialAudioEnabled', 'xrConfigureAudioAttenuation',
 ]);
 
 // Tools that modify complex structures -- need multi-pass with context
 const COMPLEX_TOOLS = new Set([
-  'add_node', 'connect_pins', 'disconnect_pin', 'set_pin_default',
-  'create_blueprint', 'create_graph', 'compile_blueprint',
-  'anim_blueprint_modify', 'material_create', 'material_modify',
-  'enhanced_input', 'seq_create', 'seq_add_track',
-  'pcg_execute', 'executePythonCapture',
+  'addNode', 'connectPins', 'disconnectPin', 'setPinDefault',
+  'createBlueprint', 'createGraph', 'compileBlueprint',
+  'animBlueprintModify', 'materialCreate', 'materialModify',
+  'enhancedInput', 'seqCreate', 'seqAddTrack',
+  'pcgExecute', 'executePythonCapture',
 ]);
 
 // Tools where errors are costly -- use ensemble (Validator + Worker agree)
 const CRITICAL_TOOLS = new Set([
-  'delete_actors', 'execute_script', 'cleanup_scripts',
-  'compile_blueprint', 'asset_import',
+  'deleteActors', 'executeScript', 'cleanupScripts',
+  'compileBlueprint', 'assetImport',
 ]);
 
 // Tools that benefit from spatial/visual analysis
 const SPATIAL_TOOLS = new Set([
-  'screenshot', 'capture_viewport', 'move_camera',
+  'screenshot', 'captureViewport', 'moveCamera',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -151,7 +156,7 @@ function getAvgConfidence(toolName) {
  * @returns {object} The selected technique definition
  */
 function selectTechnique(step, options = {}) {
-  const toolName = step.tool;
+  const toolName = snakeToCamel(step.tool);
 
   // 1. Check for explicit technique hint in the plan step
   if (step.technique && TECHNIQUES[step.technique]) {

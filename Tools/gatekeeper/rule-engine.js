@@ -12,6 +12,11 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Normalize snake_case to camelCase so both conventions resolve against the registry
+function snakeToCamel(s) {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 // Load tool registry once at startup
 let toolRegistry = null;
 
@@ -47,8 +52,9 @@ function validateStep(step, workflowState) {
   const registry = loadRegistry();
   const errors = [];
 
-  // 1. Check tool exists
-  const toolDef = registry[step.tool];
+  // 1. Check tool exists (normalize snake_case -> camelCase for registry lookup)
+  const normalizedTool = snakeToCamel(step.tool);
+  const toolDef = registry[normalizedTool] || registry[step.tool];
   if (!toolDef) {
     errors.push({
       code: 'UNKNOWN_TOOL',
@@ -114,7 +120,7 @@ function validateStep(step, workflowState) {
     if (bp && !workflowState.snapshotTaken.has(bp)) {
       errors.push({
         code: 'NO_SNAPSHOT',
-        message: `Blueprint "${bp}" is being mutated without a prior snapshot_graph call. Add a snapshot step before this mutation.`,
+        message: `Blueprint "${bp}" is being mutated without a prior snapshotGraph call. Add a snapshot step before this mutation.`,
         severity: 'fatal'
       });
     }
@@ -124,13 +130,13 @@ function validateStep(step, workflowState) {
   }
 
   // 6. Track snapshots
-  if (step.tool === 'snapshot_graph') {
+  if (normalizedTool === 'snapshotGraph') {
     const bp = step.params?.blueprint;
     if (bp) workflowState.snapshotTaken.add(bp);
   }
 
   // 7. Track compiles
-  if (step.tool === 'compile_blueprint') {
+  if (normalizedTool === 'compileBlueprint') {
     const bp = step.params?.blueprint;
     if (bp) workflowState.compilePending.delete(bp);
   }
@@ -193,7 +199,7 @@ function validatePlan(plan) {
   for (const bp of state.compilePending) {
     uncompiledWarnings.push({
       code: 'NO_COMPILE',
-      message: `Blueprint "${bp}" was mutated but no compile_blueprint step follows. Add a compile step at the end.`,
+      message: `Blueprint "${bp}" was mutated but no compileBlueprint step follows. Add a compile step at the end.`,
       severity: 'warning'
     });
   }
