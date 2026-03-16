@@ -1,0 +1,1 @@
+# User Context\n\nPlace any additional documentation here that you want the Worker to reference.\nExamples: Meta developer docs, project-specific notes, style guides.\n\nFiles in this folder are loaded into the Worker's context window at inference time.\nKeep files under 8KB each for best results.

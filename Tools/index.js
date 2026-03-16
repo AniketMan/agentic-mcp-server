@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 
 /**
- * AgenticMCP Server
+ * AgenticMCP Server v3.0.0
  *
- * Dual-path MCP server for Unreal Engine 5 editor manipulation.
+ * Fully local MCP server for Unreal Engine 5 editor manipulation.
+ * No external LLM dependencies. All inference runs on local Llama models.
+ *
+ * Architecture:
+ *   User request (natural language)
+ *     -> Worker (Llama via llama.cpp) infers tool call
+ *     -> Rule engine validates params
+ *     -> Confidence gate checks score
+ *     -> Project state validator cross-checks live editor
+ *     -> Idempotency guard skips if already done
+ *     -> C++ plugin executes
+ *     -> Result feeds back to Worker for next step
  *
  * Primary path: HTTP connection to C++ plugin running inside UE5 editor.
  * Fallback path: Python binary injector for offline .umap manipulation.
- *
- * Based on Natfii/ue5-mcp-bridge (MIT). Extended with:
- * - Offline fallback via binary injector
- * - Snapshot/rollback system
- * - Blueprint validation endpoint
- * - Auto-path selection with status reporting
  *
  * Environment Variables:
  *   UNREAL_MCP_URL          - Base URL for Unreal MCP server (default: http://localhost:9847)
@@ -23,6 +28,7 @@
  *   INJECT_CONTEXT          - Auto-inject UE API docs on tool calls (default: false)
  *   AGENTIC_FALLBACK_ENABLED - Enable offline binary injector fallback (default: true)
  *   AGENTIC_PROJECT_ROOT    - UE project root for fallback (auto-detect if not set)
+ *   LLAMA_WORKER_URL        - Worker inference server URL (default: http://localhost:8081)
  */
 
 import { readFileSync } from "node:fs";
@@ -69,11 +75,8 @@ import {
   executeVisualAgentCommand,
 } from "./visual-agent.js";
 
-// Async Runner for Claude Planner
-import { launchPlan, checkJobStatus } from "./async-runner.js";
-
-// Escalation feedback for Claude Planner
-import { getPendingEscalations, resolveEscalation } from "./gatekeeper/escalation.js";
+// Request Handler -- replaces Claude Planner with local Llama inference loop
+import { handleRequest } from "./request-handler.js";
 
 // Quantized Inference Layer -- deterministic scene wiring via cached manifests
 import {
@@ -99,7 +102,6 @@ import {
 
 // Project State Validator -- cross-validates mutations against live project data
 // Every mutation is verified against the actual UE5 project state before execution.
-// Accuracy at all costs.
 import {
   validateMutation,
   formatValidationFailure,
@@ -125,6 +127,7 @@ const CONFIG = {
   pollIntervalMs: parseInt(process.env.MCP_POLL_INTERVAL_MS, 10) || 2000,
   fallbackEnabled: process.env.AGENTIC_FALLBACK_ENABLED !== "false",
   projectRoot: process.env.AGENTIC_PROJECT_ROOT || "",
+  workerUrl: process.env.LLAMA_WORKER_URL || "http://localhost:8081",
 };
 
 // Tools that perform I/O-heavy or engine-blocking operations and need
@@ -157,7 +160,7 @@ let fallbackAvailable = false;
 
 // Create the MCP server
 const server = new Server(
-  { name: "agentic-mcp-server", version: "2.0.0" },
+  { name: "agentic-mcp-server", version: "3.0.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -165,10 +168,7 @@ const server = new Server(
 let cachedTools = [];
 
 // ---------------------------------------------------------------------------
-// Tool Registry — loads description, parameters, and annotations from JSON
-// The C++ /mcp/tools endpoint only returns tool names. This registry provides
-// the full metadata (description, parameter schema, annotations) that the MCP
-// protocol requires so that agents know HOW to call each tool.
+// Tool Registry
 // ---------------------------------------------------------------------------
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let toolRegistry = new Map();
@@ -181,7 +181,7 @@ try {
   log.info("Tool registry loaded", { count: toolRegistry.size });
 } catch (error) {
   log.error("Failed to load tool registry", { error: error.message });
-  log.warn("Tools will be registered with minimal metadata -- agents may not send correct parameters");
+  log.warn("Tools will be registered with minimal metadata");
 }
 
 // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     name: "unreal_status",
     description: editorConnected
       ? `Check Unreal Editor connection. Currently: CONNECTED to ${status.projectName || "Unknown"} (${status.engineVersion || "Unknown"}). Fallback: ${fallbackAvailable ? "AVAILABLE" : "NOT AVAILABLE"}`
-      : `Check Unreal Editor connection. Currently: NOT CONNECTED. Fallback: ${fallbackAvailable ? "AVAILABLE (offline mode)" : "NOT AVAILABLE"}. Start Unreal Editor with the AgenticMCP plugin for full functionality.`,
+      : `Check Unreal Editor connection. Currently: NOT CONNECTED. Fallback: ${fallbackAvailable ? "AVAILABLE (offline mode)" : "NOT AVAILABLE"}.`,
     inputSchema: { type: "object", properties: {} },
     annotations: {
       readOnlyHint: true,
@@ -213,8 +213,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     },
   });
 
+  // ---- execute_request: Natural language -> local inference -> tool execution ----
+  mcpTools.push({
+    name: "execute_request",
+    description: "Execute a natural language request using local Llama inference. " +
+      "The Worker model interprets the request, selects the correct tool(s), " +
+      "and executes them through the full validation stack (confidence gate, " +
+      "project state validator, idempotency guard). Multi-step requests are " +
+      "handled automatically via sequential inference loop.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        request: {
+          type: "string",
+          description: "Natural language description of what to do in Unreal Editor. " +
+            "Examples: 'add a grab component to the phone actor', " +
+            "'list all actors in the restaurant level', " +
+            "'create a new Blueprint called BP_DoorInteraction'"
+        }
+      },
+      required: ["request"]
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+  });
+
   // If editor is connected, register all live tools via auto-discovery
-  // The C++ plugin returns tool names; we enrich with metadata from tool-registry.json
   if (editorConnected) {
     const unrealTools = await fetchUnrealTools();
     cachedTools = unrealTools;
@@ -222,7 +250,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     for (const tool of unrealTools) {
       const registry = toolRegistry.get(tool.name);
       if (registry) {
-        // Full metadata from registry
         mcpTools.push({
           name: `unreal_${tool.name}`,
           description: `[Unreal Editor] ${registry.description}`,
@@ -230,8 +257,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           annotations: convertAnnotations(registry.annotations),
         });
       } else {
-        // Tool exists in C++ but not in registry -- register with minimal info
-        // so it is still callable, but log a warning
         log.warn("Tool missing from registry", { tool: tool.name });
         mcpTools.push({
           name: `unreal_${tool.name}`,
@@ -259,50 +284,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     }
   }
 
-  // Planner Tools (Claude only)
-  mcpTools.push({
-    name: "launch_plan",
-    description: "[PLANNER ONLY] Launch a JSON execution plan in the background. The local workers will execute it. Returns a job_id to poll.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        planPath: { type: "string", description: "Absolute path to the plan JSON file" }
-      },
-      required: ["planPath"]
-    },
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false }
-  });
-
-  mcpTools.push({
-    name: "check_job_status",
-    description: "[PLANNER ONLY] Check the status of a background plan execution job. Also returns any pending escalations that need your attention.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        jobId: { type: "string", description: "The job_id returned by launch_plan" }
-      },
-      required: ["jobId"]
-    },
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
-  });
-
-  mcpTools.push({
-    name: "resolve_escalation",
-    description: "[PLANNER ONLY] Respond to an escalation from the workers. Provide a revised step or direct tool call to resolve the issue.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        jobId: { type: "string", description: "The job_id of the running plan" },
-        stepIndex: { type: "number", description: "The step index that was escalated" },
-        action: { type: "string", description: "One of: revise_step, provide_direct_call, break_into_substeps, skip_step" },
-        revised_step: { type: "object", description: "The revised step object (tool, parameters, description)" },
-        message: { type: "string", description: "Explanation for the workers about what to do differently" }
-      },
-      required: ["jobId", "stepIndex", "action"]
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false }
-  });
-
   // UE context documentation tool is always available
   mcpTools.push({
     name: "unreal_get_ue_context",
@@ -316,8 +297,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
         query: {
           type: "string",
-          description:
-            "Search query to find relevant context (e.g., 'state machine transitions', 'async loading')",
+          description: "Search query to find relevant context",
         },
       },
     },
@@ -339,7 +319,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     });
   }
 
-  // Quantized Inference tools -- always available (work with cached data + live editor)
+  // Quantized Inference tools
   for (const qTool of QUANTIZED_TOOLS) {
     mcpTools.push({
       name: `unreal_${qTool.name}`,
@@ -354,7 +334,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     });
   }
 
-  // Scene Verifier tools -- post-wiring validation (always available)
+  // Scene Verifier tools
   for (const vTool of VERIFIER_TOOLS) {
     mcpTools.push({
       name: `unreal_${vTool.name}`,
@@ -394,33 +374,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return handleStatusRequest();
   }
 
-  // ---- Planner Async Tools ----
-  if (name === "launch_plan") {
-    return {
-      content: [{ type: "text", text: JSON.stringify(launchPlan(args.planPath), null, 2) }]
-    };
-  }
-  if (name === "check_job_status") {
-    const status = checkJobStatus(args.jobId);
-    // Attach any pending escalations so Claude sees them
-    if (status.status === 'running' || status.status === 'failed') {
-      try {
-        status.pending_escalations = getPendingEscalations(args.jobId);
-      } catch { status.pending_escalations = []; }
-    }
-    return {
-      content: [{ type: "text", text: JSON.stringify(status, null, 2) }]
-    };
-  }
-  if (name === "resolve_escalation") {
-    const result = resolveEscalation(args.jobId, args.stepIndex, {
-      action: args.action,
-      revised_step: args.revised_step || null,
-      message: args.message || '',
-    });
-    return {
-      content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
-    };
+  // ---- execute_request: Natural language inference loop ----
+  if (name === "execute_request") {
+    return handleExecuteRequest(args);
   }
 
   // ---- Validate tool name prefix ----
@@ -461,7 +417,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // ---- Quantized Inference tools ----
   const quantizedToolNames = QUANTIZED_TOOLS.map((t) => t.name);
   if (quantizedToolNames.includes(toolName)) {
-    // Create a callUnreal wrapper for the quantized layer
     const callUnreal = async (endpoint, method = "POST", body = {}) => {
       if (!editorConnected) return null;
       try {
@@ -494,8 +449,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     const commandStr = args?.command || "";
-
-    // Create HTTP client wrapper for VisualAgent commands
     const httpClient = async (endpoint, params) => {
       return await _executeUnrealTool(CONFIG.unrealMcpUrl, CONFIG.requestTimeoutMs, endpoint, params);
     };
@@ -504,14 +457,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       includeSnapshot: true,
     });
 
-    // Build response content
     const content = [];
-
-    // Main result text
     let resultText = result.message || JSON.stringify(result, null, 2);
     content.push({ type: "text", text: resultText });
 
-    // If screenshot was taken, include as image
     if (result.data && result.mimeType) {
       content.push({
         type: "image",
@@ -520,7 +469,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       });
     }
 
-    // If scene snapshot was auto-appended, include it
     if (result._sceneSnapshot) {
       content.push({
         type: "text",
@@ -554,7 +502,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             reason: gateResult.reason,
             suggestion: gateResult.suggestion,
             message: `Mutation blocked: confidence ${gateResult.confidence.toFixed(2)} is below threshold ${gateResult.threshold}. ` +
-              `Claude can freely read and plan -- adapt your approach to increase confidence, then retry.`,
+              `Read and adapt your approach to increase confidence, then retry.`,
           }, null, 2),
         },
       ],
@@ -568,13 +516,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   // ---- Project State Validator: cross-validate against live project ----
-  // Only runs when the editor is connected (needs live read access).
-  // Every mutation is verified against actual project state before execution.
   if (editorConnected) {
     const validationResult = await validateMutation(
       toolName,
       args,
-      // Pass the read-only tool executor so the validator can query the editor
       async (readToolName, readArgs) => {
         return await executeUnrealTool(readToolName, readArgs);
       }
@@ -608,8 +553,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   // ---- Idempotency Guard: skip if the intended result already exists ----
-  // Makes the pipeline fully resumable. Start, stop, come back, re-run --
-  // completed work is never duplicated.
   if (editorConnected) {
     const idempotencyResult = await checkIdempotency(
       toolName,
@@ -634,7 +577,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             text: JSON.stringify(skippedResponse, null, 2),
           },
         ],
-        isError: false, // Not an error -- just already done
+        isError: false,
       };
     }
   }
@@ -643,17 +586,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   let result;
 
   if (editorConnected) {
-    // Primary path: live editor (already validated against project state)
     result = await executeLiveTool(request, toolName, args);
   } else if (fallbackAvailable) {
-    // Fallback path: binary injector
     result = await executeFallbackTool(toolName, args, CONFIG.projectRoot);
   } else {
     return {
       content: [
         {
           type: "text",
-          text: `Cannot execute tool "${toolName}": Unreal Editor is not connected and offline fallback is not available. Start the editor with AgenticMCP plugin enabled, or configure AGENTIC_PROJECT_ROOT for offline mode.`,
+          text: `Cannot execute tool "${toolName}": Unreal Editor is not connected and offline fallback is not available.`,
         },
       ],
       isError: true,
@@ -680,10 +621,90 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // ---------------------------------------------------------------------------
+// Handle execute_request -- local inference loop
+// ---------------------------------------------------------------------------
+async function handleExecuteRequest(args) {
+  const { request: userRequest } = args;
+
+  if (!userRequest || userRequest.trim().length === 0) {
+    return {
+      content: [{ type: "text", text: "Error: request cannot be empty." }],
+      isError: true,
+    };
+  }
+
+  if (!editorConnected) {
+    return {
+      content: [{ type: "text", text: "Error: Unreal Editor must be connected for execute_request." }],
+      isError: true,
+    };
+  }
+
+  log.info("execute_request received", { request: userRequest.slice(0, 100) });
+
+  try {
+    const result = await handleRequest(userRequest, {
+      workerUrl: CONFIG.workerUrl,
+
+      // Execute a tool against the C++ plugin
+      executeToolFn: async (toolName, payload) => {
+        return await executeUnrealTool(toolName, payload);
+      },
+
+      // Project state validation
+      validateMutationFn: async (toolName, payload, readFn) => {
+        return await validateMutation(toolName, payload, readFn);
+      },
+
+      // Idempotency check
+      checkIdempotencyFn: async (toolName, payload, readFn) => {
+        return await checkIdempotency(toolName, payload, readFn);
+      },
+
+      // Confidence gate
+      evaluateGateFn: (toolName, payload) => {
+        return evaluateGate(toolName, payload);
+      },
+
+      // Read-only tool executor for validators
+      readToolFn: async (readToolName, readArgs) => {
+        return await executeUnrealTool(readToolName, readArgs);
+      },
+    });
+
+    // Format the response
+    const lines = [];
+    lines.push(`## Request: ${userRequest}`);
+    lines.push(`**Status**: ${result.success ? 'Completed' : 'Partial'}`);
+    lines.push(`**Iterations**: ${result.iterations}`);
+    lines.push(`**Summary**: ${result.summary}`);
+
+    if (result.steps.length > 0) {
+      lines.push('\n### Steps Executed:');
+      for (const step of result.steps) {
+        const icon = step.status === 'completed' ? 'OK' : step.status === 'skipped' ? 'SKIP' : 'FAIL';
+        lines.push(`- [${icon}] ${step.toolName} (${step.status})`);
+        if (step.reason) lines.push(`  Reason: ${step.reason}`);
+      }
+    }
+
+    return {
+      content: [{ type: "text", text: lines.join('\n') }],
+      isError: !result.success,
+    };
+  } catch (error) {
+    log.error("execute_request failed", { error: error.message, stack: error.stack });
+    return {
+      content: [{ type: "text", text: `Error: ${error.message}` }],
+      isError: true,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Execute tool via live editor (with async support)
 // ---------------------------------------------------------------------------
 async function executeLiveTool(request, toolName, args) {
-  // Task queue tools are the async infrastructure itself — don't wrap them
   const isTaskTool = toolName.startsWith("task_");
 
   if (CONFIG.asyncEnabled && !isTaskTool) {
@@ -764,7 +785,6 @@ function handleContextRequest(args) {
     };
   }
 
-  // No category or query — list all available categories
   const categoryList = listCategories().map((cat) => {
     const info = getCategoryInfo(cat);
     return `- **${cat}**: Keywords: ${info.keywords.slice(0, 5).join(", ")}...`;
@@ -791,9 +811,18 @@ async function handleStatusRequest() {
     fallbackAvailable = await checkFallbackAvailable(CONFIG.projectRoot);
   }
 
+  // Check if local LLM is available
+  let workerAvailable = false;
+  try {
+    const resp = await fetch(`${CONFIG.workerUrl}/health`, { signal: AbortSignal.timeout(2000) });
+    workerAvailable = resp.ok;
+  } catch { /* not available */ }
+
   const response = {
     editor_connected: editorConnected,
     fallback_available: fallbackAvailable,
+    worker_available: workerAvailable,
+    worker_url: CONFIG.workerUrl,
     active_path: editorConnected ? "live_editor" : fallbackAvailable ? "offline_fallback" : "none",
     context_categories: listCategories(),
   };
@@ -821,11 +850,11 @@ async function handleStatusRequest() {
     }
     response.tool_summary = categories;
     response.total_tools = unrealTools.length;
-    response.message = "Unreal Editor connected. All tools operational.";
+    response.message = "Unreal Editor connected. All tools operational. " +
+      (workerAvailable ? "Local Llama Worker: ONLINE." : "Local Llama Worker: OFFLINE (execute_request unavailable).");
   } else if (fallbackAvailable) {
     response.total_tools = FALLBACK_TOOLS.length;
-    response.message =
-      "Unreal Editor not connected. Offline fallback active — subset of tools available. Start editor for full functionality.";
+    response.message = "Unreal Editor not connected. Offline fallback active.";
     response.degraded_capabilities = [
       "No compilation or validation",
       "No real-time actor spawning",
@@ -833,8 +862,7 @@ async function handleStatusRequest() {
       "Read/write .umap files only",
     ];
   } else {
-    response.message =
-      "No connection available. Start Unreal Editor with AgenticMCP plugin, or set AGENTIC_PROJECT_ROOT for offline mode.";
+    response.message = "No connection available. Start Unreal Editor with AgenticMCP plugin.";
   }
 
   return {
@@ -847,7 +875,6 @@ async function handleStatusRequest() {
 // Start the server
 // ---------------------------------------------------------------------------
 
-// Global error handlers for unhandled rejections and exceptions
 process.on('unhandledRejection', (reason, promise) => {
   log.error('Unhandled Promise Rejection', {
     reason: reason?.message || String(reason),
@@ -860,7 +887,6 @@ process.on('uncaughtException', (error) => {
     error: error.message,
     stack: error.stack
   });
-  // Give time to flush logs before exiting
   setTimeout(() => process.exit(1), 100);
 });
 
@@ -898,8 +924,9 @@ async function main() {
   }
 
   log.info("AgenticMCP Server started", {
-    version: "2.0.0",
+    version: "3.0.0",
     unrealUrl: CONFIG.unrealMcpUrl,
+    workerUrl: CONFIG.workerUrl,
     timeoutMs: CONFIG.requestTimeoutMs,
     asyncEnabled: CONFIG.asyncEnabled,
     fallbackEnabled: CONFIG.fallbackEnabled,
@@ -908,6 +935,7 @@ async function main() {
     contextCategories: categories,
     editorConnected,
     reconnectionEnabled: true,
+    plannerMode: "local_llama",
   });
 }
 

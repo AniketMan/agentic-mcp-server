@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM  Start inference servers for AgenticMCP Gatekeeper
+REM  Start inference servers for AgenticMCP v3.0 (fully local)
 REM
 REM  GPU Memory Budget:
 REM    - Single 16GB GPU: Run Worker (8B) only. All roles auto-fallback to it.
@@ -30,7 +30,7 @@ echo.
 REM --- Worker (8B) on port 8081 - REQUIRED ---
 REM This is the primary inference server. The gatekeeper routes all roles here
 REM if no other servers are detected.
-start "AgenticMCP - Worker (port 8081)" cmd /c "start-planner.bat"
+start "AgenticMCP - Worker (port 8081)" cmd /c "start-worker.bat"
 timeout /t 5 /nobreak >nul
 
 REM --- Validator (3B) on port 8080 - OPTIONAL (needs ~2GB extra VRAM) ---
