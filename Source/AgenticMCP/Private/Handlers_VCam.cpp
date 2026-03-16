@@ -48,7 +48,7 @@ FString FAgenticMCPServer::HandleVCamList(const FString& Body)
 
         // Check for VCam component
         UActorComponent* VCamComp = Cam->FindComponentByClass(
-            FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("VCamComponent")));
+            FindFirstObject<UClass>(TEXT("VCamComponent"), EFindFirstObjectOptions::NativeFirst));
         Writer->WriteValue(TEXT("hasVCamComponent"), VCamComp != nullptr);
         Writer->WriteObjectEnd();
     }
@@ -111,7 +111,7 @@ FString FAgenticMCPServer::HandleVCamCreate(const FString& Body)
     Cam->SetActorLabel(*Name);
 
     // Try to add VCam component dynamically
-    UClass* VCamClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("VCamComponent"));
+    UClass* VCamClass = FindFirstObject<UClass>(TEXT("VCamComponent"), EFindFirstObjectOptions::NativeFirst);
     if (VCamClass)
     {
         UActorComponent* VCamComp = NewObject<UActorComponent>(Cam, VCamClass, TEXT("VCamComponent"));

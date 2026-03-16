@@ -8,8 +8,28 @@
 #include "Engine/World.h"
 #include "Editor.h"
 #include "EngineUtils.h"
+#include "UObject/UObjectIterator.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPComposure, Log, All);
+
+// Helper: Find a UClass by short name across all loaded packages.
+// Uses FindFirstObject on UE 5.1+ (ANY_PACKAGE was removed).
+static UClass* FindClassByName(const TCHAR* ClassName)
+{
+	// Try FindFirstObject first (UE 5.1+)
+	UClass* Found = FindFirstObject<UClass>(ClassName, EFindFirstObjectOptions::NativeFirst);
+	if (Found) return Found;
+
+	// Fallback: iterate loaded classes
+	for (TObjectIterator<UClass> It; It; ++It)
+	{
+		if (It->GetName() == ClassName)
+		{
+			return *It;
+		}
+	}
+	return nullptr;
+}
 
 // ============================================================
 // composureList
@@ -24,7 +44,7 @@ FString FAgenticMCPServer::HandleComposureList(const FString& Body)
     }
 
     // Find CompositingElement actors
-    UClass* CompElementClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("CompositingElement"));
+    UClass* CompElementClass = FindClassByName(TEXT("CompositingElement"));
 
     FString Result;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -88,11 +108,11 @@ FString FAgenticMCPServer::HandleComposureCreateElement(const FString& Body)
     else if (ElementType == TEXT("MediaPlate")) ClassName = TEXT("CompositingMediaInput");
     else ClassName = TEXT("CompositingElement");
 
-    UClass* ElementClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, *ClassName);
+    UClass* ElementClass = FindClassByName(*ClassName);
     if (!ElementClass)
     {
         // Fallback to base CompositingElement
-        ElementClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("CompositingElement"));
+        ElementClass = FindClassByName(TEXT("CompositingElement"));
     }
 
     if (!ElementClass)

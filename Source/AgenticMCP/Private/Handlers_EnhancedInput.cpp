@@ -107,7 +107,7 @@ FString FAgenticMCPServer::HandleInputCreateAction(const FString& Body)
         return MakeErrorJson(TEXT("name is required"));
     }
 
-    UClass* FactoryClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("InputActionFactory"));
+    UClass* FactoryClass = FindFirstObject<UClass>(TEXT("InputActionFactory"), EFindFirstObjectOptions::NativeFirst);
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("EnhancedInput plugin is not loaded."));
@@ -182,7 +182,7 @@ FString FAgenticMCPServer::HandleInputCreateMappingContext(const FString& Body)
         return MakeErrorJson(TEXT("name is required"));
     }
 
-    UClass* FactoryClass = FindObject<UClass>(ANY_PACKAGE_COMPAT, TEXT("InputMappingContextFactory"));
+    UClass* FactoryClass = FindFirstObject<UClass>(TEXT("InputMappingContextFactory"), EFindFirstObjectOptions::NativeFirst);
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("EnhancedInput plugin is not loaded."));

@@ -692,7 +692,7 @@ FString FAgenticMCPServer::HandlePCGAddNode(const FString& Body)
 	if (!Graph)
 		return MakeErrorJson(FString::Printf(TEXT("PCG Graph not found: %s"), *GraphPath));
 
-	UClass* SettingsClass = FindObject<UClass>(ANY_PACKAGE, *NodeClass);
+	UClass* SettingsClass = FindFirstObject<UClass>(*NodeClass, EFindFirstObjectOptions::NativeFirst);
 	if (!SettingsClass)
 		return MakeErrorJson(FString::Printf(TEXT("Node class not found: %s"), *NodeClass));
 

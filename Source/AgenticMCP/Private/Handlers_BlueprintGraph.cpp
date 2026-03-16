@@ -38,7 +38,7 @@ FString FAgenticMCPServer::HandleBPCreateBlueprint(const FString& Body)
 
 	if (ParentClass.IsEmpty()) ParentClass = TEXT("Actor");
 
-	UClass* Parent = FindObject<UClass>(ANY_PACKAGE, *ParentClass);
+	UClass* Parent = FindFirstObject<UClass>(*ParentClass, EFindFirstObjectOptions::NativeFirst);
 	if (!Parent) Parent = AActor::StaticClass();
 
 	FString AssetName = FPaths::GetBaseFilename(Path);
@@ -198,7 +198,7 @@ FString FAgenticMCPServer::HandleBPAddNode(const FString& Body)
 	{
 		FString FunctionName = Json->GetStringField(TEXT("functionName"));
 		UK2Node_CallFunction* CallNode = NewObject<UK2Node_CallFunction>(Graph);
-		UFunction* Func = FindObject<UFunction>(ANY_PACKAGE, *FunctionName);
+		UFunction* Func = FindFirstObject<UFunction>(*FunctionName, EFindFirstObjectOptions::NativeFirst);
 		if (Func)
 			CallNode->SetFromFunction(Func);
 		NewNode = CallNode;
