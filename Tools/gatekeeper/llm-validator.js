@@ -244,7 +244,9 @@ Format: {"toolName": "${step.tool}", "payload": {...}}`;
 
   try {
     const url = await getUrlForRole(role);
-    // Use /v1/chat/completions endpoint with system role for prompt injection
+    // Use /v1/chat/completions endpoint (OpenAI-compatible)
+    // NOTE: llama.cpp does NOT support logprobs on this endpoint.
+    // Confidence is scored by structural analysis of the response.
     const resp = await fetch(`${url}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -257,9 +259,6 @@ Format: {"toolName": "${step.tool}", "payload": {...}}`;
         temperature: 0.1,  // near-deterministic
         top_p: 0.9,
         stop: ['\n\n'],
-        // Request logprobs for confidence scoring
-        logprobs: true,
-        top_logprobs: 1,
       }),
       signal: AbortSignal.timeout(30000),
     });
@@ -272,16 +271,60 @@ Format: {"toolName": "${step.tool}", "payload": {...}}`;
     const choice = result.choices?.[0];
     const content = choice?.message?.content?.trim();
 
-    // Extract confidence from logprobs if available
+    // Structural confidence scoring (llama.cpp has no logprobs on chat endpoint)
+    // Score based on: valid JSON, correct tool name, no escalation, has required fields
     let confidence = 0;
-    const logprobsData = choice?.logprobs?.content;
-    if (logprobsData && logprobsData.length > 0) {
-      // Average token probability across the output (exp of logprob)
-      const probs = logprobsData.map(t => Math.exp(t.logprob || -10));
-      confidence = probs.reduce((a, b) => a + b, 0) / probs.length;
-    } else if (result.usage?.completion_tokens) {
-      // Heuristic fallback: if we got tokens but no logprobs, assume moderate confidence
-      confidence = 0.80;
+    if (content && content.length > 0) {
+      let score = 0;
+      let checks = 0;
+
+      // Check 1: Response is valid JSON
+      checks++;
+      let parsedCheck = null;
+      try {
+        parsedCheck = JSON.parse(content);
+        score++;
+      } catch {
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try { parsedCheck = JSON.parse(jsonMatch[0]); score += 0.8; } catch { /* no json */ }
+        }
+      }
+
+      // Check 2: Contains the expected tool name
+      checks++;
+      if (parsedCheck?.toolName === step.tool) {
+        score++;
+      } else if (parsedCheck?.toolName) {
+        score += 0.3;  // has a tool name but wrong one
+      }
+
+      // Check 3: Has a payload object
+      checks++;
+      if (parsedCheck?.payload && typeof parsedCheck.payload === 'object') {
+        score++;
+      }
+
+      // Check 4: Not an escalation
+      checks++;
+      if (!parsedCheck?.escalation) {
+        score++;
+      }
+
+      // Check 5: Payload has at least one key
+      checks++;
+      if (parsedCheck?.payload && Object.keys(parsedCheck.payload).length > 0) {
+        score++;
+      }
+
+      // Check 6: No "unknown" or placeholder values in payload
+      checks++;
+      const payloadStr = JSON.stringify(parsedCheck?.payload || {});
+      if (!payloadStr.match(/UNKNOWN|TODO|PLACEHOLDER|undefined|null/i)) {
+        score++;
+      }
+
+      confidence = Math.min(score / checks, 1.0);
     }
 
     // Try to parse the JSON output
