@@ -29,6 +29,18 @@ FString FAgenticMCPServer::HandlePythonExecFile(const FString& Body)
 	if (FilePath.IsEmpty())
 		return MakeErrorJson(TEXT("Missing 'filePath'"));
 
+	// ---- Path sanitization (P1 security fix) ----
+	// Collapse relative segments and reject traversal attempts
+	FPaths::CollapseRelativeDirectories(FilePath);
+	if (FilePath.Contains(TEXT("..")))
+		return MakeErrorJson(TEXT("Path traversal detected: '..' not allowed"));
+
+	// Restrict to project directory tree
+	FString ProjectDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
+	FString FullFilePath = FPaths::ConvertRelativePathToFull(FilePath);
+	if (!FullFilePath.StartsWith(ProjectDir))
+		return MakeErrorJson(FString::Printf(TEXT("Path outside project directory: %s"), *FullFilePath));
+
 	if (!FPaths::FileExists(FilePath))
 		return MakeErrorJson(FString::Printf(TEXT("File not found: %s"), *FilePath));
 
@@ -70,12 +82,15 @@ FString FAgenticMCPServer::HandlePythonExecString(const FString& Body)
 	if (Code.IsEmpty())
 		return MakeErrorJson(TEXT("Missing 'code'"));
 
-	// Write to temp file and execute
-	FString TempPath = FPaths::ProjectSavedDir() / TEXT("MCP_TempScript.py");
+	// Write to unique temp file and execute (P2 security fix: prevent race conditions)
+	FString TempPath = FPaths::ProjectSavedDir() / FString::Printf(TEXT("MCP_TempScript_%s.py"), *FGuid::NewGuid().ToString());
 	FFileHelper::SaveStringToFile(Code, *TempPath);
 
 	FString Command = FString::Printf(TEXT("py \"%s\""), *TempPath);
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
+
+	// Clean up temp file after execution
+	IFileManager::Get().Delete(*TempPath);
 
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	OutJson->SetStringField(TEXT("status"), TEXT("ok"));

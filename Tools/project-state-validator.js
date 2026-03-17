@@ -1025,28 +1025,90 @@ const VALIDATION_RULES = {
   executePython: [
     {
       name: "python_safety_check",
-      description: "Basic safety check on Python code execution",
+      description: "Multi-phase Python code safety scanner",
       readTool: null,
       buildArgs: () => null,
       validate: (_, args) => {
         const code = args.code || args.script || "";
-        const dangerous = [
-          "shutil.rmtree", "os.remove", "os.unlink", "os.rmdir",
-          "subprocess.call", "subprocess.run", "subprocess.Popen",
-          "eval(", "exec(",
-          "import socket", "import http",
+
+        // Phase 1: Size limit (prevent resource exhaustion)
+        if (code.length > 50000) {
+          return {
+            valid: false,
+            claimed: `Executing Python code (${code.length} chars)`,
+            actual: "Code exceeds maximum allowed size (50000 chars)",
+            fix: "Break the code into smaller execution units.",
+          };
+        }
+
+        // Phase 2: Normalize (strip comments and collapse whitespace for scanning)
+        const normalized = code
+          .replace(/#[^\n]*/g, "")           // strip line comments
+          .replace(/"""[\s\S]*?"""/g, "")   // strip triple-quoted strings
+          .replace(/'''[\s\S]*?'''/g, "")   // strip triple-quoted strings
+          .replace(/\s+/g, " ");            // collapse whitespace
+
+        // Phase 3: Dangerous pattern regex scan
+        const dangerousPatterns = [
+          // Filesystem destruction
+          { rx: /\bshutil\.rmtree\b/, desc: "shutil.rmtree" },
+          { rx: /\bos\.(remove|unlink|rmdir|removedirs)\b/, desc: "os file deletion" },
+          { rx: /\bos\.system\b/, desc: "os.system" },
+          // Subprocess
+          { rx: /\bsubprocess\.(call|run|Popen|check_output|check_call|getoutput|getstatusoutput)\b/, desc: "subprocess execution" },
+          // Code injection
+          { rx: /\beval\s*\(/, desc: "eval()" },
+          { rx: /\bexec\s*\(/, desc: "exec()" },
+          { rx: /\bcompile\s*\(/, desc: "compile()" },
+          // Import of dangerous modules
+          { rx: /\b(import|from)\s+(socket|http|urllib|requests|ctypes|multiprocessing|threading|signal)\b/, desc: "dangerous module import" },
+          { rx: /\b__import__\s*\(/, desc: "__import__()" },
+          // File write detection (including r+ mode which allows writing)
+          { rx: /\bopen\s*\([^)]*['"][^'"]*[wax+][^'"]*['"]/, desc: "file write via open()" },
+          // Attribute/builtin escape hatches
+          { rx: /\b__globals__\b/, desc: "__globals__ access" },
+          { rx: /\b__builtins__\b/, desc: "__builtins__ access" },
+          { rx: /\bglobals\s*\(\s*\)/, desc: "globals() call" },
+          { rx: /\bvars\s*\(\s*(__builtins__|builtins)/, desc: "vars(__builtins__) escape" },
+          { rx: /\b__subclasses__\s*\(/, desc: "__subclasses__() MRO escape" },
+          { rx: /\b__mro__\b/, desc: "__mro__ access" },
+          { rx: /\bmro\s*\(\s*\)/, desc: "mro() call" },
+          // Network
+          { rx: /\bsocket\s*\.\s*socket\b/, desc: "raw socket creation" },
+          { rx: /\burlopen\s*\(/, desc: "urlopen()" },
         ];
-        for (const pattern of dangerous) {
-          if (code.includes(pattern)) {
+
+        for (const { rx, desc } of dangerousPatterns) {
+          if (rx.test(normalized)) {
             return {
               valid: false,
-              claimed: `Executing Python with '${pattern}'`,
-              actual: `Potentially dangerous operation detected: '${pattern}'`,
+              claimed: `Executing Python with '${desc}'`,
+              actual: `Dangerous operation detected: '${desc}'`,
               fix: `Review the Python code carefully. Avoid destructive filesystem ` +
-                `operations and network calls. Use UE5's built-in Python API instead.`,
+                `operations, network calls, and sandbox escapes. Use UE5's built-in Python API instead.`,
             };
           }
         }
+
+        // Phase 4: Obfuscation detection (string concat to build dangerous names)
+        const obfuscationPatterns = [
+          { rx: /getattr\s*\([^)]*['"]\s*\+\s*['"]/, desc: "getattr with string concatenation" },
+          { rx: /bytes\s*\(\s*\[/, desc: "bytes() constructor (potential string obfuscation)" },
+          { rx: /chr\s*\(.*\)\s*\+\s*chr\s*\(/, desc: "chr() concatenation" },
+        ];
+
+        for (const { rx, desc } of obfuscationPatterns) {
+          if (rx.test(normalized)) {
+            return {
+              valid: false,
+              claimed: `Executing Python with obfuscated code`,
+              actual: `Potential obfuscation detected: '${desc}'`,
+              fix: `Code appears to use obfuscation techniques to bypass safety checks. ` +
+                `Write code directly without string manipulation tricks.`,
+            };
+          }
+        }
+
         return { valid: true };
       },
       docCategory: "Blueprint",
@@ -1164,8 +1226,8 @@ export async function validateMutation(toolName, args, executeReadTool) {
 }
 
 /**
- * Format validation failures into a structured response for Claude.
- * This is what Claude sees when a mutation is blocked by the validator.
+ * Format validation failures into a structured response for the Worker.
+ * This is what the Worker sees when a mutation is blocked by the validator.
  *
  * @param {string} toolName - The blocked tool
  * @param {object} args - The tool arguments

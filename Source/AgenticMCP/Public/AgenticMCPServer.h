@@ -122,6 +122,12 @@ private:
 	bool bRunning = false;
 	bool bIsEditor = false;
 
+	// ---- Authentication ----
+	FString ConfiguredApiKey;
+	void LoadApiKey();
+	bool AuthenticateRequest(const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete);
+	static bool TimingSafeCompare(const FString& A, const FString& B);
+
 	// ============================================================
 	// Handler declarations -- organized by category
 	// ============================================================
