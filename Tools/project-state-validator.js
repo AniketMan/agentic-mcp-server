@@ -1025,140 +1025,88 @@ const VALIDATION_RULES = {
   executePython: [
     {
       name: "python_safety_check",
-      description: "AST-tokenization-based safety check on Python code execution",
+      description: "Multi-phase Python code safety scanner",
       readTool: null,
       buildArgs: () => null,
       validate: (_, args) => {
         const code = args.code || args.script || "";
 
-        if (!code.trim()) {
-          return { valid: true };
-        }
-
-        // ---------------------------------------------------------------
-        // Phase 1: Normalize code to defeat encoding-based bypasses
-        // ---------------------------------------------------------------
-        const normalizedCode = code
-          .replace(/\\x[0-9a-fA-F]{2}/g, "X")   // Hex escapes
-          .replace(/\\u[0-9a-fA-F]{4}/g, "X")    // Unicode escapes
-          .replace(/\\[0-7]{1,3}/g, "X")          // Octal escapes
-          .replace(/\bbase64\b/gi, "BASE64_BLOCKED")
-          .replace(/\bcodecs\b/gi, "CODECS_BLOCKED");
-
-        // ---------------------------------------------------------------
-        // Phase 2: Tokenize and check for dangerous patterns
-        //   Unlike simple string matching, this catches obfuscated calls
-        //   like __import__('os'), getattr(builtins, 'exec'), etc.
-        // ---------------------------------------------------------------
-
-        // Dangerous module imports (direct and dynamic)
-        const dangerousModules = [
-          "os", "sys", "subprocess", "shutil", "socket", "http",
-          "ftplib", "smtplib", "ctypes", "signal", "multiprocessing",
-          "importlib", "pathlib", "tempfile", "glob", "io",
-          "pickle", "shelve", "marshal", "code", "codeop",
-          "compileall", "py_compile", "zipimport", "pkgutil",
-        ];
-
-        // Dangerous builtins and attribute access patterns
-        const dangerousPatterns = [
-          // Direct dangerous calls
-          /\b(?:eval|exec|compile|execfile)\s*\(/i,
-          // Dynamic import mechanisms
-          /\b__import__\s*\(/i,
-          /\bimportlib\s*\.\s*import_module\s*\(/i,
-          // Builtin access tricks
-          /\bgetattr\s*\(\s*(?:__builtins__|builtins)/i,
-          /\b__builtins__\s*\[/i,
-          /\b__builtins__\s*\.\s*__dict__/i,
-          // Dangerous dunder access
-          /\b__subclasses__\s*\(/i,
-          /\b__globals__/i,
-          /\b__code__/i,
-          /\b__class__\s*\.\s*__bases__/i,
-          /\b__mro__/i,
-          // File system destructors
-          /\bshutil\s*\.\s*rmtree/i,
-          /\bos\s*\.\s*(?:remove|unlink|rmdir|system|popen|exec[lv]?[pe]?)\s*\(/i,
-          /\bos\s*\.\s*(?:rename|replace|makedirs|chmod|chown)\s*\(/i,
-          // Subprocess variations
-          /\bsubprocess\s*\.\s*(?:call|run|Popen|check_output|check_call|getoutput|getstatusoutput)\s*\(/i,
-          // Network operations
-          /\bsocket\s*\.\s*socket\s*\(/i,
-          /\burllib\s*\.\s*request/i,
-          /\brequests\s*\.\s*(?:get|post|put|delete|patch)\s*\(/i,
-          // Pickle deserialization (arbitrary code execution)
-          /\bpickle\s*\.\s*(?:loads?|Unpickler)\s*\(/i,
-          // open() for writing (allow read-only)
-          /\bopen\s*\([^)]*['"]\s*[wax+]\s*['"]/i,
-          // Code compilation
-          /\bcompile\s*\([^)]*['"]\s*exec\s*['"]/i,
-        ];
-
-        // Check for dangerous import statements
-        const importRegex = /\b(?:import|from)\s+(\S+)/gi;
-        let match;
-        while ((match = importRegex.exec(normalizedCode)) !== null) {
-          const moduleName = match[1].split(".")[0].toLowerCase();
-          if (dangerousModules.includes(moduleName)) {
-            return {
-              valid: false,
-              claimed: `Executing Python with 'import ${match[1]}'`,
-              actual: `Blocked import of restricted module: '${match[1]}'`,
-              fix: `Module '${moduleName}' is not allowed in MCP Python execution. ` +
-                `Use UE5's built-in Python API (unreal module) instead. ` +
-                `For file operations, use unreal.EditorAssetLibrary. ` +
-                `For logging, use unreal.log().`,
-            };
-          }
-        }
-
-        // Check for dangerous code patterns
-        for (const pattern of dangerousPatterns) {
-          const patternMatch = normalizedCode.match(pattern);
-          if (patternMatch) {
-            return {
-              valid: false,
-              claimed: `Executing Python containing '${patternMatch[0].trim()}'`,
-              actual: `Blocked: potentially dangerous code pattern detected`,
-              fix: `The pattern '${patternMatch[0].trim()}' is not allowed. ` +
-                `Avoid: eval/exec, __import__, getattr on builtins, ` +
-                `subprocess, os.system, file deletion, network calls, ` +
-                `and pickle deserialization. Use the unreal module API.`,
-            };
-          }
-        }
-
-        // Phase 3: Check for string concatenation / char-code tricks that
-        // try to reconstruct blocked function names
-        const charCodePatterns = [
-          /chr\s*\(\s*\d+\s*\)\s*\+\s*chr/i,         // chr(111)+chr(115) = "os"
-          /\bbytearray\s*\(\s*\[/i,                    // bytearray([111,115])
-          /\b(?:join|format)\s*\([^)]*(?:\\x|\\u)/i,   // "".join with escapes
-        ];
-
-        for (const pattern of charCodePatterns) {
-          if (pattern.test(normalizedCode)) {
-            return {
-              valid: false,
-              claimed: `Executing Python with character code construction`,
-              actual: `Blocked: code appears to construct strings from character codes (potential obfuscation)`,
-              fix: `Character code construction patterns (chr(), bytearray, hex escapes) ` +
-                `are not allowed as they can be used to bypass security checks. ` +
-                `Write code directly using the unreal Python API.`,
-            };
-          }
-        }
-
-        // Phase 4: Script size limit to prevent resource exhaustion
+        // Phase 1: Size limit (prevent resource exhaustion)
         if (code.length > 50000) {
           return {
             valid: false,
-            claimed: `Executing Python script (${code.length} chars)`,
-            actual: `Script exceeds maximum allowed size (50KB)`,
-            fix: `Break the script into smaller units or use pythonExecFile ` +
-              `to execute a .py file from the project directory.`,
+            claimed: `Executing Python code (${code.length} chars)`,
+            actual: "Code exceeds maximum allowed size (50000 chars)",
+            fix: "Break the code into smaller execution units.",
           };
+        }
+
+        // Phase 2: Normalize (strip comments and collapse whitespace for scanning)
+        const normalized = code
+          .replace(/#[^\n]*/g, "")           // strip line comments
+          .replace(/"""[\s\S]*?"""/g, "")   // strip triple-quoted strings
+          .replace(/'''[\s\S]*?'''/g, "")   // strip triple-quoted strings
+          .replace(/\s+/g, " ");            // collapse whitespace
+
+        // Phase 3: Dangerous pattern regex scan
+        const dangerousPatterns = [
+          // Filesystem destruction
+          { rx: /\bshutil\.rmtree\b/, desc: "shutil.rmtree" },
+          { rx: /\bos\.(remove|unlink|rmdir|removedirs)\b/, desc: "os file deletion" },
+          { rx: /\bos\.system\b/, desc: "os.system" },
+          // Subprocess
+          { rx: /\bsubprocess\.(call|run|Popen|check_output|check_call|getoutput|getstatusoutput)\b/, desc: "subprocess execution" },
+          // Code injection
+          { rx: /\beval\s*\(/, desc: "eval()" },
+          { rx: /\bexec\s*\(/, desc: "exec()" },
+          { rx: /\bcompile\s*\(/, desc: "compile()" },
+          // Import of dangerous modules
+          { rx: /\b(import|from)\s+(socket|http|urllib|requests|ctypes|multiprocessing|threading|signal)\b/, desc: "dangerous module import" },
+          { rx: /\b__import__\s*\(/, desc: "__import__()" },
+          // File write detection (including r+ mode which allows writing)
+          { rx: /\bopen\s*\([^)]*['"][^'"]*[wax+][^'"]*['"]/, desc: "file write via open()" },
+          // Attribute/builtin escape hatches
+          { rx: /\b__globals__\b/, desc: "__globals__ access" },
+          { rx: /\b__builtins__\b/, desc: "__builtins__ access" },
+          { rx: /\bglobals\s*\(\s*\)/, desc: "globals() call" },
+          { rx: /\bvars\s*\(\s*(__builtins__|builtins)/, desc: "vars(__builtins__) escape" },
+          { rx: /\b__subclasses__\s*\(/, desc: "__subclasses__() MRO escape" },
+          { rx: /\b__mro__\b/, desc: "__mro__ access" },
+          { rx: /\bmro\s*\(\s*\)/, desc: "mro() call" },
+          // Network
+          { rx: /\bsocket\s*\.\s*socket\b/, desc: "raw socket creation" },
+          { rx: /\burlopen\s*\(/, desc: "urlopen()" },
+        ];
+
+        for (const { rx, desc } of dangerousPatterns) {
+          if (rx.test(normalized)) {
+            return {
+              valid: false,
+              claimed: `Executing Python with '${desc}'`,
+              actual: `Dangerous operation detected: '${desc}'`,
+              fix: `Review the Python code carefully. Avoid destructive filesystem ` +
+                `operations, network calls, and sandbox escapes. Use UE5's built-in Python API instead.`,
+            };
+          }
+        }
+
+        // Phase 4: Obfuscation detection (string concat to build dangerous names)
+        const obfuscationPatterns = [
+          { rx: /getattr\s*\([^)]*['"]\s*\+\s*['"]/, desc: "getattr with string concatenation" },
+          { rx: /bytes\s*\(\s*\[/, desc: "bytes() constructor (potential string obfuscation)" },
+          { rx: /chr\s*\(.*\)\s*\+\s*chr\s*\(/, desc: "chr() concatenation" },
+        ];
+
+        for (const { rx, desc } of obfuscationPatterns) {
+          if (rx.test(normalized)) {
+            return {
+              valid: false,
+              claimed: `Executing Python with obfuscated code`,
+              actual: `Potential obfuscation detected: '${desc}'`,
+              fix: `Code appears to use obfuscation techniques to bypass safety checks. ` +
+                `Write code directly without string manipulation tricks.`,
+            };
+          }
         }
 
         return { valid: true };
@@ -1278,8 +1226,8 @@ export async function validateMutation(toolName, args, executeReadTool) {
 }
 
 /**
- * Format validation failures into a structured response for Claude.
- * This is what Claude sees when a mutation is blocked by the validator.
+ * Format validation failures into a structured response for the Worker.
+ * This is what the Worker sees when a mutation is blocked by the validator.
  *
  * @param {string} toolName - The blocked tool
  * @param {object} args - The tool arguments

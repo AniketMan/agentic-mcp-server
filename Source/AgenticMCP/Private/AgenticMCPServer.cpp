@@ -2261,6 +2261,95 @@ void FAgenticMCPServer::RegisterHandlers()
 }
 
 // ============================================================
+// Authentication
+// ============================================================
+
+void FAgenticMCPServer::LoadApiKey()
+{
+	// Read from environment variable AGENTIC_MCP_API_KEY
+	FString EnvKey = FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTIC_MCP_API_KEY"));
+	if (!EnvKey.IsEmpty())
+	{
+		ConfiguredApiKey = EnvKey;
+		UE_LOG(LogTemp, Display, TEXT("AgenticMCP: API key loaded from environment (%d chars)"), ConfiguredApiKey.Len());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AgenticMCP: No API key configured (AGENTIC_MCP_API_KEY not set). Auth disabled — all requests will be accepted."));
+	}
+}
+
+bool FAgenticMCPServer::TimingSafeCompare(const FString& A, const FString& B)
+{
+	if (A.Len() != B.Len()) return false;
+	uint8 Result = 0;
+	for (int32 i = 0; i < A.Len(); ++i)
+	{
+		Result |= (uint8)((*A)[i] ^ (*B)[i]);
+	}
+	return Result == 0;
+}
+
+bool FAgenticMCPServer::AuthenticateRequest(const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+{
+	// If no API key is configured, allow all requests (dev mode)
+	if (ConfiguredApiKey.IsEmpty())
+	{
+		return true;
+	}
+
+	// Check Authorization header: "Bearer <key>"
+	FString AuthHeader;
+	for (const auto& Header : Request.Headers)
+	{
+		if (Header.Key.Equals(TEXT("Authorization"), ESearchCase::IgnoreCase))
+		{
+			if (Header.Value.Num() > 0)
+			{
+				AuthHeader = Header.Value[0];
+			}
+			break;
+		}
+	}
+
+	FString ProvidedKey;
+	if (AuthHeader.StartsWith(TEXT("Bearer ")))
+	{
+		ProvidedKey = AuthHeader.RightChop(7).TrimStartAndEnd();
+	}
+
+	// Also check X-API-Key header as fallback
+	if (ProvidedKey.IsEmpty())
+	{
+		for (const auto& Header : Request.Headers)
+		{
+			if (Header.Key.Equals(TEXT("X-API-Key"), ESearchCase::IgnoreCase))
+			{
+				if (Header.Value.Num() > 0)
+				{
+					ProvidedKey = Header.Value[0].TrimStartAndEnd();
+				}
+				break;
+			}
+		}
+	}
+
+	if (ProvidedKey.IsEmpty() || !TimingSafeCompare(ProvidedKey, ConfiguredApiKey))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AgenticMCP: Unauthorized request rejected"));
+		TSharedRef<FJsonObject> Err = MakeShared<FJsonObject>();
+		Err->SetStringField(TEXT("error"), TEXT("Unauthorized: invalid or missing API key"));
+		TUniquePtr<FHttpServerResponse> R = FHttpServerResponse::Create(
+			JsonToString(Err), TEXT("application/json"));
+		R->Code = EHttpServerResponseCodes::Denied;
+		OnComplete(MoveTemp(R));
+		return false;
+	}
+
+	return true;
+}
+
+// ============================================================
 // Start / Stop / ProcessOneRequest
 // ============================================================
 
@@ -2363,6 +2452,9 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 	Port = InPort;
 	bIsEditor = bEditorMode;
 
+	// ---- Load API key ----
+	LoadApiKey();
+
 	// ---- Scan asset registry ----
 	UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Scanning asset registry..."));
 	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
@@ -2428,6 +2520,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete)) return true;
 				TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
 				J->SetStringField(TEXT("status"), TEXT("ok"));
 				J->SetStringField(TEXT("server"), TEXT("AgenticMCP"));
@@ -2446,6 +2539,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete)) return true;
 				TArray<TSharedPtr<FJsonValue>> EndpointsArray;
 				for (const auto& Pair : HandlerMap)
 				{
@@ -2469,6 +2563,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete)) return true;
 				TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
 				if (bIsEditor)
 				{
@@ -2491,6 +2586,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete)) return true;
 				TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
 				J->SetStringField(TEXT("status"), TEXT("connected"));
 				J->SetStringField(TEXT("server"), TEXT("AgenticMCP"));
@@ -2509,6 +2605,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete)) return true;
 				TArray<TSharedPtr<FJsonValue>> ToolsArray;
 				for (const auto& Pair : HandlerMap)
 				{
@@ -2529,6 +2626,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		FHttpRequestHandler::CreateLambda(
 			[this](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete)) return true;
 				// Extract tool name from the relative path
 				// The request path after /mcp/tool/ contains the tool name
 				FString RelPath = Request.RelativePath.GetPath();

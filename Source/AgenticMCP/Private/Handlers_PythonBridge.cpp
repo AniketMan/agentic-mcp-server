@@ -7,109 +7,9 @@
 #include "AgenticMCPServer.h"
 #include "Editor.h"
 #include "Misc/FileHelper.h"
-#include "Misc/Paths.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
-
-// ============================================================================
-// Path Sanitization Helpers
-// ============================================================================
-
-/**
- * Validate and sanitize a file path for Python execution.
- * Blocks path traversal, command injection, and access outside allowed directories.
- *
- * @param RawPath       The user-supplied path
- * @param OutSafePath   The normalized, validated path (only set on success)
- * @param OutError      Error message (only set on failure)
- * @return              True if the path is safe to use
- */
-static bool SanitizePythonFilePath(const FString& RawPath, FString& OutSafePath, FString& OutError)
-{
-	if (RawPath.IsEmpty())
-	{
-		OutError = TEXT("File path is empty");
-		return false;
-	}
-
-	// Block command injection characters
-	static const TCHAR* DangerousChars[] = {
-		TEXT(";"), TEXT("&"), TEXT("|"), TEXT("`"), TEXT("$"),
-		TEXT("$("), TEXT("\n"), TEXT("\r")
-	};
-	for (const TCHAR* Dangerous : DangerousChars)
-	{
-		if (RawPath.Contains(Dangerous))
-		{
-			OutError = FString::Printf(TEXT("Path contains forbidden character sequence: '%s'"), Dangerous);
-			return false;
-		}
-	}
-
-	// Normalize the path
-	FString NormalizedPath = FPaths::ConvertRelativePathToFull(RawPath);
-	FPaths::NormalizeFilename(NormalizedPath);
-	FPaths::RemoveDuplicateSlashes(NormalizedPath);
-
-	// Block path traversal: after normalization, no ".." should remain
-	if (NormalizedPath.Contains(TEXT("..")))
-	{
-		OutError = TEXT("Path traversal ('..') is not allowed");
-		return false;
-	}
-
-	// Enforce .py extension
-	if (!NormalizedPath.EndsWith(TEXT(".py"), ESearchCase::IgnoreCase))
-	{
-		OutError = TEXT("Only .py files can be executed");
-		return false;
-	}
-
-	// Restrict to allowed directories:
-	//   1. The UE project directory tree
-	//   2. The UE engine Python directory
-	//   3. The plugin's own Tools directory
-	FString ProjectDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
-	FString EngineDir = FPaths::ConvertRelativePathToFull(FPaths::EngineDir());
-	FString PluginDir = FPaths::ConvertRelativePathToFull(
-		FPaths::Combine(FPaths::ProjectPluginsDir(), TEXT("AgenticMCP")));
-	FString SavedDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
-
-	bool bAllowed = NormalizedPath.StartsWith(ProjectDir)
-		|| NormalizedPath.StartsWith(EngineDir)
-		|| NormalizedPath.StartsWith(PluginDir)
-		|| NormalizedPath.StartsWith(SavedDir);
-
-	if (!bAllowed)
-	{
-		OutError = FString::Printf(
-			TEXT("Path '%s' is outside allowed directories (project, engine, plugin, saved)"),
-			*NormalizedPath);
-		return false;
-	}
-
-	OutSafePath = NormalizedPath;
-	return true;
-}
-
-/**
- * Sanitize a single argument string for safe inclusion in a Python command.
- * Strips quotes and dangerous characters.
- */
-static FString SanitizePythonArg(const FString& RawArg)
-{
-	FString Safe = RawArg;
-	Safe = Safe.Replace(TEXT("\""), TEXT(""));
-	Safe = Safe.Replace(TEXT(";"), TEXT(""));
-	Safe = Safe.Replace(TEXT("&"), TEXT(""));
-	Safe = Safe.Replace(TEXT("|"), TEXT(""));
-	Safe = Safe.Replace(TEXT("`"), TEXT(""));
-	Safe = Safe.Replace(TEXT("$"), TEXT(""));
-	Safe = Safe.Replace(TEXT("\n"), TEXT(""));
-	Safe = Safe.Replace(TEXT("\r"), TEXT(""));
-	return Safe;
-}
 
 // ============================================================================
 // IMPROVED PYTHON BRIDGE
@@ -120,9 +20,6 @@ static FString SanitizePythonArg(const FString& RawArg)
 // Body: { "filePath": "/path/to/script.py", "args": ["arg1", "arg2"] }
 FString FAgenticMCPServer::HandlePythonExecFile(const FString& Body)
 {
-	if (!GEditor)
-		return MakeErrorJson(TEXT("Editor not available"));
-
 	TSharedPtr<FJsonObject> Json;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
 	if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
@@ -132,36 +29,38 @@ FString FAgenticMCPServer::HandlePythonExecFile(const FString& Body)
 	if (FilePath.IsEmpty())
 		return MakeErrorJson(TEXT("Missing 'filePath'"));
 
-	// Sanitize and validate the path
-	FString SafePath;
-	FString PathError;
-	if (!SanitizePythonFilePath(FilePath, SafePath, PathError))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("AgenticMCP: Python path rejected: %s (input: %s)"),
-			*PathError, *FilePath);
-		return MakeErrorJson(FString::Printf(TEXT("Invalid file path: %s"), *PathError));
-	}
+	// ---- Path sanitization (P1 security fix) ----
+	// Collapse relative segments and reject traversal attempts
+	FPaths::CollapseRelativeDirectories(FilePath);
+	if (FilePath.Contains(TEXT("..")))
+		return MakeErrorJson(TEXT("Path traversal detected: '..' not allowed"));
 
-	if (!FPaths::FileExists(SafePath))
-		return MakeErrorJson(FString::Printf(TEXT("File not found: %s"), *SafePath));
+	// Restrict to project directory tree
+	FString ProjectDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
+	FString FullFilePath = FPaths::ConvertRelativePathToFull(FilePath);
+	if (!FullFilePath.StartsWith(ProjectDir))
+		return MakeErrorJson(FString::Printf(TEXT("Path outside project directory: %s"), *FullFilePath));
 
-	FString Command = FString::Printf(TEXT("py \"%s\""), *SafePath);
+	if (!FPaths::FileExists(FilePath))
+		return MakeErrorJson(FString::Printf(TEXT("File not found: %s"), *FilePath));
+
+	FString Command = FString::Printf(TEXT("py \"%s\""), *FilePath);
 
 	const TArray<TSharedPtr<FJsonValue>>* ArgsArray = nullptr;
 	if (Json->TryGetArrayField(TEXT("args"), ArgsArray))
 	{
 		for (const TSharedPtr<FJsonValue>& Arg : *ArgsArray)
 		{
-			FString SafeArg = SanitizePythonArg(Arg->AsString());
-			Command += FString::Printf(TEXT(" \"%s\""), *SafeArg);
+			Command += FString::Printf(TEXT(" \"%s\""), *Arg->AsString());
 		}
 	}
 
+	// Capture output via log
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
 
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
-	OutJson->SetStringField(TEXT("executedPath"), SafePath);
+	OutJson->SetStringField(TEXT("command"), Command);
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
 	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
@@ -183,13 +82,15 @@ FString FAgenticMCPServer::HandlePythonExecString(const FString& Body)
 	if (Code.IsEmpty())
 		return MakeErrorJson(TEXT("Missing 'code'"));
 
-	// Write to temp file in Saved directory (always allowed) and execute
-	FString TempPath = FPaths::ConvertRelativePathToFull(
-		FPaths::ProjectSavedDir() / TEXT("MCP_TempScript.py"));
+	// Write to unique temp file and execute (P2 security fix: prevent race conditions)
+	FString TempPath = FPaths::ProjectSavedDir() / FString::Printf(TEXT("MCP_TempScript_%s.py"), *FGuid::NewGuid().ToString());
 	FFileHelper::SaveStringToFile(Code, *TempPath);
 
 	FString Command = FString::Printf(TEXT("py \"%s\""), *TempPath);
 	GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
+
+	// Clean up temp file after execution
+	IFileManager::Get().Delete(*TempPath);
 
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
@@ -197,3 +98,4 @@ FString FAgenticMCPServer::HandlePythonExecString(const FString& Body)
 	FString Out; TSharedRef<TJsonWriter<>> W = TJsonWriterFactory<>::Create(&Out);
 	FJsonSerializer::Serialize(OutJson, W); return Out;
 }
+
