@@ -110,12 +110,7 @@ FString FAgenticMCPServer::HandleInputCreateAction(const FString& Body)
         return MakeErrorJson(TEXT("name is required"));
     }
 
-<<<<<<< HEAD
-    // UE 5.6: nullptr deprecated, use FindFirstObject with full script path
-    UClass* FactoryClass = FindFirstObject<UClass>(TEXT("/Script/EnhancedInputEditor.InputActionFactory"), EFindFirstObjectOptions::EnsureIfAmbiguous);
-=======
     UClass* FactoryClass = FindFirstObject<UClass>(TEXT("InputActionFactory"), EFindFirstObjectOptions::NativeFirst);
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("EnhancedInput plugin is not loaded."));
@@ -190,12 +185,7 @@ FString FAgenticMCPServer::HandleInputCreateMappingContext(const FString& Body)
         return MakeErrorJson(TEXT("name is required"));
     }
 
-<<<<<<< HEAD
-    // UE 5.6: nullptr deprecated, use FindFirstObject with full script path
-    UClass* FactoryClass = FindFirstObject<UClass>(TEXT("/Script/EnhancedInputEditor.InputMappingContextFactory"), EFindFirstObjectOptions::EnsureIfAmbiguous);
-=======
     UClass* FactoryClass = FindFirstObject<UClass>(TEXT("InputMappingContextFactory"), EFindFirstObjectOptions::NativeFirst);
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
     if (!FactoryClass)
     {
         return MakeErrorJson(TEXT("EnhancedInput plugin is not loaded."));

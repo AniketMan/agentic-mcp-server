@@ -83,10 +83,6 @@ FString FAgenticMCPServer::HandleMetaHumanSpawn(const FString& Body)
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	FTransform SpawnTransform(Rotation, Location);
-<<<<<<< HEAD
-	// UE 5.6: SpawnActor no longer takes FTransform pointer, use reference
-=======
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	AActor* Actor = World->SpawnActor<AActor>(BP->GeneratedClass, SpawnTransform, SpawnParams);
 	if (!Actor)
 		return MakeErrorJson(TEXT("Failed to spawn MetaHuman"));

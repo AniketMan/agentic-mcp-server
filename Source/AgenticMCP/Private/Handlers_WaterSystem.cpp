@@ -26,11 +26,7 @@ FString FAgenticMCPServer::HandleWaterList(const FString& Body)
         return MakeErrorJson(TEXT("No editor world"));
     }
 
-<<<<<<< HEAD
-    UClass* WaterBodyClass = FindObject<UClass>(nullptr, TEXT("WaterBody"));
-=======
     UClass* WaterBodyClass = FindFirstObject<UClass>(TEXT("WaterBody"), EFindFirstObjectOptions::NativeFirst);
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 
     FString Result;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -94,11 +90,7 @@ FString FAgenticMCPServer::HandleWaterCreate(const FString& Body)
     else if (WaterType == TEXT("Lake")) ClassName = TEXT("WaterBodyLake");
     else ClassName = TEXT("WaterBodyCustom");
 
-<<<<<<< HEAD
-    UClass* WaterClass = FindObject<UClass>(nullptr, *ClassName);
-=======
     UClass* WaterClass = FindFirstObject<UClass>(*ClassName, EFindFirstObjectOptions::NativeFirst);
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
     if (!WaterClass)
     {
         return MakeErrorJson(FString::Printf(TEXT("Water class not found: %s. Enable the Water plugin."), *ClassName));

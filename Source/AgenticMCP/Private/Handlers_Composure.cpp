@@ -47,11 +47,7 @@ FString FAgenticMCPServer::HandleComposureList(const FString& Body)
     }
 
     // Find CompositingElement actors
-<<<<<<< HEAD
-    UClass* CompElementClass = FindObject<UClass>(nullptr, TEXT("CompositingElement"));
-=======
     UClass* CompElementClass = FindClassByName(TEXT("CompositingElement"));
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 
     FString Result;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
@@ -115,19 +111,11 @@ FString FAgenticMCPServer::HandleComposureCreateElement(const FString& Body)
     else if (ElementType == TEXT("MediaPlate")) ClassName = TEXT("CompositingMediaInput");
     else ClassName = TEXT("CompositingElement");
 
-<<<<<<< HEAD
-    UClass* ElementClass = FindObject<UClass>(nullptr, *ClassName);
-    if (!ElementClass)
-    {
-        // Fallback to base CompositingElement
-        ElementClass = FindObject<UClass>(nullptr, TEXT("CompositingElement"));
-=======
     UClass* ElementClass = FindClassByName(*ClassName);
     if (!ElementClass)
     {
         // Fallback to base CompositingElement
         ElementClass = FindClassByName(TEXT("CompositingElement"));
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
     }
 
     if (!ElementClass)

@@ -1967,8 +1967,9 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleGetBlueprint(Params);
 	});
 	HandlerMap.Add(TEXT("getGraph"), [this](const TMap<FString, FString>& Params, const FString& Body)
-<<<<<<< HEAD
-=======
+	{
+		return HandleGetGraph(Params);
+	});
 
 	// --- New mutation routes ---
 	HandlerMap.Add(TEXT("landscapeSculpt"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLandscapeSculpt(Body); });
@@ -2113,7 +2114,6 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("mediaSetSource"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMediaSetSource(Body); });
 
 
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	{
 		return HandleGetGraph(Params);
 	});
@@ -2264,6 +2264,100 @@ void FAgenticMCPServer::RegisterHandlers()
 // Start / Stop / ProcessOneRequest
 // ============================================================
 
+// ============================================================
+// Authentication Helper
+// ============================================================
+//
+// Validates incoming requests using an API key and/or localhost restriction.
+// Configure via environment variables:
+//   AGENTICMCP_API_KEY  - If set, all requests must include this value
+//                         in the X-API-Key header.
+//   AGENTICMCP_ALLOW_REMOTE - If "true", allow non-localhost connections
+//                             (default: false, localhost-only).
+// ============================================================
+
+static FString GetConfiguredApiKey()
+{
+	FString Key;
+	FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTICMCP_API_KEY"), Key);
+	return Key;
+}
+
+static bool IsRemoteAccessAllowed()
+{
+	FString Value;
+	FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTICMCP_ALLOW_REMOTE"), Value);
+	return Value.Equals(TEXT("true"), ESearchCase::IgnoreCase);
+}
+
+static bool IsLocalhostAddress(const FString& PeerAddress)
+{
+	return PeerAddress.StartsWith(TEXT("127."))
+		|| PeerAddress == TEXT("::1")
+		|| PeerAddress == TEXT("localhost")
+		|| PeerAddress.IsEmpty(); // Empty peer = local IPC
+}
+
+/**
+ * Check auth on an incoming HTTP request. Returns true if allowed, false if rejected.
+ * On rejection, sends a 403 JSON error via OnComplete.
+ */
+static bool AuthenticateRequest(
+	const FHttpServerRequest& Request,
+	const FHttpResultCallback& OnComplete,
+	const FString& ConfiguredApiKey)
+{
+	// 1. Localhost enforcement (unless remote access is explicitly enabled)
+	if (!IsRemoteAccessAllowed())
+	{
+		FString PeerAddress = Request.PeerAddress.IsValid()
+			? Request.PeerAddress.ToString()
+			: TEXT("");
+		if (!IsLocalhostAddress(PeerAddress))
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("AgenticMCP: Rejected non-localhost request from %s. "
+					 "Set AGENTICMCP_ALLOW_REMOTE=true to allow."),
+				*PeerAddress);
+			TSharedRef<FJsonObject> ErrJson = MakeShared<FJsonObject>();
+			ErrJson->SetStringField(TEXT("error"), TEXT("Remote access denied. Only localhost connections are allowed."));
+			FString ErrStr;
+			TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ErrStr);
+			FJsonSerializer::Serialize(ErrJson, Writer);
+			TUniquePtr<FHttpServerResponse> Resp = FHttpServerResponse::Create(ErrStr, TEXT("application/json"));
+			OnComplete(MoveTemp(Resp));
+			return false;
+		}
+	}
+
+	// 2. API key enforcement (if configured)
+	if (!ConfiguredApiKey.IsEmpty())
+	{
+		const TArray<FString>* ApiKeyHeaders = Request.Headers.Find(TEXT("X-API-Key"));
+		FString ProvidedKey;
+		if (ApiKeyHeaders && ApiKeyHeaders->Num() > 0)
+		{
+			ProvidedKey = (*ApiKeyHeaders)[0];
+		}
+
+		if (ProvidedKey != ConfiguredApiKey)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("AgenticMCP: Rejected request with invalid/missing API key"));
+			TSharedRef<FJsonObject> ErrJson = MakeShared<FJsonObject>();
+			ErrJson->SetStringField(TEXT("error"), TEXT("Unauthorized. Provide a valid X-API-Key header."));
+			FString ErrStr;
+			TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&ErrStr);
+			FJsonSerializer::Serialize(ErrJson, Writer);
+			TUniquePtr<FHttpServerResponse> Resp = FHttpServerResponse::Create(ErrStr, TEXT("application/json"));
+			OnComplete(MoveTemp(Resp));
+			return false;
+		}
+	}
+
+	return true; // Allowed
+}
+
 bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 {
 	Port = InPort;
@@ -2283,6 +2377,17 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 	// ---- Register handler dispatch map ----
 	RegisterHandlers();
 
+	// ---- Auth configuration ----
+	FString ApiKey = GetConfiguredApiKey();
+	if (!ApiKey.IsEmpty())
+	{
+		UE_LOG(LogTemp, Display, TEXT("AgenticMCP: API key authentication ENABLED"));
+	}
+	if (!IsRemoteAccessAllowed())
+	{
+		UE_LOG(LogTemp, Display, TEXT("AgenticMCP: Localhost-only mode (set AGENTICMCP_ALLOW_REMOTE=true to change)"));
+	}
+
 	// ---- Start HTTP server ----
 	FHttpServerModule& HttpModule = FModuleManager::LoadModuleChecked<FHttpServerModule>("HTTPServer");
 	TSharedPtr<IHttpRouter> Router = HttpModule.GetHttpRouter(Port);
@@ -2293,11 +2398,15 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 	}
 
 	// Lambda factory: creates a queued handler that dispatches work to the game thread
-	auto QueuedHandler = [this](const FString& Endpoint)
+	// All queued handlers enforce auth before enqueuing.
+	auto QueuedHandler = [this, ApiKey](const FString& Endpoint)
 	{
 		return FHttpRequestHandler::CreateLambda(
-			[this, Endpoint](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
+			[this, Endpoint, ApiKey](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
+				if (!AuthenticateRequest(Request, OnComplete, ApiKey))
+					return true; // Auth failed; response already sent
+
 				TSharedPtr<FPendingRequest> Req = MakeShared<FPendingRequest>();
 				Req->Endpoint = Endpoint;
 				Req->QueryParams = Request.QueryParams;

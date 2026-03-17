@@ -1025,28 +1025,142 @@ const VALIDATION_RULES = {
   executePython: [
     {
       name: "python_safety_check",
-      description: "Basic safety check on Python code execution",
+      description: "AST-tokenization-based safety check on Python code execution",
       readTool: null,
       buildArgs: () => null,
       validate: (_, args) => {
         const code = args.code || args.script || "";
-        const dangerous = [
-          "shutil.rmtree", "os.remove", "os.unlink", "os.rmdir",
-          "subprocess.call", "subprocess.run", "subprocess.Popen",
-          "eval(", "exec(",
-          "import socket", "import http",
+
+        if (!code.trim()) {
+          return { valid: true };
+        }
+
+        // ---------------------------------------------------------------
+        // Phase 1: Normalize code to defeat encoding-based bypasses
+        // ---------------------------------------------------------------
+        const normalizedCode = code
+          .replace(/\\x[0-9a-fA-F]{2}/g, "X")   // Hex escapes
+          .replace(/\\u[0-9a-fA-F]{4}/g, "X")    // Unicode escapes
+          .replace(/\\[0-7]{1,3}/g, "X")          // Octal escapes
+          .replace(/\bbase64\b/gi, "BASE64_BLOCKED")
+          .replace(/\bcodecs\b/gi, "CODECS_BLOCKED");
+
+        // ---------------------------------------------------------------
+        // Phase 2: Tokenize and check for dangerous patterns
+        //   Unlike simple string matching, this catches obfuscated calls
+        //   like __import__('os'), getattr(builtins, 'exec'), etc.
+        // ---------------------------------------------------------------
+
+        // Dangerous module imports (direct and dynamic)
+        const dangerousModules = [
+          "os", "sys", "subprocess", "shutil", "socket", "http",
+          "ftplib", "smtplib", "ctypes", "signal", "multiprocessing",
+          "importlib", "pathlib", "tempfile", "glob", "io",
+          "pickle", "shelve", "marshal", "code", "codeop",
+          "compileall", "py_compile", "zipimport", "pkgutil",
         ];
-        for (const pattern of dangerous) {
-          if (code.includes(pattern)) {
+
+        // Dangerous builtins and attribute access patterns
+        const dangerousPatterns = [
+          // Direct dangerous calls
+          /\b(?:eval|exec|compile|execfile)\s*\(/i,
+          // Dynamic import mechanisms
+          /\b__import__\s*\(/i,
+          /\bimportlib\s*\.\s*import_module\s*\(/i,
+          // Builtin access tricks
+          /\bgetattr\s*\(\s*(?:__builtins__|builtins)/i,
+          /\b__builtins__\s*\[/i,
+          /\b__builtins__\s*\.\s*__dict__/i,
+          // Dangerous dunder access
+          /\b__subclasses__\s*\(/i,
+          /\b__globals__/i,
+          /\b__code__/i,
+          /\b__class__\s*\.\s*__bases__/i,
+          /\b__mro__/i,
+          // File system destructors
+          /\bshutil\s*\.\s*rmtree/i,
+          /\bos\s*\.\s*(?:remove|unlink|rmdir|system|popen|exec[lv]?[pe]?)\s*\(/i,
+          /\bos\s*\.\s*(?:rename|replace|makedirs|chmod|chown)\s*\(/i,
+          // Subprocess variations
+          /\bsubprocess\s*\.\s*(?:call|run|Popen|check_output|check_call|getoutput|getstatusoutput)\s*\(/i,
+          // Network operations
+          /\bsocket\s*\.\s*socket\s*\(/i,
+          /\burllib\s*\.\s*request/i,
+          /\brequests\s*\.\s*(?:get|post|put|delete|patch)\s*\(/i,
+          // Pickle deserialization (arbitrary code execution)
+          /\bpickle\s*\.\s*(?:loads?|Unpickler)\s*\(/i,
+          // open() for writing (allow read-only)
+          /\bopen\s*\([^)]*['"]\s*[wax+]\s*['"]/i,
+          // Code compilation
+          /\bcompile\s*\([^)]*['"]\s*exec\s*['"]/i,
+        ];
+
+        // Check for dangerous import statements
+        const importRegex = /\b(?:import|from)\s+(\S+)/gi;
+        let match;
+        while ((match = importRegex.exec(normalizedCode)) !== null) {
+          const moduleName = match[1].split(".")[0].toLowerCase();
+          if (dangerousModules.includes(moduleName)) {
             return {
               valid: false,
-              claimed: `Executing Python with '${pattern}'`,
-              actual: `Potentially dangerous operation detected: '${pattern}'`,
-              fix: `Review the Python code carefully. Avoid destructive filesystem ` +
-                `operations and network calls. Use UE5's built-in Python API instead.`,
+              claimed: `Executing Python with 'import ${match[1]}'`,
+              actual: `Blocked import of restricted module: '${match[1]}'`,
+              fix: `Module '${moduleName}' is not allowed in MCP Python execution. ` +
+                `Use UE5's built-in Python API (unreal module) instead. ` +
+                `For file operations, use unreal.EditorAssetLibrary. ` +
+                `For logging, use unreal.log().`,
             };
           }
         }
+
+        // Check for dangerous code patterns
+        for (const pattern of dangerousPatterns) {
+          const patternMatch = normalizedCode.match(pattern);
+          if (patternMatch) {
+            return {
+              valid: false,
+              claimed: `Executing Python containing '${patternMatch[0].trim()}'`,
+              actual: `Blocked: potentially dangerous code pattern detected`,
+              fix: `The pattern '${patternMatch[0].trim()}' is not allowed. ` +
+                `Avoid: eval/exec, __import__, getattr on builtins, ` +
+                `subprocess, os.system, file deletion, network calls, ` +
+                `and pickle deserialization. Use the unreal module API.`,
+            };
+          }
+        }
+
+        // Phase 3: Check for string concatenation / char-code tricks that
+        // try to reconstruct blocked function names
+        const charCodePatterns = [
+          /chr\s*\(\s*\d+\s*\)\s*\+\s*chr/i,         // chr(111)+chr(115) = "os"
+          /\bbytearray\s*\(\s*\[/i,                    // bytearray([111,115])
+          /\b(?:join|format)\s*\([^)]*(?:\\x|\\u)/i,   // "".join with escapes
+        ];
+
+        for (const pattern of charCodePatterns) {
+          if (pattern.test(normalizedCode)) {
+            return {
+              valid: false,
+              claimed: `Executing Python with character code construction`,
+              actual: `Blocked: code appears to construct strings from character codes (potential obfuscation)`,
+              fix: `Character code construction patterns (chr(), bytearray, hex escapes) ` +
+                `are not allowed as they can be used to bypass security checks. ` +
+                `Write code directly using the unreal Python API.`,
+            };
+          }
+        }
+
+        // Phase 4: Script size limit to prevent resource exhaustion
+        if (code.length > 50000) {
+          return {
+            valid: false,
+            claimed: `Executing Python script (${code.length} chars)`,
+            actual: `Script exceeds maximum allowed size (50KB)`,
+            fix: `Break the script into smaller units or use pythonExecFile ` +
+              `to execute a .py file from the project directory.`,
+          };
+        }
+
         return { valid: true };
       },
       docCategory: "Blueprint",

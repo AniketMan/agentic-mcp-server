@@ -22,11 +22,8 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "ActorFolder.h"
-<<<<<<< HEAD
-=======
 #include "EditorActorFolders.h"
 #include "Folder.h"
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 
 static UWorld* GetEditorWorld_Scene()
 {
@@ -276,24 +273,15 @@ FString FAgenticMCPServer::HandleSceneCreateFolder(const FString& Body)
 		return MakeErrorJson(TEXT("No editor world"));
 	}
 
-<<<<<<< HEAD
-	// UE 5.6: Use Actor->SetFolderPath directly instead of FActorFolders
-	// Creating folders is implicit when setting an actor's folder path
-	// For now, just return success as folders are created on-demand
-	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
-	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
-	OutJson->SetStringField(TEXT("folderPath"), FolderPath);
-=======
 	FFolder::FRootObject RootObject(World->PersistentLevel);
 	FActorFolders::Get().CreateFolder(*World, FFolder(RootObject, FName(*FolderPath)));
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetStringField(TEXT("status"), TEXT("ok"));
 	Result->SetStringField(TEXT("folderPath"), FolderPath);
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(OutJson, Writer);
+	FJsonSerializer::Serialize(Result, Writer);
 	return Out;
 }
 
@@ -325,23 +313,15 @@ FString FAgenticMCPServer::HandleSceneDeleteFolder(const FString& Body)
 		return MakeErrorJson(TEXT("No editor world"));
 	}
 
-<<<<<<< HEAD
-	// UE 5.6: FActorFolders API changed - folders are managed implicitly
-	// Deleting a folder just means moving actors out of it
-	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
-	OutJson->SetStringField(TEXT("status"), TEXT("ok"));
-	OutJson->SetStringField(TEXT("deletedFolder"), FolderPath);
-=======
 	FFolder::FRootObject RootObject(World->PersistentLevel);
 	FActorFolders::Get().DeleteFolder(*World, FFolder(RootObject, FName(*FolderPath)));
 
 	TSharedRef<FJsonObject> Result = MakeShared<FJsonObject>();
 	Result->SetStringField(TEXT("status"), TEXT("ok"));
 	Result->SetStringField(TEXT("deletedFolder"), FolderPath);
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 	FString Out;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Out);
-	FJsonSerializer::Serialize(OutJson, Writer);
+	FJsonSerializer::Serialize(Result, Writer);
 	return Out;
 }
 

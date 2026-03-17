@@ -95,21 +95,12 @@ FString FAgenticMCPServer::HandleControlRigCreate(const FString& Body)
 		return MakeErrorJson(TEXT("name is required"));
 	}
 
-<<<<<<< HEAD
-    // Use the factory system to create a ControlRigBlueprint
-    UClass* FactoryClass = FindObject<UClass>(nullptr, TEXT("ControlRigBlueprintFactory"));
-    if (!FactoryClass)
-    {
-        return MakeErrorJson(TEXT("ControlRig plugin is not loaded. Enable the ControlRig plugin first."));
-    }
-=======
 	// Use the factory system to create a ControlRigBlueprint
 	UClass* FactoryClass = FindClassByName_ControlRig(TEXT("ControlRigBlueprintFactory"));
 	if (!FactoryClass)
 	{
 		return MakeErrorJson(TEXT("ControlRig plugin is not loaded. Enable the ControlRig plugin first."));
 	}
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 
 	UFactory* Factory = NewObject<UFactory>(GetTransientPackage(), FactoryClass);
 	if (!Factory)
@@ -242,28 +233,6 @@ FString FAgenticMCPServer::HandleControlRigAddControl(const FString& Body)
 		     "lib.add_control(rig, '%s', unreal.RigControlType.%s)"),
 		*AssetPath, *ControlName, *ControlType);
 
-<<<<<<< HEAD
-    // Execute Python command via GEditor->Exec()
-    if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
-    {
-            FString ExecCmd = FString::Printf(TEXT("py %s"), *PythonCmd);
-            bool bSuccess = GEditor->Exec(GEditor->GetEditorWorldContext().World(), *ExecCmd);
-        if (bSuccess)
-        {
-            Asset->MarkPackageDirty();
-            FString Result;
-            TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Result);
-            Writer->WriteObjectStart();
-            Writer->WriteValue(TEXT("success"), true);
-            Writer->WriteValue(TEXT("controlName"), ControlName);
-            Writer->WriteValue(TEXT("controlType"), ControlType);
-            Writer->WriteValue(TEXT("rigPath"), AssetPath);
-            Writer->WriteObjectEnd();
-            Writer->Close();
-            return Result;
-        }
-    }
-=======
 	// Execute Python command via GEditor->Exec()
 	if (FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
 	{
@@ -284,7 +253,6 @@ FString FAgenticMCPServer::HandleControlRigAddControl(const FString& Body)
 			return Result;
 		}
 	}
->>>>>>> dff5884439a2782dee312ccab688904ae4de2c17
 
 	return MakeErrorJson(TEXT("PythonScriptPlugin not loaded. Enable Python Editor Script Plugin to use Control Rig editing."));
 }
