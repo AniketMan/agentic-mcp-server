@@ -1,4 +1,4 @@
-// AgenticMCPServer.cpp
+﻿// AgenticMCPServer.cpp
 // Core HTTP server implementation for AgenticMCP.
 // Contains: Start/Stop/ProcessOneRequest, route registration, serialization,
 // and all common helper functions used across handler files.
@@ -1239,24 +1239,6 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleXRConfigureAudioAttenuation(Params, Body);
 	});
 
-	// ---- Story/Game Handlers ----
-	HandlerMap.Add(TEXT("storyState"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleStoryState(Params, Body);
-	});
-	HandlerMap.Add(TEXT("storyAdvance"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleStoryAdvance(Params, Body);
-	});
-	HandlerMap.Add(TEXT("storyGoto"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleStoryGoto(Params, Body);
-	});
-	HandlerMap.Add(TEXT("storyPlay"), [this](const TMap<FString, FString>& Params, const FString& Body)
-	{
-		return HandleStoryPlay(Params, Body);
-	});
-
 	// ---- DataTable Handlers ----
 	HandlerMap.Add(TEXT("dataTableRead"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
@@ -1573,6 +1555,14 @@ void FAgenticMCPServer::RegisterHandlers()
 		return HandleSequencerRenderStatus(Body);
 	});
 
+	// UE-style sequencer aliases
+	HandlerMap.Add(TEXT("CreateLevelSequence"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSequencerCreate(Body); });
+	HandlerMap.Add(TEXT("AddTrackToSequence"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSequencerAddTrack(Body); });
+	HandlerMap.Add(TEXT("AddSectionToTrack"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSequencerAddSection(Body); });
+	HandlerMap.Add(TEXT("SetKeyOnSection"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSequencerSetKeyframe(Body); });
+	HandlerMap.Add(TEXT("GetSequenceTracks"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSequencerGetTracks(Body); });
+	HandlerMap.Add(TEXT("RenderSequence"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSequencerRender(Body); });
+
 	// ---- Material Graph Mutation Handlers ----
 	HandlerMap.Add(TEXT("materialAddNode"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
@@ -1602,6 +1592,18 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleMaterialAssignToActor(Body);
 	});
+
+	// UE-style material aliases
+	HandlerMap.Add(TEXT("CreateMaterial"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialCreate(Body); });
+	HandlerMap.Add(TEXT("GetMaterialInfo"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialGetInfo(Body); });
+	HandlerMap.Add(TEXT("CreateMaterialInstance"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialCreateInstance(Body); });
+	HandlerMap.Add(TEXT("SetMaterialScalarParameter"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialSetScalar(Body); });
+	HandlerMap.Add(TEXT("SetMaterialVectorParameter"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialSetVector(Body); });
+	HandlerMap.Add(TEXT("SetMaterialTextureParameter"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialSetTextureParam(Body); });
+	HandlerMap.Add(TEXT("AssignMaterialToActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialAssignToActor(Body); });
+	HandlerMap.Add(TEXT("GetMaterialGraph"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialGetGraph(Body); });
+	HandlerMap.Add(TEXT("AddMaterialNode"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialAddNode(Body); });
+	HandlerMap.Add(TEXT("DeleteMaterialNode"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMaterialDeleteNode(Body); });
 
 	// ---- UMG Widget Mutation Handlers ----
 	HandlerMap.Add(TEXT("umgCreateWidget"), [this](const TMap<FString, FString>& Params, const FString& Body)
@@ -1896,6 +1898,18 @@ void FAgenticMCPServer::RegisterHandlers()
 	{
 		return HandleBuildGetStatus(Body);
 	});
+	HandlerMap.Add(TEXT("buildCook"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBuildCook(Body);
+	});
+	HandlerMap.Add(TEXT("buildPackage"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBuildPackage(Body);
+	});
+	HandlerMap.Add(TEXT("buildGetLog"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		return HandleBuildGetLog(Body);
+	});
 	HandlerMap.Add(TEXT("buildLighting"), [this](const TMap<FString, FString>& Params, const FString& Body)
 	{
 		return HandleBuildLighting(Body);
@@ -1995,10 +2009,110 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("levelSetCurrentLevel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLevelSetCurrentLevel(Body); });
 	HandlerMap.Add(TEXT("levelBuildLighting"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLevelBuildLighting(Body); });
 	HandlerMap.Add(TEXT("levelBuildNavigation"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLevelBuildNavigation(Body); });
+
+	// UE-style level aliases
+	HandlerMap.Add(TEXT("CreateLevel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLevelCreate(Body); });
+	HandlerMap.Add(TEXT("OpenLevel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLoadLevel(Body); });
+	HandlerMap.Add(TEXT("SaveLevel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLevelSave(Body); });
+	HandlerMap.Add(TEXT("SaveAll"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLevelSave(TEXT("{\"all\":true}")); });
+	HandlerMap.Add(TEXT("GetCurrentLevel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleListLevels(TEXT("{}")); });
+	HandlerMap.Add(TEXT("AddSublevel"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		TSharedPtr<FJsonObject> In = ParseBodyJson(Body);
+		if (!In.IsValid())
+		{
+			return HandleLevelAddSublevel(Body);
+		}
+		TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
+		if (In->HasField(TEXT("path")))
+		{
+			Out->SetStringField(TEXT("path"), In->GetStringField(TEXT("path")));
+		}
+		else if (In->HasField(TEXT("levelPath")))
+		{
+			Out->SetStringField(TEXT("path"), In->GetStringField(TEXT("levelPath")));
+		}
+		return HandleLevelAddSublevel(JsonToString(Out));
+	});
+	HandlerMap.Add(TEXT("RemoveSublevel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleRemoveSublevel(Body); });
+	HandlerMap.Add(TEXT("GetSublevels"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleListLevels(TEXT("{}")); });
+
 	HandlerMap.Add(TEXT("actorDuplicate"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorDuplicate(Body); });
 	HandlerMap.Add(TEXT("actorSetMobility"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorSetMobility(Body); });
 	HandlerMap.Add(TEXT("actorSetTags"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorSetTags(Body); });
 	HandlerMap.Add(TEXT("actorSetLayer"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorSetLayer(Body); });
+
+	// UE-style actor aliases
+	HandlerMap.Add(TEXT("SpawnActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSpawnActor(Body); });
+	HandlerMap.Add(TEXT("DeleteActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleDeleteActor(Body); });
+	HandlerMap.Add(TEXT("DuplicateActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorDuplicate(Body); });
+	HandlerMap.Add(TEXT("SetActorTransform"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSetActorTransform(Body); });
+	HandlerMap.Add(TEXT("SetActorProperty"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSetActorProperty(Body); });
+	HandlerMap.Add(TEXT("SetActorMobility"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorSetMobility(Body); });
+	HandlerMap.Add(TEXT("SetActorFolder"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleActorSetLayer(Body); });
+	HandlerMap.Add(TEXT("GetAllActors"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleListActors(Body); });
+	HandlerMap.Add(TEXT("GetActorInfo"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleGetActor(Body); });
+	HandlerMap.Add(TEXT("GetActorTransform"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleGetActor(Body); });
+	HandlerMap.Add(TEXT("FindActorsByClass"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		TSharedPtr<FJsonObject> In = ParseBodyJson(Body);
+		if (!In.IsValid())
+		{
+			return HandleListActors(Body);
+		}
+		TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
+		if (In->HasField(TEXT("classFilter")))
+		{
+			Out->SetStringField(TEXT("classFilter"), In->GetStringField(TEXT("classFilter")));
+		}
+		else if (In->HasField(TEXT("className")))
+		{
+			Out->SetStringField(TEXT("classFilter"), In->GetStringField(TEXT("className")));
+		}
+		return HandleListActors(JsonToString(Out));
+	});
+	HandlerMap.Add(TEXT("FindActorsByName"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		TSharedPtr<FJsonObject> In = ParseBodyJson(Body);
+		if (!In.IsValid())
+		{
+			return HandleListActors(Body);
+		}
+		TSharedRef<FJsonObject> Out = MakeShared<FJsonObject>();
+		if (In->HasField(TEXT("nameFilter")))
+		{
+			Out->SetStringField(TEXT("nameFilter"), In->GetStringField(TEXT("nameFilter")));
+		}
+		else if (In->HasField(TEXT("name")))
+		{
+			Out->SetStringField(TEXT("nameFilter"), In->GetStringField(TEXT("name")));
+		}
+		return HandleListActors(JsonToString(Out));
+	});
+	HandlerMap.Add(TEXT("SelectActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSelectActor(Body); });
+	HandlerMap.Add(TEXT("FocusActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleFocusActor(Body); });
+	HandlerMap.Add(TEXT("SetActorLabel"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSceneSetActorLabel(Body); });
+	HandlerMap.Add(TEXT("DeselectAll"), [this](const TMap<FString, FString>& Params, const FString& Body)
+	{
+		if (!GEditor)
+		{
+			return MakeErrorJson(TEXT("Editor not available"));
+		}
+		GEditor->SelectNone(true, true);
+		TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+		OutJson->SetBoolField(TEXT("success"), true);
+		OutJson->SetStringField(TEXT("message"), TEXT("Selection cleared"));
+		return JsonToString(OutJson);
+	});
+
+	// UE-style component aliases
+	HandlerMap.Add(TEXT("AddComponent"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleAddComponent(Body); });
+	HandlerMap.Add(TEXT("RemoveComponent"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleComponentRemove(Body); });
+	HandlerMap.Add(TEXT("SetComponentProperty"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleComponentSetProperty(Body); });
+	HandlerMap.Add(TEXT("GetAllComponents"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleComponentList(Body); });
+	HandlerMap.Add(TEXT("SetComponentTransform"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleComponentSetTransform(Body); });
+	HandlerMap.Add(TEXT("SetComponentVisibility"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleComponentSetVisibility(Body); });
+	HandlerMap.Add(TEXT("SetComponentCollision"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleComponentSetCollision(Body); });
 	HandlerMap.Add(TEXT("physicsAddConstraint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePhysicsAddConstraint(Body); });
 	HandlerMap.Add(TEXT("physicsRemoveConstraint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePhysicsRemoveConstraint(Body); });
 	HandlerMap.Add(TEXT("physicsSetMass"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePhysicsSetMass(Body); });
@@ -2035,6 +2149,26 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("bpCompile"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPCompile(Body); });
 	HandlerMap.Add(TEXT("bpGetGraph"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPGetGraph(Body); });
 	HandlerMap.Add(TEXT("bpDeleteNode"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPDeleteNode(Body); });
+
+	// UE-style niagara aliases
+	HandlerMap.Add(TEXT("CreateNiagaraSystem"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraCreateSystem(Body); });
+	HandlerMap.Add(TEXT("AddEmitterToNiagaraSystem"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraAddEmitter(Body); });
+	HandlerMap.Add(TEXT("RemoveEmitterFromNiagaraSystem"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraRemoveEmitter(Body); });
+	HandlerMap.Add(TEXT("SetNiagaraSystemProperty"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraSetSystemProperty(Body); });
+	HandlerMap.Add(TEXT("SpawnNiagaraSystem"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraSpawnSystem(Body); });
+	HandlerMap.Add(TEXT("GetNiagaraSystems"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraListSystems(Params, Body); });
+	HandlerMap.Add(TEXT("GetNiagaraSystemInfo"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNiagaraGetSystemInfo(Params, Body); });
+
+	// UE-style blueprint aliases
+	HandlerMap.Add(TEXT("CreateBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPCreateBlueprint(Body); });
+	HandlerMap.Add(TEXT("AddVariableToBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPAddVariable(Body); });
+	HandlerMap.Add(TEXT("AddFunctionToBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPAddFunction(Body); });
+	HandlerMap.Add(TEXT("AddNodeToBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPAddNode(Body); });
+	HandlerMap.Add(TEXT("ConnectBlueprintPins"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPConnectPins(Body); });
+	HandlerMap.Add(TEXT("CompileBlueprint"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPCompile(Body); });
+	HandlerMap.Add(TEXT("GetBlueprintGraph"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPGetGraph(Body); });
+	HandlerMap.Add(TEXT("DeleteBlueprintNode"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleBPDeleteNode(Body); });
+
 	HandlerMap.Add(TEXT("pcgAddNode"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePCGAddNode(Body); });
 	HandlerMap.Add(TEXT("pcgRemoveNode"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePCGRemoveNode(Body); });
 	HandlerMap.Add(TEXT("pcgConnectNodes"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePCGConnectNodes(Body); });
@@ -2046,6 +2180,54 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("metahumanSpawn"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMetaHumanSpawn(Body); });
 	HandlerMap.Add(TEXT("groomList"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleGroomList(Body); });
 	HandlerMap.Add(TEXT("groomSetBinding"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleGroomSetBinding(Body); });
+
+	// ---- Story / Narrative ----
+	HandlerMap.Add(TEXT("storyGetState"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleStoryGetState(Body); });
+	HandlerMap.Add(TEXT("storySetStep"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleStorySetStep(Body); });
+	HandlerMap.Add(TEXT("storyGetScreenplay"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleStoryGetScreenplay(Body); });
+	HandlerMap.Add(TEXT("storyExecuteAction"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleStoryExecuteAction(Body); });
+
+	// ---- Narrative DataAsset Authoring (Handlers_NarrativeData.cpp) ----
+#if WITH_VRNARRATIVEKIT
+	HandlerMap.Add(TEXT("narrativeRead"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeRead(Body); });
+	HandlerMap.Add(TEXT("narrativeAddChapter"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeAddChapter(Body); });
+	HandlerMap.Add(TEXT("narrativeAddScene"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeAddScene(Body); });
+	HandlerMap.Add(TEXT("narrativeAddInteraction"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeAddInteraction(Body); });
+	HandlerMap.Add(TEXT("narrativeAddNarrationCue"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeAddNarrationCue(Body); });
+	HandlerMap.Add(TEXT("narrativeRemoveScene"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeRemoveScene(Body); });
+	HandlerMap.Add(TEXT("narrativeRemoveChapter"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeRemoveChapter(Body); });
+	HandlerMap.Add(TEXT("narrativeClear"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeClear(Body); });
+	HandlerMap.Add(TEXT("narrativeReorderScenes"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeReorderScenes(Body); });
+	HandlerMap.Add(TEXT("narrativeUpdateScene"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleNarrativeUpdateScene(Body); });
+	UE_LOG(LogTemp, Log, TEXT("AgenticMCP: VRNarrativeKit detected — narrative authoring tools enabled (10 endpoints)"));
+#else
+	{
+		auto NarrativeNotAvailable = [this](const TMap<FString, FString>& Params, const FString& Body) -> FString {
+			return MakeErrorJson(TEXT("VRNarrativeKit plugin is not loaded. Narrative authoring tools are unavailable. Enable the VRNarrativeKit plugin and recompile."));
+		};
+		HandlerMap.Add(TEXT("narrativeRead"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeAddChapter"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeAddScene"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeAddInteraction"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeAddNarrationCue"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeRemoveScene"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeRemoveChapter"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeClear"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeReorderScenes"), NarrativeNotAvailable);
+		HandlerMap.Add(TEXT("narrativeUpdateScene"), NarrativeNotAvailable);
+		UE_LOG(LogTemp, Log, TEXT("AgenticMCP: VRNarrativeKit not found — narrative authoring tools disabled"));
+	}
+#endif
+
+	// ---- Utility / Discovery (MCP_REQUESTS fixes) ----
+	HandlerMap.Add(TEXT("listEnumValues"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleListEnumValues(Body); });
+	HandlerMap.Add(TEXT("listEditableProperties"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleListEditableProperties(Body); });
+	HandlerMap.Add(TEXT("createDataAsset"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleCreateDataAsset(Body); });
+	HandlerMap.Add(TEXT("createTransitionPresetRegistry"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleCreateTransitionPresetRegistry(Body); });
+	HandlerMap.Add(TEXT("addComponentToActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleAddComponentToActor(Body); });
+	HandlerMap.Add(TEXT("setMaterialOnActor"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSetMaterialOnActor(Body); });
+	HandlerMap.Add(TEXT("spawnActorBatch"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSpawnActorBatch(Body); });
+	HandlerMap.Add(TEXT("setWorldSetting"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleSetWorldSetting(Body); });
 	HandlerMap.Add(TEXT("pythonExecFile"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePythonExecFile(Body); });
 	HandlerMap.Add(TEXT("pythonExecString"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandlePythonExecString(Body); });
 
@@ -2112,11 +2294,6 @@ void FAgenticMCPServer::RegisterHandlers()
 	HandlerMap.Add(TEXT("mediaCreatePlayer"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMediaCreatePlayer(Body); });
 	HandlerMap.Add(TEXT("mediaCreateSource"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMediaCreateSource(Body); });
 	HandlerMap.Add(TEXT("mediaSetSource"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleMediaSetSource(Body); });
-
-
-	{
-		return HandleGetGraph(Params);
-	});
 
 	// --- New mutation routes ---
 	HandlerMap.Add(TEXT("landscapeSculpt"), [this](const TMap<FString, FString>& Params, const FString& Body) { return HandleLandscapeSculpt(Body); });
@@ -2367,15 +2544,12 @@ bool FAgenticMCPServer::AuthenticateRequest(const FHttpServerRequest& Request, c
 
 static FString GetConfiguredApiKey()
 {
-	FString Key;
-	FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTICMCP_API_KEY"), Key);
-	return Key;
+	return FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTICMCP_API_KEY"));
 }
 
 static bool IsRemoteAccessAllowed()
 {
-	FString Value;
-	FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTICMCP_ALLOW_REMOTE"), Value);
+	FString Value = FPlatformMisc::GetEnvironmentVariable(TEXT("AGENTICMCP_ALLOW_REMOTE"));
 	return Value.Equals(TEXT("true"), ESearchCase::IgnoreCase);
 }
 
@@ -2399,8 +2573,8 @@ static bool AuthenticateRequest(
 	// 1. Localhost enforcement (unless remote access is explicitly enabled)
 	if (!IsRemoteAccessAllowed())
 	{
-		FString PeerAddress = Request.PeerAddress.IsValid()
-			? Request.PeerAddress.ToString()
+	FString PeerAddress = Request.PeerAddress.IsValid()
+			? Request.PeerAddress->ToString(false)
 			: TEXT("");
 		if (!IsLocalhostAddress(PeerAddress))
 		{
@@ -2496,7 +2670,7 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		return FHttpRequestHandler::CreateLambda(
 			[this, Endpoint, ApiKey](const FHttpServerRequest& Request, const FHttpResultCallback& OnComplete)
 			{
-				if (!AuthenticateRequest(Request, OnComplete, ApiKey))
+				if (!::AuthenticateRequest(Request, OnComplete, ApiKey))
 					return true; // Auth failed; response already sent
 
 				TSharedPtr<FPendingRequest> Req = MakeShared<FPendingRequest>();
@@ -2983,16 +3157,6 @@ bool FAgenticMCPServer::Start(int32 InPort, bool bEditorMode)
 		QueuedHandler(TEXT("xrGetSpatialAudioStatus")));
 	Router->BindRoute(FHttpPath(TEXT("/api/xr/audio/attenuation")), EHttpServerRequestVerbs::VERB_POST,
 		QueuedHandler(TEXT("xrConfigureAudioAttenuation")));
-
-	// Story/Game Endpoints
-	Router->BindRoute(FHttpPath(TEXT("/api/story/state")), EHttpServerRequestVerbs::VERB_GET,
-		QueuedHandler(TEXT("storyState")));
-	Router->BindRoute(FHttpPath(TEXT("/api/story/advance")), EHttpServerRequestVerbs::VERB_POST,
-		QueuedHandler(TEXT("storyAdvance")));
-	Router->BindRoute(FHttpPath(TEXT("/api/story/goto")), EHttpServerRequestVerbs::VERB_POST,
-		QueuedHandler(TEXT("storyGoto")));
-	Router->BindRoute(FHttpPath(TEXT("/api/story/play")), EHttpServerRequestVerbs::VERB_POST,
-		QueuedHandler(TEXT("storyPlay")));
 
 	// DataTable Endpoints
 	Router->BindRoute(FHttpPath(TEXT("/api/datatable/read")), EHttpServerRequestVerbs::VERB_POST,

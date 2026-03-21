@@ -1,6 +1,6 @@
 {
   "name": "agentic-mcp-server",
-  "version": "2.0.0",
+  "version": "3.1.0",
   "description": "Dual-path MCP server for Unreal Engine 5 — live editor connection with offline binary injector fallback. Works with Claude Code, Cursor, Windsurf, Manus, and any MCP client.",
   "main": "index.js",
   "type": "module",

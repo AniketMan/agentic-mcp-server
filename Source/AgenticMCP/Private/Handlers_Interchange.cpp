@@ -22,6 +22,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPInterchange, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleInterchangeGetStatus(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

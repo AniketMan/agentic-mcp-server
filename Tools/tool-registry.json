@@ -777,8 +777,71 @@
       "description": "BuildGetStatus",
       "parameters": [],
       "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "buildCook",
+      "description": "BuildCook",
+      "parameters": [
+        {
+          "name": "platform",
+          "type": "string",
+          "description": "Target platform (e.g. Win64)",
+          "required": false
+        },
+        {
+          "name": "configuration",
+          "type": "string",
+          "description": "Build configuration (e.g. Development)",
+          "required": false
+        },
+        {
+          "name": "map",
+          "type": "string",
+          "description": "Optional map name/path",
+          "required": false
+        }
+      ],
+      "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true
+      }
+    },
+    {
+      "name": "buildPackage",
+      "description": "BuildPackage",
+      "parameters": [
+        {
+          "name": "platform",
+          "type": "string",
+          "description": "Target platform (e.g. Win64)",
+          "required": false
+        },
+        {
+          "name": "configuration",
+          "type": "string",
+          "description": "Build configuration (e.g. Development)",
+          "required": false
+        },
+        {
+          "name": "map",
+          "type": "string",
+          "description": "Optional map name/path",
+          "required": false
+        }
+      ],
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true
+      }
+    },
+    {
+      "name": "buildGetLog",
+      "description": "BuildGetLog",
+      "parameters": [],
+      "annotations": {
+        "readOnlyHint": true
       }
     },
     {
@@ -3864,51 +3927,6 @@
       }
     },
     {
-      "name": "storyAdvance",
-      "description": "Advance the story to the next beat",
-      "parameters": [],
-      "annotations": {
-        "destructiveHint": true
-      }
-    },
-    {
-      "name": "storyGoto",
-      "description": "Jump to a specific story beat or chapter",
-      "parameters": [
-        {
-          "name": "index",
-          "type": "string",
-          "description": "index parameter",
-          "required": false
-        },
-        {
-          "name": "stepName",
-          "type": "string",
-          "description": "stepName parameter",
-          "required": false
-        }
-      ],
-      "annotations": {
-        "destructiveHint": true
-      }
-    },
-    {
-      "name": "storyPlay",
-      "description": "Play/resume story playback",
-      "parameters": [],
-      "annotations": {
-        "destructiveHint": true
-      }
-    },
-    {
-      "name": "storyState",
-      "description": "Get the current story/narrative state",
-      "parameters": [],
-      "annotations": {
-        "readOnlyHint": true
-      }
-    },
-    {
       "name": "streamingLevelVisibility",
       "description": "Set visibility of a streaming sublevel",
       "parameters": [
@@ -5621,6 +5639,144 @@
       }
     },
     {
+      "name": "AddComponent",
+      "description": "AddComponent",
+      "parameters": [
+        {
+          "name": "blueprint",
+          "type": "string",
+          "description": "Blueprint name/path (supported by existing addComponent handler)",
+          "required": true
+        },
+        {
+          "name": "componentClass",
+          "type": "string",
+          "description": "Component class to add",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "RemoveComponent",
+      "description": "RemoveComponent",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Component name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetComponentProperty",
+      "description": "SetComponentProperty",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Component name",
+          "required": true
+        },
+        {
+          "name": "propertyName",
+          "type": "string",
+          "description": "Property name",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Property value",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetAllComponents",
+      "description": "GetAllComponents",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetComponentTransform",
+      "description": "SetComponentTransform",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Component name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetComponentVisibility",
+      "description": "SetComponentVisibility",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Component name",
+          "required": true
+        },
+        {
+          "name": "visible",
+          "type": "boolean",
+          "description": "Visibility toggle",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetComponentCollision",
+      "description": "SetComponentCollision",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name",
+          "required": true
+        },
+        {
+          "name": "componentName",
+          "type": "string",
+          "description": "Component name",
+          "required": true
+        }
+      ]
+    },
+    {
       "name": "animBPGetBlendSpace",
       "description": "[Auto-generated] Handler: HandleAnimBPGetBlendSpace",
       "parameters": [
@@ -6304,6 +6460,87 @@
       "parameters": []
     },
     {
+      "name": "CreateLevel",
+      "description": "CreateLevel",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path for the new level",
+          "required": true
+        },
+        {
+          "name": "template",
+          "type": "string",
+          "description": "Template name (optional)",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "OpenLevel",
+      "description": "OpenLevel",
+      "parameters": [
+        {
+          "name": "levelPath",
+          "type": "string",
+          "description": "Level path to load",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SaveLevel",
+      "description": "SaveLevel",
+      "parameters": [
+        {
+          "name": "all",
+          "type": "boolean",
+          "description": "If true, save all dirty packages",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "SaveAll",
+      "description": "SaveAll",
+      "parameters": []
+    },
+    {
+      "name": "GetCurrentLevel",
+      "description": "GetCurrentLevel",
+      "parameters": []
+    },
+    {
+      "name": "AddSublevel",
+      "description": "AddSublevel",
+      "parameters": [
+        {
+          "name": "levelPath",
+          "type": "string",
+          "description": "Asset path of the sublevel map",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "RemoveSublevel",
+      "description": "RemoveSublevel",
+      "parameters": [
+        {
+          "name": "levelPath",
+          "type": "string",
+          "description": "Asset path of the sublevel map",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetSublevels",
+      "description": "GetSublevels",
+      "parameters": []
+    },
+    {
       "name": "actorDuplicate",
       "description": "Duplicate an actor in the level",
       "parameters": [
@@ -6383,6 +6620,705 @@
           "name": "layer",
           "type": "string",
           "description": "Layer name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SpawnActor",
+      "description": "SpawnActor",
+      "parameters": [
+        {
+          "name": "className",
+          "type": "string",
+          "description": "Actor class to spawn",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "Optional actor label",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "DeleteActor",
+      "description": "DeleteActor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DuplicateActor",
+      "description": "DuplicateActor",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetActorTransform",
+      "description": "SetActorTransform",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetActorProperty",
+      "description": "SetActorProperty",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "property",
+          "type": "string",
+          "description": "Property name",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Property value",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetActorMobility",
+      "description": "SetActorMobility",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "mobility",
+          "type": "string",
+          "description": "Static, Stationary, or Movable",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetActorFolder",
+      "description": "SetActorFolder",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "layer",
+          "type": "string",
+          "description": "Folder/layer name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetAllActors",
+      "description": "GetAllActors",
+      "parameters": []
+    },
+    {
+      "name": "SelectActor",
+      "description": "SelectActor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name/label/reference",
+          "required": true
+        },
+        {
+          "name": "addToSelection",
+          "type": "boolean",
+          "description": "If true, add to current selection",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "FocusActor",
+      "description": "FocusActor",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Actor name/label/reference",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetActorLabel",
+      "description": "SetActorLabel",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "description": "New actor label",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DeselectAll",
+      "description": "DeselectAll",
+      "parameters": []
+    },
+    {
+      "name": "CreateLevelSequence",
+      "description": "Create a new Level Sequence asset",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Level Sequence asset name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path for the Level Sequence",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "AddTrackToSequence",
+      "description": "Add a track to a Level Sequence",
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "Path to Level Sequence asset",
+          "required": true
+        },
+        {
+          "name": "trackType",
+          "type": "string",
+          "description": "Track type (e.g. Transform, Float, Event)",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "AddSectionToTrack",
+      "description": "Add a section to an existing sequence track",
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "Path to Level Sequence asset",
+          "required": true
+        },
+        {
+          "name": "trackName",
+          "type": "string",
+          "description": "Track display name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetKeyOnSection",
+      "description": "Set a keyframe on a sequence section",
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "Path to Level Sequence asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetSequenceTracks",
+      "description": "Get tracks in a Level Sequence",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "Path to Level Sequence asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "RenderSequence",
+      "description": "Render a Level Sequence",
+      "parameters": [
+        {
+          "name": "sequencePath",
+          "type": "string",
+          "description": "Path to Level Sequence asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CreateMaterial",
+      "description": "Create a Material asset",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Material asset name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "GetMaterialInfo",
+      "description": "Get Material asset details",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CreateMaterialInstance",
+      "description": "Create a Material Instance",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Material Instance name",
+          "required": true
+        },
+        {
+          "name": "parentMaterialPath",
+          "type": "string",
+          "description": "Path to parent Material",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetMaterialScalarParameter",
+      "description": "Set scalar parameter on Material/Instance",
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material or Material Instance",
+          "required": true
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "Scalar parameter name",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "description": "Scalar parameter value",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetMaterialVectorParameter",
+      "description": "Set vector parameter on Material/Instance",
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material or Material Instance",
+          "required": true
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "Vector parameter name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetMaterialTextureParameter",
+      "description": "Set texture parameter on Material/Instance",
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material or Material Instance",
+          "required": true
+        },
+        {
+          "name": "parameterName",
+          "type": "string",
+          "description": "Texture parameter name",
+          "required": true
+        },
+        {
+          "name": "texturePath",
+          "type": "string",
+          "description": "Path to Texture asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "AssignMaterialToActor",
+      "description": "Assign a Material to an actor component",
+      "parameters": [
+        {
+          "name": "actorName",
+          "type": "string",
+          "description": "Actor name or label",
+          "required": true
+        },
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material or Material Instance",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetMaterialGraph",
+      "description": "Get Material graph structure",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "AddMaterialNode",
+      "description": "Add a node to a Material graph",
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DeleteMaterialNode",
+      "description": "Delete a node from a Material graph",
+      "parameters": [
+        {
+          "name": "materialPath",
+          "type": "string",
+          "description": "Path to Material asset",
+          "required": true
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Node identifier",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CreateNiagaraSystem",
+      "description": "Create a Niagara System asset",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Niagara System asset name",
+          "required": true
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "AddEmitterToNiagaraSystem",
+      "description": "Add an emitter to a Niagara System",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "Path to Niagara System asset",
+          "required": true
+        },
+        {
+          "name": "emitterName",
+          "type": "string",
+          "description": "Emitter asset name/path",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "RemoveEmitterFromNiagaraSystem",
+      "description": "Remove an emitter from a Niagara System",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "Path to Niagara System asset",
+          "required": true
+        },
+        {
+          "name": "emitterName",
+          "type": "string",
+          "description": "Emitter name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SetNiagaraSystemProperty",
+      "description": "Set a property on a Niagara System",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "Path to Niagara System asset",
+          "required": true
+        },
+        {
+          "name": "propertyName",
+          "type": "string",
+          "description": "Property to set",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Property value",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "SpawnNiagaraSystem",
+      "description": "Spawn Niagara System actor in the level",
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "Path to Niagara System asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetNiagaraSystems",
+      "description": "List Niagara Systems",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": []
+    },
+    {
+      "name": "GetNiagaraSystemInfo",
+      "description": "Get Niagara System details",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": [
+        {
+          "name": "systemPath",
+          "type": "string",
+          "description": "Path to Niagara System asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CreateBlueprint",
+      "description": "Create a Blueprint asset",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Blueprint asset name",
+          "required": true
+        },
+        {
+          "name": "parentClass",
+          "type": "string",
+          "description": "Parent class name",
+          "required": false
+        },
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Content path",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "AddVariableToBlueprint",
+      "description": "Add variable to Blueprint",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Variable name",
+          "required": true
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Variable type",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "AddFunctionToBlueprint",
+      "description": "Add function to Blueprint",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Function name",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "AddNodeToBlueprint",
+      "description": "Add node to Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        },
+        {
+          "name": "nodeClass",
+          "type": "string",
+          "description": "Blueprint node class",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ConnectBlueprintPins",
+      "description": "Connect Blueprint node pins",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "CompileBlueprint",
+      "description": "Compile a Blueprint asset",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "GetBlueprintGraph",
+      "description": "Get Blueprint graph data",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "DeleteBlueprintNode",
+      "description": "Delete node from Blueprint graph",
+      "parameters": [
+        {
+          "name": "blueprintPath",
+          "type": "string",
+          "description": "Path to Blueprint asset",
+          "required": true
+        },
+        {
+          "name": "nodeId",
+          "type": "string",
+          "description": "Node identifier",
           "required": true
         }
       ]
@@ -8799,6 +9735,228 @@
         "properties": {},
         "required": []
       }
+    },
+    {
+      "description": "Play a haptic effect on a Quest controller",
+      "name": "xrPlayHapticEffect",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "hand",
+          "required": true,
+          "description": "Left or Right"
+        },
+        {
+          "type": "string",
+          "name": "amplitude",
+          "required": false,
+          "description": "Haptic amplitude 0.0-1.0"
+        },
+        {
+          "type": "string",
+          "name": "duration",
+          "required": false,
+          "description": "Duration in seconds"
+        }
+      ]
+    },
+    {
+      "description": "Stop haptic effect on a Quest controller",
+      "name": "xrStopHapticEffect",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "hand",
+          "required": true,
+          "description": "Left or Right"
+        }
+      ]
+    },
+    {
+      "description": "Get haptic capabilities of connected Quest controllers",
+      "name": "xrGetHapticCapabilities",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": []
+    },
+    {
+      "description": "Enable or disable Meta spatial audio",
+      "name": "xrSetSpatialAudioEnabled",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "enabled",
+          "required": true,
+          "description": "true or false"
+        }
+      ]
+    },
+    {
+      "description": "Get status of Meta spatial audio system",
+      "name": "xrGetSpatialAudioStatus",
+      "annotations": {
+        "readOnlyHint": true
+      },
+      "parameters": []
+    },
+    {
+      "description": "Configure audio attenuation settings for spatial audio",
+      "name": "xrConfigureAudioAttenuation",
+      "annotations": {
+        "destructiveHint": true
+      },
+      "parameters": [
+        {
+          "type": "string",
+          "name": "minDistance",
+          "required": false,
+          "description": "Minimum attenuation distance in cm"
+        },
+        {
+          "type": "string",
+          "name": "maxDistance",
+          "required": false,
+          "description": "Maximum attenuation distance in cm"
+        }
+        ]
+    },
+    {
+      "name": "narrativeRead",
+      "description": "Read the full NarrativeData DataAsset structure — chapters, scenes, interactions, narration cues. Returns the complete narrative flow as JSON.",
+      "parameters": [
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path (default: /Game/OrdinaryCourage/Data/DA_NarrativeData)" }
+      ],
+      "annotations": { "readOnlyHint": true, "idempotentHint": true }
+    },
+    {
+      "name": "narrativeAddChapter",
+      "description": "Add a new chapter to the NarrativeData DataAsset. Chapters contain scenes in order.",
+      "parameters": [
+        { "name": "chapterID", "type": "string", "required": true, "description": "Unique chapter ID (e.g. Chapter01_Beginnings)" },
+        { "name": "chapterTitle", "type": "string", "required": true, "description": "Display title for the chapter" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeAddScene",
+      "description": "Add a new scene to a chapter in the NarrativeData DataAsset. Scenes define levels, transitions, interactions, and narration.",
+      "parameters": [
+        { "name": "chapterID", "type": "string", "required": true, "description": "Chapter to add the scene to" },
+        { "name": "sceneID", "type": "string", "required": true, "description": "Unique scene ID (e.g. Scene00_Tutorial)" },
+        { "name": "sceneTitle", "type": "string", "required": false, "description": "Display title" },
+        { "name": "level", "type": "string", "required": false, "description": "Soft object path to the sublevel (e.g. /Game/Maps/Tutorial/SUB_Tutorial_Void)" },
+        { "name": "baseEnvironmentTag", "type": "string", "required": false, "description": "Environment tag (e.g. Void, Home, Hospital)" },
+        { "name": "streamingStrategy", "type": "string", "required": false, "description": "Auto, OverlaySwap, PreloadedSwap, FullTransition, AdditiveLoad, DataLayerToggle" },
+        { "name": "bPreloadDuringPrevious", "type": "boolean", "required": false, "description": "Preload this scene while the previous scene is active" },
+        { "name": "playerStartLocation", "type": "object", "required": false, "description": "Player spawn location {x, y, z}" },
+        { "name": "playerStartRotation", "type": "object", "required": false, "description": "Player spawn rotation {pitch, yaw, roll}" },
+        { "name": "transitionInPreset", "type": "string", "required": false, "description": "Transition-in preset name (FadeBlack, DissolveWarm, etc.)" },
+        { "name": "transitionInDuration", "type": "number", "required": false, "description": "Transition-in duration in seconds" },
+        { "name": "transitionOutPreset", "type": "string", "required": false, "description": "Transition-out preset name" },
+        { "name": "transitionOutDuration", "type": "number", "required": false, "description": "Transition-out duration in seconds" },
+        { "name": "bTeleportEnabled", "type": "boolean", "required": false, "description": "Allow teleport locomotion in this scene" },
+        { "name": "bSmoothLocomotionEnabled", "type": "boolean", "required": false, "description": "Allow smooth locomotion in this scene" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeAddInteraction",
+      "description": "Add an interaction requirement to a scene. Interactions define what the player must do before the scene can advance.",
+      "parameters": [
+        { "name": "sceneID", "type": "string", "required": true, "description": "Scene to add the interaction to" },
+        { "name": "interactionID", "type": "string", "required": true, "description": "Unique interaction ID (e.g. LookAtDoor)" },
+        { "name": "type", "type": "string", "required": false, "description": "Gaze, Grip, Trigger, GripTrigger, Navigation, Poke, Automatic" },
+        { "name": "description", "type": "string", "required": false, "description": "UI prompt text shown to the player" },
+        { "name": "bRequired", "type": "boolean", "required": false, "description": "Must complete before scene can advance (default: true)" },
+        { "name": "targetActorTag", "type": "string", "required": false, "description": "Tag of the actor to interact with" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeAddNarrationCue",
+      "description": "Add a narration cue (voice-over + subtitle) to a scene. Cues play in order, optionally waiting for interactions.",
+      "parameters": [
+        { "name": "sceneID", "type": "string", "required": true, "description": "Scene to add the cue to" },
+        { "name": "voice", "type": "string", "required": false, "description": "Primary, Secondary, or Character" },
+        { "name": "characterName", "type": "string", "required": false, "description": "Character name (only when voice=Character)" },
+        { "name": "subtitleText", "type": "string", "required": true, "description": "Subtitle text displayed during playback" },
+        { "name": "voiceOverAsset", "type": "string", "required": false, "description": "Soft path to USoundBase asset (e.g. /Game/Audio/VO/NarratorVO_Tutorial)" },
+        { "name": "delayAfterPrevious", "type": "number", "required": false, "description": "Delay in seconds before this cue starts (after previous cue finishes)" },
+        { "name": "waitForInteractionID", "type": "string", "required": false, "description": "Wait for this interaction to complete before playing this cue" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeRemoveScene",
+      "description": "Remove a scene from the NarrativeData DataAsset by scene ID.",
+      "parameters": [
+        { "name": "sceneID", "type": "string", "required": true, "description": "Scene ID to remove" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeRemoveChapter",
+      "description": "Remove a chapter and all its scenes from the NarrativeData DataAsset.",
+      "parameters": [
+        { "name": "chapterID", "type": "string", "required": true, "description": "Chapter ID to remove" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeClear",
+      "description": "Clear ALL chapters and scenes from the NarrativeData DataAsset. Nuclear option — use with caution.",
+      "parameters": [
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeReorderScenes",
+      "description": "Reorder scenes within a chapter to match a provided sequence of scene IDs.",
+      "parameters": [
+        { "name": "chapterID", "type": "string", "required": true, "description": "Chapter containing the scenes" },
+        { "name": "sceneOrder", "type": "array", "required": true, "description": "Array of scene ID strings in the desired order" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
+    },
+    {
+      "name": "narrativeUpdateScene",
+      "description": "Update specific fields of an existing scene. Only provided fields are changed; others remain untouched.",
+      "parameters": [
+        { "name": "sceneID", "type": "string", "required": true, "description": "Scene ID to update" },
+        { "name": "sceneTitle", "type": "string", "required": false, "description": "New display title" },
+        { "name": "level", "type": "string", "required": false, "description": "New sublevel path" },
+        { "name": "baseEnvironmentTag", "type": "string", "required": false, "description": "New environment tag" },
+        { "name": "streamingStrategy", "type": "string", "required": false, "description": "New streaming strategy" },
+        { "name": "bPreloadDuringPrevious", "type": "boolean", "required": false, "description": "New preload setting" },
+        { "name": "bTeleportEnabled", "type": "boolean", "required": false, "description": "New teleport setting" },
+        { "name": "bSmoothLocomotionEnabled", "type": "boolean", "required": false, "description": "New smooth locomotion setting" },
+        { "name": "transitionInPreset", "type": "string", "required": false, "description": "New transition-in preset" },
+        { "name": "transitionInDuration", "type": "number", "required": false, "description": "New transition-in duration" },
+        { "name": "transitionOutPreset", "type": "string", "required": false, "description": "New transition-out preset" },
+        { "name": "transitionOutDuration", "type": "number", "required": false, "description": "New transition-out duration" },
+        { "name": "playerStartLocation", "type": "object", "required": false, "description": "New player start {x, y, z}" },
+        { "name": "playerStartRotation", "type": "object", "required": false, "description": "New player rotation {pitch, yaw, roll}" },
+        { "name": "path", "type": "string", "required": false, "description": "Optional custom asset path" }
+      ],
+      "annotations": { "destructiveHint": true }
     }
   ]
 }

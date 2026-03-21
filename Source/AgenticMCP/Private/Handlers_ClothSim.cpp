@@ -23,6 +23,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPCloth, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleClothList(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

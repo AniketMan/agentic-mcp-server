@@ -22,6 +22,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPGAS, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleGASList(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

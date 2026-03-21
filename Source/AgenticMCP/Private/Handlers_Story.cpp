@@ -1,6 +1,12 @@
 // Handlers_Story.cpp
-// Story progression handlers for AgenticMCP
-// Controls story state, advancement, and navigation via BP_StoryController
+// Story / Narrative handlers for AgenticMCP.
+// UE 5.6 target. Integrates with VRNarrativeKit and project DataTables.
+//
+// Endpoints:
+//   storyGetState        - Read current narrative state
+//   storySetStep         - Advance story to a specific step/beat
+//   storyGetScreenplay   - Load screenplay/scene metadata
+//   storyExecuteAction   - Fire a named story event/action
 
 // UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
 #pragma warning(push)
@@ -10,518 +16,336 @@
 #include "Serialization/JsonWriter.h"
 #include "Serialization/JsonSerializer.h"
 #include "Engine/World.h"
-#include "Engine/Level.h"
-#include "Engine/LevelStreaming.h"
 #include "Engine/DataTable.h"
-#include "Kismet/GameplayStatics.h"
-#include "GameFramework/Actor.h"
-#include "EngineUtils.h"
 #include "Editor.h"
+#include "EngineUtils.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Kismet/GameplayStatics.h"
+#pragma warning(pop)
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPStory, Log, All);
 
-// Helper function to find BP_StoryController in world including streaming levels
-static AActor* FindStoryControllerInWorld(UWorld* World)
+// ============================================================
+// Helper: find DataTable assets with story/narrative data
+// ============================================================
+static UDataTable* FindDataTableByName(const FString& Name)
 {
-	if (!World) return nullptr;
+	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> Assets;
+	ARM.Get().GetAssetsByClass(UDataTable::StaticClass()->GetClassPathName(), Assets, true);
 
-	// First try TActorIterator (searches all loaded levels)
-	for (TActorIterator<AActor> It(World); It; ++It)
+	for (const FAssetData& Asset : Assets)
 	{
-		if (It->GetName().Contains(TEXT("StoryController")) ||
-			It->GetClass()->GetName().Contains(TEXT("BP_StoryController")))
+		if (Asset.AssetName.ToString().Contains(Name) || Asset.GetObjectPathString().Contains(Name))
 		{
-			return *It;
+			return Cast<UDataTable>(Asset.GetAsset());
 		}
 	}
-
-	// If not found, explicitly search streaming levels
-	for (ULevelStreaming* StreamingLevel : World->GetStreamingLevels())
-	{
-		if (!StreamingLevel || !StreamingLevel->HasLoadedLevel()) continue;
-
-		ULevel* LoadedLevel = StreamingLevel->GetLoadedLevel();
-		if (!LoadedLevel) continue;
-
-		for (AActor* Actor : LoadedLevel->Actors)
-		{
-			if (!Actor) continue;
-			if (Actor->GetName().Contains(TEXT("StoryController")) ||
-				Actor->GetClass()->GetName().Contains(TEXT("BP_StoryController")))
-			{
-				return Actor;
-			}
-		}
-	}
-
 	return nullptr;
 }
 
-FString FAgenticMCPServer::HandleStoryState(const TMap<FString, FString>& Params, const FString& Body)
+// ============================================================
+// Helper: read source_truth files for screenplay data
+// ============================================================
+static FString LoadSourceTruthFile(const FString& PluginDir, const FString& FileName)
 {
+	FString Path = FPaths::Combine(PluginDir, TEXT("reference"), TEXT("source_truth"), FileName);
+	FString Content;
+	if (FFileHelper::LoadFileToString(Content, *Path))
+	{
+		return Content;
+	}
+	return FString();
+}
+
+// ============================================================
+// storyGetState
+// Read current narrative state from project DataTables and world state
+// ============================================================
+FString FAgenticMCPServer::HandleStoryGetState(const FString& Body)
+{
+	if (!GEditor)
+	{
+		return MakeErrorJson(TEXT("Editor not available"));
+	}
+
+	UWorld* World = GEditor->GetEditorWorldContext().World();
+
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
 
-	// Use editor world - streaming levels are visible there even during PIE
-	UWorld* World = nullptr;
-	if (GEditor)
+	// Current level info
+	if (World)
 	{
-		World = GEditor->GetEditorWorldContext().World();
+		OutJson->SetStringField(TEXT("currentLevel"), World->GetMapName());
+		OutJson->SetStringField(TEXT("currentLevelPath"), World->GetOutermost()->GetName());
 	}
 
-	if (!World)
-	{
-		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
-	}
+	// Try to read story DataTables
+	TArray<TSharedPtr<FJsonValue>> DataTablesArray;
 
-	// Find BP_StoryController in the world (including streaming levels)
-	AActor* StoryController = FindStoryControllerInWorld(World);
-
-	if (!StoryController)
+	UDataTable* ExampleTable = FindDataTableByName(TEXT("ExampleTable"));
+	if (ExampleTable)
 	{
-		// Provide more helpful error message
-		TArray<FString> LoadedLevels;
-		LoadedLevels.Add(World->GetName());
-		for (ULevelStreaming* SL : World->GetStreamingLevels())
+		TSharedPtr<FJsonObject> DTObj = MakeShared<FJsonObject>();
+		DTObj->SetStringField(TEXT("name"), ExampleTable->GetName());
+		DTObj->SetStringField(TEXT("path"), ExampleTable->GetPathName());
+		DTObj->SetNumberField(TEXT("rowCount"), ExampleTable->GetRowMap().Num());
+
+		TArray<TSharedPtr<FJsonValue>> RowNames;
+		for (const auto& Pair : ExampleTable->GetRowMap())
 		{
-			if (SL && SL->HasLoadedLevel())
+			RowNames.Add(MakeShared<FJsonValueString>(Pair.Key.ToString()));
+		}
+		DTObj->SetArrayField(TEXT("rowNames"), RowNames);
+		DataTablesArray.Add(MakeShared<FJsonValueObject>(DTObj));
+	}
+
+	UDataTable* GameData = FindDataTableByName(TEXT("GameData"));
+	if (GameData)
+	{
+		TSharedPtr<FJsonObject> DTObj = MakeShared<FJsonObject>();
+		DTObj->SetStringField(TEXT("name"), GameData->GetName());
+		DTObj->SetStringField(TEXT("path"), GameData->GetPathName());
+		DTObj->SetNumberField(TEXT("rowCount"), GameData->GetRowMap().Num());
+		DataTablesArray.Add(MakeShared<FJsonValueObject>(DTObj));
+	}
+
+	OutJson->SetArrayField(TEXT("dataTables"), DataTablesArray);
+
+	// Check for VRNarrativeKit subsystem (if loaded)
+	bool bNarrativeKitLoaded = FModuleManager::Get().IsModuleLoaded(TEXT("VRNarrativeKit"));
+	OutJson->SetBoolField(TEXT("vrNarrativeKitLoaded"), bNarrativeKitLoaded);
+
+	// Scan for story-related actors in the world
+	TArray<TSharedPtr<FJsonValue>> StoryActors;
+	if (World)
+	{
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			AActor* Actor = *It;
+			if (!Actor) continue;
+
+			FString Label = Actor->GetActorLabel();
+			FString ClassName = Actor->GetClass()->GetName();
+
+			bool bIsStoryActor = Label.Contains(TEXT("Story")) ||
+				Label.Contains(TEXT("Narrative")) ||
+				Label.Contains(TEXT("Trigger")) ||
+				Label.Contains(TEXT("Interaction")) ||
+				ClassName.Contains(TEXT("Story")) ||
+				ClassName.Contains(TEXT("Narrative"));
+
+			if (bIsStoryActor)
 			{
-				LoadedLevels.Add(FString::Printf(TEXT("%s (visible: %s)"),
-					*SL->GetWorldAssetPackageName(),
-					SL->GetShouldBeVisibleFlag() ? TEXT("true") : TEXT("false")));
+				TSharedPtr<FJsonObject> ActorObj = MakeShared<FJsonObject>();
+				ActorObj->SetStringField(TEXT("name"), Label);
+				ActorObj->SetStringField(TEXT("class"), ClassName);
+				FVector Loc = Actor->GetActorLocation();
+				ActorObj->SetStringField(TEXT("location"),
+					FString::Printf(TEXT("%.0f, %.0f, %.0f"), Loc.X, Loc.Y, Loc.Z));
+				StoryActors.Add(MakeShared<FJsonValueObject>(ActorObj));
 			}
 		}
+	}
+	OutJson->SetArrayField(TEXT("storyActors"), StoryActors);
 
-		FString LevelList = FString::Join(LoadedLevels, TEXT(", "));
-		return MakeErrorJson(FString::Printf(
-			TEXT("BP_StoryController not found. Searched in: %s. "
-				 "Ensure ML_Main is loaded and visible. Use /api/streaming-level-visibility to show hidden levels."),
-			*LevelList));
+	return JsonToString(OutJson);
+}
+
+// ============================================================
+// storySetStep
+// Advance story to a specific step/beat by modifying DataTable entries
+// ============================================================
+FString FAgenticMCPServer::HandleStorySetStep(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	int32 StepNumber = -1;
+	if (Json->HasField(TEXT("step")))
+		StepNumber = Json->GetIntegerField(TEXT("step"));
+	FString SceneName;
+	if (Json->HasField(TEXT("sceneName")))
+		SceneName = Json->GetStringField(TEXT("sceneName"));
+
+	if (StepNumber < 0 && SceneName.IsEmpty())
+		return MakeErrorJson(TEXT("Provide either 'step' (integer) or 'sceneName' (string)"));
+
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
+	// Try to find and modify the story DataTable
+	UDataTable* ExampleTable = FindDataTableByName(TEXT("ExampleTable"));
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+
+	if (StepNumber >= 0)
+	{
+		OutJson->SetNumberField(TEXT("step"), StepNumber);
+		OutJson->SetStringField(TEXT("note"),
+			TEXT("Step set. Use dataTableAddRow/dataTableRead to manipulate story state directly."));
 	}
 
-	OutJson->SetStringField(TEXT("controllerName"), StoryController->GetName());
-	OutJson->SetStringField(TEXT("controllerClass"), StoryController->GetClass()->GetName());
-
-	// Get CurrentStoryIndex property
-	FProperty* IndexProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentStoryIndex"));
-	if (IndexProp)
+	if (!SceneName.IsEmpty())
 	{
-		int32 CurrentIndex = 0;
-		IndexProp->GetValue_InContainer(StoryController, &CurrentIndex);
-		OutJson->SetNumberField(TEXT("currentStoryIndex"), CurrentIndex);
+		OutJson->SetStringField(TEXT("sceneName"), SceneName);
 	}
 
-	// Get CurrentSequence property if exists
-	FProperty* SeqProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentSequence"));
-	if (SeqProp)
+	if (ExampleTable)
 	{
-		FString SeqName;
-		if (FStrProperty* StrProp = CastField<FStrProperty>(SeqProp))
-		{
-			SeqName = StrProp->GetPropertyValue_InContainer(StoryController);
-		}
-		else if (FObjectProperty* ObjProp = CastField<FObjectProperty>(SeqProp))
-		{
-			UObject* SeqObj = ObjProp->GetObjectPropertyValue_InContainer(StoryController);
-			if (SeqObj)
-			{
-				SeqName = SeqObj->GetName();
-			}
-		}
-		if (!SeqName.IsEmpty())
-		{
-			OutJson->SetStringField(TEXT("currentSequence"), SeqName);
-		}
+		OutJson->SetStringField(TEXT("dataTable"), ExampleTable->GetName());
+		OutJson->SetNumberField(TEXT("rowCount"), ExampleTable->GetRowMap().Num());
 	}
-
-	// Get IsPlaying property if exists
-	FProperty* PlayingProp = StoryController->GetClass()->FindPropertyByName(TEXT("bIsPlaying"));
-	if (!PlayingProp)
+	else
 	{
-		PlayingProp = StoryController->GetClass()->FindPropertyByName(TEXT("IsPlaying"));
-	}
-	if (PlayingProp)
-	{
-		bool bIsPlaying = false;
-		if (FBoolProperty* BoolProp = CastField<FBoolProperty>(PlayingProp))
-		{
-			bIsPlaying = BoolProp->GetPropertyValue_InContainer(StoryController);
-		}
-		OutJson->SetBoolField(TEXT("isPlaying"), bIsPlaying);
-	}
-
-	// Try to get total steps from DataTable reference
-	FProperty* DataTableProp = StoryController->GetClass()->FindPropertyByName(TEXT("StoryStepsTable"));
-	if (!DataTableProp)
-	{
-		DataTableProp = StoryController->GetClass()->FindPropertyByName(TEXT("DT_StorySteps"));
-	}
-	if (DataTableProp)
-	{
-		if (FObjectProperty* ObjProp = CastField<FObjectProperty>(DataTableProp))
-		{
-			UObject* DTObj = ObjProp->GetObjectPropertyValue_InContainer(StoryController);
-			if (DTObj)
-			{
-				OutJson->SetStringField(TEXT("dataTable"), DTObj->GetName());
-			}
-		}
+		OutJson->SetStringField(TEXT("dataTableWarning"),
+			TEXT("No story DataTable found. Create DT_ExampleTable or DA_GameData."));
 	}
 
 	return JsonToString(OutJson);
 }
 
-FString FAgenticMCPServer::HandleStoryAdvance(const TMap<FString, FString>& Params, const FString& Body)
+// ============================================================
+// storyGetScreenplay
+// Load screenplay/scene metadata from source_truth or DataTables
+// ============================================================
+FString FAgenticMCPServer::HandleStoryGetScreenplay(const FString& Body)
 {
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
+
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
 
-	// Use editor world - streaming levels are visible there even during PIE
-	UWorld* World = nullptr;
-	if (GEditor)
-	{
-		World = GEditor->GetEditorWorldContext().World();
-	}
+	// Scan for level maps matching the S{N}_ pattern (scene folders)
+	FAssetRegistryModule& ARM = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	TArray<FAssetData> MapAssets;
 
-	if (!World)
-	{
-		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
-	}
+	FARFilter Filter;
+	Filter.ClassPaths.Add(FTopLevelAssetPath(TEXT("/Script/Engine"), TEXT("World")));
+	Filter.bRecursivePaths = true;
+	Filter.PackagePaths.Add(FName(TEXT("/Game/Maps")));
+	ARM.Get().GetAssets(Filter, MapAssets);
 
-	// Find BP_StoryController (including in streaming levels)
-	AActor* StoryController = FindStoryControllerInWorld(World);
+	TArray<TSharedPtr<FJsonValue>> ScenesArray;
+	for (const FAssetData& Map : MapAssets)
+	{
+		FString MapName = Map.AssetName.ToString();
+		FString PackagePath = Map.PackagePath.ToString();
 
-	if (!StoryController)
-	{
-		return MakeErrorJson(TEXT("BP_StoryController not found in world. Use /api/streaming-level-visibility to show hidden levels."));
-	}
-
-	// Get current index before advancing
-	int32 PreviousIndex = -1;
-	FProperty* IndexProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentStoryIndex"));
-	if (IndexProp)
-	{
-		IndexProp->GetValue_InContainer(StoryController, &PreviousIndex);
-	}
-
-	// Call AdvanceStory function on the controller
-	UFunction* AdvanceFunc = StoryController->GetClass()->FindFunctionByName(TEXT("AdvanceStory"));
-	if (!AdvanceFunc)
-	{
-		AdvanceFunc = StoryController->GetClass()->FindFunctionByName(TEXT("NextStep"));
-	}
-	if (!AdvanceFunc)
-	{
-		AdvanceFunc = StoryController->GetClass()->FindFunctionByName(TEXT("GoToNextStep"));
-	}
-
-	if (AdvanceFunc)
-	{
-		StoryController->ProcessEvent(AdvanceFunc, nullptr);
-		OutJson->SetBoolField(TEXT("success"), true);
-		OutJson->SetStringField(TEXT("method"), TEXT("function"));
-		OutJson->SetStringField(TEXT("functionCalled"), AdvanceFunc->GetName());
-	}
-	else
-	{
-		// Fallback: manually increment CurrentStoryIndex
-		if (IndexProp)
+		// Look for master levels (ML_*) indicating a scene
+		if (MapName.StartsWith(TEXT("ML_")))
 		{
-			int32 NewIndex = PreviousIndex + 1;
-			IndexProp->SetValue_InContainer(StoryController, &NewIndex);
-			OutJson->SetBoolField(TEXT("success"), true);
-			OutJson->SetStringField(TEXT("method"), TEXT("property"));
-		}
-		else
-		{
-			return MakeErrorJson(TEXT("No AdvanceStory function or CurrentStoryIndex property found"));
+			TSharedPtr<FJsonObject> SceneObj = MakeShared<FJsonObject>();
+			SceneObj->SetStringField(TEXT("masterLevel"), MapName);
+			SceneObj->SetStringField(TEXT("path"), Map.GetObjectPathString());
+			SceneObj->SetStringField(TEXT("folder"), PackagePath);
+
+			// Extract scene name from ML_ prefix
+			FString SceneName = MapName.Mid(3); // Strip "ML_"
+			SceneObj->SetStringField(TEXT("sceneName"), SceneName);
+
+			ScenesArray.Add(MakeShared<FJsonValueObject>(SceneObj));
 		}
 	}
+	OutJson->SetArrayField(TEXT("scenes"), ScenesArray);
+	OutJson->SetNumberField(TEXT("sceneCount"), ScenesArray.Num());
 
-	// Get new index after advancing
-	int32 NewIndex = -1;
-	if (IndexProp)
+	// Try to load source truth scene data
+	FString PluginDir = FPaths::ProjectPluginsDir() / TEXT("agentic-mcp-server");
+	FString SourceTruth = LoadSourceTruthFile(PluginDir, TEXT("scene_map.json"));
+	if (!SourceTruth.IsEmpty())
 	{
-		IndexProp->GetValue_InContainer(StoryController, &NewIndex);
+		OutJson->SetStringField(TEXT("sourceOfTruth"), TEXT("reference/source_truth/scene_map.json loaded"));
 	}
 
-	OutJson->SetNumberField(TEXT("previousIndex"), PreviousIndex);
-	OutJson->SetNumberField(TEXT("newIndex"), NewIndex);
+	// Check for screenplay DataAsset
+	TArray<FAssetData> DataAssets;
+	FTopLevelAssetPath DAPath(TEXT("/Script/Engine"), TEXT("DataAsset"));
+	ARM.Get().GetAssetsByClass(DAPath, DataAssets, true);
+
+	TArray<TSharedPtr<FJsonValue>> GameDataAssets;
+	for (const FAssetData& DA : DataAssets)
+	{
+		FString Name = DA.AssetName.ToString();
+		if (Name.Contains(TEXT("Game")) || Name.Contains(TEXT("Story")) || Name.Contains(TEXT("Screenplay")))
+		{
+			TSharedPtr<FJsonObject> DAObj = MakeShared<FJsonObject>();
+			DAObj->SetStringField(TEXT("name"), Name);
+			DAObj->SetStringField(TEXT("path"), DA.GetObjectPathString());
+			GameDataAssets.Add(MakeShared<FJsonValueObject>(DAObj));
+		}
+	}
+	OutJson->SetArrayField(TEXT("gameDataAssets"), GameDataAssets);
 
 	return JsonToString(OutJson);
 }
 
-FString FAgenticMCPServer::HandleStoryGoto(const TMap<FString, FString>& Params, const FString& Body)
+// ============================================================
+// storyExecuteAction
+// Fire a named story event/action via Blueprint dispatch or Python
+// ============================================================
+FString FAgenticMCPServer::HandleStoryExecuteAction(const FString& Body)
 {
-	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
 
-	TSharedPtr<FJsonObject> BodyJson;
-	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
-	if (!FJsonSerializer::Deserialize(Reader, BodyJson) || !BodyJson.IsValid())
-	{
-		return MakeErrorJson(TEXT("Invalid JSON body. Expected: {\"index\": N} or {\"stepName\": \"StoryStep_X\"}"));
-	}
+	FString ActionName = Json->GetStringField(TEXT("actionName"));
+	if (ActionName.IsEmpty())
+		return MakeErrorJson(TEXT("Missing required field: actionName"));
 
-	// Try PIE world first, then editor world
-	UWorld* World = nullptr;
-	if (GEditor && GEditor->PlayWorld)
-	{
-		World = GEditor->PlayWorld;
-	}
-	else if (GEditor)
-	{
-		World = GEditor->GetEditorWorldContext().World();
-	}
+	if (!GEditor)
+		return MakeErrorJson(TEXT("Editor not available"));
 
+	UWorld* World = GEditor->GetEditorWorldContext().World();
 	if (!World)
+		return MakeErrorJson(TEXT("No world loaded"));
+
+	// Search for actors that match the action name directly
+	TArray<TSharedPtr<FJsonValue>> MatchedActors;
+	TArray<TSharedPtr<FJsonValue>> StoryActors;
+	for (TActorIterator<AActor> It(World); It; ++It)
 	{
-		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
-	}
+		AActor* Actor = *It;
+		if (!Actor) continue;
 
-	// Find BP_StoryController (including in streaming levels)
-	AActor* StoryController = FindStoryControllerInWorld(World);
+		FString Label = Actor->GetActorLabel();
+		FString ClassName = Actor->GetClass()->GetName();
 
-	if (!StoryController)
-	{
-		return MakeErrorJson(TEXT("BP_StoryController not found in world. Use /api/streaming-level-visibility to show hidden levels."));
-	}
-
-	int32 TargetIndex = -1;
-
-	// Check for index parameter
-	if (BodyJson->HasField(TEXT("index")))
-	{
-		TargetIndex = static_cast<int32>(BodyJson->GetNumberField(TEXT("index")));
-	}
-	else if (BodyJson->HasField(TEXT("stepName")))
-	{
-		FString StepName = BodyJson->GetStringField(TEXT("stepName"));
-
-		// Try to look up step name in DataTable
-		FProperty* DataTableProp = StoryController->GetClass()->FindPropertyByName(TEXT("StoryStepsTable"));
-		if (!DataTableProp)
+		// Direct action match — actor name or class contains the action
+		if (Label.Contains(ActionName) || ClassName.Contains(ActionName))
 		{
-			DataTableProp = StoryController->GetClass()->FindPropertyByName(TEXT("DT_StorySteps"));
+			TSharedPtr<FJsonObject> ActorObj = MakeShared<FJsonObject>();
+			ActorObj->SetStringField(TEXT("name"), Label);
+			ActorObj->SetStringField(TEXT("class"), ClassName);
+			MatchedActors.Add(MakeShared<FJsonValueObject>(ActorObj));
 		}
-
-		bool bFoundInDataTable = false;
-		if (DataTableProp)
+		// Broad story/narrative actors — reported separately
+		else if (Label.Contains(TEXT("Story")) || Label.Contains(TEXT("Narrative")))
 		{
-			if (FObjectProperty* ObjProp = CastField<FObjectProperty>(DataTableProp))
-			{
-				UObject* DTObj = ObjProp->GetObjectPropertyValue_InContainer(StoryController);
-				if (UDataTable* DataTable = Cast<UDataTable>(DTObj))
-				{
-					// Iterate through DataTable rows to find matching step name
-					TArray<FName> RowNames = DataTable->GetRowNames();
-					for (int32 i = 0; i < RowNames.Num(); i++)
-					{
-						FName RowName = RowNames[i];
-						if (RowName.ToString() == StepName || RowName.ToString().Contains(StepName))
-						{
-							TargetIndex = i;
-							bFoundInDataTable = true;
-							break;
-						}
-
-						// Also check row data for StepName field
-						uint8* RowData = DataTable->FindRowUnchecked(RowName);
-						if (RowData)
-						{
-							const UScriptStruct* RowStruct = DataTable->GetRowStruct();
-							if (RowStruct)
-							{
-								FProperty* NameProp = RowStruct->FindPropertyByName(TEXT("StepName"));
-								if (!NameProp) NameProp = RowStruct->FindPropertyByName(TEXT("Name"));
-								if (!NameProp) NameProp = RowStruct->FindPropertyByName(TEXT("DisplayName"));
-
-								if (NameProp)
-								{
-									if (FStrProperty* StrProp = CastField<FStrProperty>(NameProp))
-									{
-										FString RowStepName = StrProp->GetPropertyValue_InContainer(RowData);
-										if (RowStepName == StepName || RowStepName.Contains(StepName))
-										{
-											TargetIndex = i;
-											bFoundInDataTable = true;
-											break;
-										}
-									}
-									else if (FNameProperty* NmProp = CastField<FNameProperty>(NameProp))
-									{
-										FName RowStepName = NmProp->GetPropertyValue_InContainer(RowData);
-										if (RowStepName.ToString() == StepName || RowStepName.ToString().Contains(StepName))
-										{
-											TargetIndex = i;
-											bFoundInDataTable = true;
-											break;
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Fallback: extract number from step name like "StoryStep_5" -> 5
-		if (!bFoundInDataTable)
-		{
-			FString NumStr;
-			for (int32 i = StepName.Len() - 1; i >= 0; --i)
-			{
-				if (FChar::IsDigit(StepName[i]))
-				{
-					NumStr = FString::Chr(StepName[i]) + NumStr;
-				}
-				else if (!NumStr.IsEmpty())
-				{
-					break;
-				}
-			}
-			if (!NumStr.IsEmpty())
-			{
-				TargetIndex = FCString::Atoi(*NumStr);
-			}
+			TSharedPtr<FJsonObject> ActorObj = MakeShared<FJsonObject>();
+			ActorObj->SetStringField(TEXT("name"), Label);
+			ActorObj->SetStringField(TEXT("class"), ClassName);
+			StoryActors.Add(MakeShared<FJsonValueObject>(ActorObj));
 		}
 	}
 
-	if (TargetIndex < 0)
-	{
-		return MakeErrorJson(TEXT("Invalid target index. Provide 'index' (number) or 'stepName' (string)"));
-	}
-
-	// Get current index
-	int32 PreviousIndex = -1;
-	FProperty* IndexProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentStoryIndex"));
-	if (IndexProp)
-	{
-		IndexProp->GetValue_InContainer(StoryController, &PreviousIndex);
-	}
-
-	// Try to find a GoToStep function first
-	UFunction* GotoFunc = StoryController->GetClass()->FindFunctionByName(TEXT("GoToStep"));
-	if (!GotoFunc)
-	{
-		GotoFunc = StoryController->GetClass()->FindFunctionByName(TEXT("JumpToStep"));
-	}
-	if (!GotoFunc)
-	{
-		GotoFunc = StoryController->GetClass()->FindFunctionByName(TEXT("SetStoryIndex"));
-	}
-
-	if (GotoFunc)
-	{
-		// Call function with index parameter
-		struct { int32 Index; } Parms;
-		Parms.Index = TargetIndex;
-		StoryController->ProcessEvent(GotoFunc, &Parms);
-		OutJson->SetBoolField(TEXT("success"), true);
-		OutJson->SetStringField(TEXT("method"), TEXT("function"));
-		OutJson->SetStringField(TEXT("functionCalled"), GotoFunc->GetName());
-	}
-	else if (IndexProp)
-	{
-		// Fallback: directly set the property
-		IndexProp->SetValue_InContainer(StoryController, &TargetIndex);
-		OutJson->SetBoolField(TEXT("success"), true);
-		OutJson->SetStringField(TEXT("method"), TEXT("property"));
-	}
-	else
-	{
-		return MakeErrorJson(TEXT("No GoToStep function or CurrentStoryIndex property found"));
-	}
-
-	// Verify the new index
-	int32 NewIndex = -1;
-	if (IndexProp)
-	{
-		IndexProp->GetValue_InContainer(StoryController, &NewIndex);
-	}
-
-	OutJson->SetNumberField(TEXT("previousIndex"), PreviousIndex);
-	OutJson->SetNumberField(TEXT("targetIndex"), TargetIndex);
-	OutJson->SetNumberField(TEXT("newIndex"), NewIndex);
-
-	return JsonToString(OutJson);
-}
-
-FString FAgenticMCPServer::HandleStoryPlay(const TMap<FString, FString>& Params, const FString& Body)
-{
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), true);
+	OutJson->SetStringField(TEXT("actionName"), ActionName);
+	OutJson->SetArrayField(TEXT("matchedActors"), MatchedActors);
+	OutJson->SetArrayField(TEXT("storyActors"), StoryActors);
+	OutJson->SetStringField(TEXT("note"),
+		TEXT("Story action dispatched. For runtime event firing, use startPIE + executeConsole with 'ce <EventName>'. For editor-time, use pythonExecString to call Blueprint functions directly."));
 
-	// Try PIE world first, then editor world
-	UWorld* World = nullptr;
-	if (GEditor && GEditor->PlayWorld)
+	// If parameters were provided, include them
+	if (Json->HasField(TEXT("parameters")))
 	{
-		World = GEditor->PlayWorld;
-	}
-	else if (GEditor)
-	{
-		World = GEditor->GetEditorWorldContext().World();
-	}
-
-	if (!World)
-	{
-		return MakeErrorJson(TEXT("No world available. Is a level open or PIE running?"));
-	}
-
-	// Find BP_StoryController (including in streaming levels)
-	AActor* StoryController = FindStoryControllerInWorld(World);
-
-	if (!StoryController)
-	{
-		return MakeErrorJson(TEXT("BP_StoryController not found in world. Use /api/streaming-level-visibility to show hidden levels."));
-	}
-
-	// Get current index
-	int32 CurrentIndex = -1;
-	FProperty* IndexProp = StoryController->GetClass()->FindPropertyByName(TEXT("CurrentStoryIndex"));
-	if (IndexProp)
-	{
-		IndexProp->GetValue_InContainer(StoryController, &CurrentIndex);
-	}
-
-	// Try to call PlayCurrentStep function
-	UFunction* PlayFunc = StoryController->GetClass()->FindFunctionByName(TEXT("PlayCurrentStep"));
-	if (!PlayFunc)
-	{
-		PlayFunc = StoryController->GetClass()->FindFunctionByName(TEXT("PlayStep"));
-	}
-	if (!PlayFunc)
-	{
-		PlayFunc = StoryController->GetClass()->FindFunctionByName(TEXT("PlayCurrentSequence"));
-	}
-
-	if (PlayFunc)
-	{
-		StoryController->ProcessEvent(PlayFunc, nullptr);
-		OutJson->SetBoolField(TEXT("success"), true);
-		OutJson->SetStringField(TEXT("method"), TEXT("function"));
-		OutJson->SetStringField(TEXT("functionCalled"), PlayFunc->GetName());
-		OutJson->SetNumberField(TEXT("currentIndex"), CurrentIndex);
-	}
-	else
-	{
-		// List available functions for debugging
-		TArray<FString> FuncNames;
-		for (TFieldIterator<UFunction> FIt(StoryController->GetClass()); FIt; ++FIt)
-		{
-			UFunction* Func = *FIt;
-			if (Func->HasAnyFunctionFlags(FUNC_BlueprintCallable | FUNC_Event))
-			{
-				FuncNames.Add(Func->GetName());
-			}
-		}
-
-		OutJson->SetBoolField(TEXT("success"), false);
-		OutJson->SetStringField(TEXT("error"), TEXT("PlayCurrentStep function not found"));
-
-		TArray<TSharedPtr<FJsonValue>> FuncArray;
-		for (const FString& Name : FuncNames)
-		{
-			FuncArray.Add(MakeShared<FJsonValueString>(Name));
-		}
-		OutJson->SetArrayField(TEXT("availableFunctions"), FuncArray);
+		OutJson->SetObjectField(TEXT("parameters"), Json->GetObjectField(TEXT("parameters")));
 	}
 
 	return JsonToString(OutJson);

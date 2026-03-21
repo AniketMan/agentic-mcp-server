@@ -1,4 +1,4 @@
-// Handlers_Mutation.cpp
+﻿// Handlers_Mutation.cpp
 // Blueprint write/mutation handlers for AgenticMCP.
 // These handlers create, modify, and delete Blueprint graph elements.
 //
@@ -31,6 +31,7 @@
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
+#include "EdGraphUtilities.h"
 #include "EdGraphSchema_K2.h"
 #include "EdGraphNode_Comment.h"
 #include "K2Node.h"
@@ -1602,17 +1603,104 @@ FString FAgenticMCPServer::HandleDuplicateNodes(const FString& Body)
 	UBlueprint* BP = LoadBlueprintByName(BlueprintName, LoadError);
 	if (!BP) return MakeErrorJson(LoadError);
 
-	// Note: Full duplication with connection preservation would require
-	// FBlueprintEditorUtils::DuplicateGraph or clipboard-based approach.
-	// For now, we create new nodes of the same type at offset positions.
-	// This is a simplified implementation.
+	// Collect source nodes by GUID
+	TSet<UEdGraphNode*> SourceNodes;
+	UEdGraph* OwnerGraph = nullptr;
+
+	for (const TSharedPtr<FJsonValue>& IdVal : *NodeIdArray)
+	{
+		FString GuidStr = IdVal->AsString();
+		if (GuidStr.IsEmpty()) continue;
+
+		UEdGraph* NodeGraph = nullptr;
+		UEdGraphNode* Node = FindNodeByGuid(BP, GuidStr, &NodeGraph);
+		if (!Node)
+		{
+			return MakeErrorJson(FString::Printf(TEXT("Node not found: %s"), *GuidStr));
+		}
+
+		if (!OwnerGraph)
+		{
+			OwnerGraph = NodeGraph;
+		}
+		else if (NodeGraph != OwnerGraph)
+		{
+			return MakeErrorJson(TEXT("All nodes must be in the same graph"));
+		}
+
+		SourceNodes.Add(Node);
+	}
+
+	if (SourceNodes.Num() == 0 || !OwnerGraph)
+	{
+		return MakeErrorJson(TEXT("No valid nodes found to duplicate"));
+	}
+
+	// Export selected nodes to text (UE 5.6: ExportNodesToText takes TSet<UObject*>)
+	TSet<UObject*> NodesToExport;
+	for (UEdGraphNode* Node : SourceNodes)
+	{
+		NodesToExport.Add(Node);
+	}
+	FString ExportedText;
+	FEdGraphUtilities::ExportNodesToText(NodesToExport, ExportedText);
+
+	if (ExportedText.IsEmpty())
+	{
+		return MakeErrorJson(TEXT("Failed to export nodes for duplication"));
+	}
+
+	// Track existing node GUIDs so we can identify the new ones
+	TSet<FGuid> ExistingGuids;
+	for (UEdGraphNode* N : OwnerGraph->Nodes)
+	{
+		if (N) ExistingGuids.Add(N->NodeGuid);
+	}
+
+	// Import (paste) the nodes back into the same graph
+	TSet<UEdGraphNode*> PastedNodes;
+	FEdGraphUtilities::ImportNodesFromText(OwnerGraph, ExportedText, PastedNodes);
+
+	if (PastedNodes.Num() == 0)
+	{
+		return MakeErrorJson(TEXT("Failed to import duplicated nodes"));
+	}
+
+	// Offset the pasted nodes
+	for (UEdGraphNode* PastedNode : PastedNodes)
+	{
+		if (PastedNode)
+		{
+			PastedNode->NodePosX += OffsetX;
+			PastedNode->NodePosY += OffsetY;
+		}
+	}
+
+	// Compile and save
+	SafeMarkStructurallyModified(BP, TEXT("MCP DuplicateNodes"));
+	bool bSaved = SaveBlueprintPackage(BP);
+
+	// Build response with new node GUIDs
+	TArray<TSharedPtr<FJsonValue>> NewNodeArray;
+	for (UEdGraphNode* PastedNode : PastedNodes)
+	{
+		if (!PastedNode) continue;
+
+		TSharedPtr<FJsonObject> NodeObj = MakeShared<FJsonObject>();
+		NodeObj->SetStringField(TEXT("nodeId"), PastedNode->NodeGuid.ToString());
+		NodeObj->SetStringField(TEXT("title"), PastedNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+		NodeObj->SetStringField(TEXT("class"), PastedNode->GetClass()->GetName());
+		NodeObj->SetNumberField(TEXT("posX"), PastedNode->NodePosX);
+		NodeObj->SetNumberField(TEXT("posY"), PastedNode->NodePosY);
+		NewNodeArray.Add(MakeShared<FJsonValueObject>(NodeObj));
+	}
 
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	OutJson->SetBoolField(TEXT("success"), true);
 	OutJson->SetStringField(TEXT("blueprint"), BlueprintName);
-	OutJson->SetStringField(TEXT("note"),
-		TEXT("Node duplication creates new nodes at offset positions. "
-			 "Connections are not preserved. Use connect-pins to rewire."));
+	OutJson->SetNumberField(TEXT("duplicatedCount"), NewNodeArray.Num());
+	OutJson->SetBoolField(TEXT("saved"), bSaved);
+	OutJson->SetArrayField(TEXT("newNodes"), NewNodeArray);
 	return JsonToString(OutJson);
 }
 

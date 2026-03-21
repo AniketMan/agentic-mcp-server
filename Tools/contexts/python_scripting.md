@@ -185,7 +185,7 @@ for sl in streaming_levels:
 ### Read Data Table
 
 ```python
-dt = unreal.load_asset("/Game/Data/DT_StorySteps")
+dt = unreal.load_asset("/Game/Data/DT_ExampleTable")
 row_names = unreal.DataTableFunctionLibrary.get_data_table_row_names(dt)
 for name in row_names:
     print(f"Row: {name}")
@@ -196,7 +196,7 @@ for name in row_names:
 ```python
 # Access row struct fields via Python
 # Note: Requires the struct to be exposed to Python
-dt = unreal.load_asset("/Game/Data/DT_StorySteps")
+dt = unreal.load_asset("/Game/Data/DT_ExampleTable")
 # Use evaluate_data_table_row for typed access
 ```
 
@@ -239,3 +239,4 @@ unreal.log("Info message")
 unreal.log_warning("Warning message")
 unreal.log_error("Error message")
 ```
+

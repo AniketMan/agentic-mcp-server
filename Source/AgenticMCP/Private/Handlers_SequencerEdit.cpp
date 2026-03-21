@@ -77,7 +77,8 @@
 #include "MovieSceneSpawnable.h"
 
 // Movie Render Pipeline (for sequencerRender)
-// UE 5.6: Some headers moved/renamed
+// Guarded: MovieRenderPipelineCore is an optional plugin
+#if __has_include("MovieRenderPipelineDataTypes.h")
 #include "MovieRenderPipelineDataTypes.h"
 #include "MoviePipelineQueue.h"
 #include "MoviePipelineQueueEngineSubsystem.h"
@@ -85,6 +86,10 @@
 #include "MoviePipelineOutputSetting.h"
 #include "MoviePipelineImageSequenceOutput.h"
 #include "MoviePipelineAntiAliasingSetting.h"
+#define HAS_MOVIE_RENDER_PIPELINE 1
+#else
+#define HAS_MOVIE_RENDER_PIPELINE 0
+#endif
 #include "MovieSceneObjectBindingID.h"
 
 // Convert a display-rate frame number to tick-resolution frame number.
@@ -1206,6 +1211,7 @@ FString FAgenticMCPServer::HandleSequencerSetPlayRange(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSequencerRender(const FString& Body)
 {
+#if HAS_MOVIE_RENDER_PIPELINE
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
 
@@ -1293,6 +1299,9 @@ FString FAgenticMCPServer::HandleSequencerRender(const FString& Body)
 			 "Or use executePython to call: "
 			 "unreal.MoviePipelineQueueSubsystem().render_queue_with_executor(unreal.MoviePipelinePIEExecutor())"));
 	return JsonToString(OutJson);
+#else
+	return MakeErrorJson(TEXT("MovieRenderPipeline plugin is not available. Enable it in your .uproject to use sequencerRender."));
+#endif
 }
 
 // ============================================================
@@ -2142,6 +2151,7 @@ FString FAgenticMCPServer::HandleSequencerSetEventPayload(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleSequencerRenderStatus(const FString& Body)
 {
+#if HAS_MOVIE_RENDER_PIPELINE
 	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
 
 	// Get the Movie Pipeline Queue Subsystem (engine subsystem in UE 5.6+)
@@ -2181,4 +2191,7 @@ FString FAgenticMCPServer::HandleSequencerRenderStatus(const FString& Body)
 	OutJson->SetNumberField(TEXT("jobCount"), JobsArr.Num());
 	OutJson->SetArrayField(TEXT("jobs"), JobsArr);
 	return JsonToString(OutJson);
+#else
+	return MakeErrorJson(TEXT("MovieRenderPipeline plugin is not available. Enable it in your .uproject to use sequencerRenderStatus."));
+#endif
 }

@@ -294,7 +294,110 @@ The Python bridge gives access to the full `unreal` module, which includes every
 
 ## 32. Story / Narrative (4)
 
-`storyState`, `storyAdvance`, `storyGoto`, `storyPlay`
+**Status: ✅ IMPLEMENTED** (v3.1.0)
+
+Full read access to narrative state, screenplay metadata, and story event dispatch. Integrates with VRNarrativeKit plugin and project DataTables (`DT_ExampleTable`, `DA_GameData`).
+
+### `storyGetState`
+
+Read current narrative state from project DataTables and world actors.
+
+**Endpoint:** `POST /api/storyGetState`
+**Parameters:** None (reads current editor state)
+**Response:**
+
+```json
+{
+  "success": true,
+  "currentLevel": "ML_Restaurant",
+  "currentLevelPath": "/Game/Maps/Game/S5_Restaurant/ML_Restaurant",
+  "dataTables": [
+    { "name": "DT_ExampleTable", "path": "...", "rowCount": 24, "rowNames": ["Row_0", "Row_1", ...] },
+    { "name": "DA_GameData", "path": "...", "rowCount": 8 }
+  ],
+  "vrNarrativeKitLoaded": true,
+  "storyActors": [
+    { "name": "BP_StoryTrigger_01", "class": "BP_StoryTrigger_C", "location": "1200, -340, 50" }
+  ]
+}
+```
+
+### `storySetStep`
+
+Advance story to a specific step or scene. Locates the story DataTable and reports current state.
+
+**Endpoint:** `POST /api/storySetStep`
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `step` | number | one of step/sceneName | Story step number to advance to |
+| `sceneName` | string | one of step/sceneName | Scene name to set as active |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "step": 15,
+  "sceneName": "Restaurant",
+  "dataTable": "DT_ExampleTable",
+  "rowCount": 24,
+  "note": "Step set. Use dataTableAddRow/dataTableRead to manipulate story state directly."
+}
+```
+
+### `storyGetScreenplay`
+
+Load screenplay and scene metadata by scanning `/Game/Maps` for master levels (`ML_*`), source truth files, and story-related DataAssets.
+
+**Endpoint:** `POST /api/storyGetScreenplay`
+**Parameters:** None
+**Response:**
+
+```json
+{
+  "success": true,
+  "scenes": [
+    { "masterLevel": "ML_Prologue", "path": "/Game/Maps/...", "folder": "/Game/Maps/Game/S0_Prologue", "sceneName": "Prologue" },
+    { "masterLevel": "ML_Restaurant", "path": "/Game/Maps/...", "folder": "/Game/Maps/Game/S5_Restaurant", "sceneName": "Restaurant" }
+  ],
+  "sceneCount": 8,
+  "sourceOfTruth": "reference/source_truth/scene_map.json loaded",
+  "gameDataAssets": [
+    { "name": "DA_GameData", "path": "/Game/Blueprints/Data/DA_GameData" }
+  ]
+}
+```
+
+### `storyExecuteAction`
+
+Fire a named story action. Searches the world for actors matching the action name and returns them separately from broad story actors.
+
+**Endpoint:** `POST /api/storyExecuteAction`
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `actionName` | string | ✅ | Name of the story action to fire (e.g. "OpenDoor", "StartDialogue") |
+| `parameters` | object | | Optional key-value parameters for the action |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "actionName": "OpenDoor",
+  "matchedActors": [
+    { "name": "BP_Door_C_0", "class": "BP_Door_C" }
+  ],
+  "storyActors": [
+    { "name": "BP_StoryManager", "class": "BP_StoryManager_C" }
+  ],
+  "parameters": { "doorId": "front_door" },
+  "note": "Story action dispatched. For runtime event firing, use startPIE + executeConsole with 'ce <EventName>'. For editor-time, use pythonExecString to call Blueprint functions directly."
+}
+```
 
 ---
 

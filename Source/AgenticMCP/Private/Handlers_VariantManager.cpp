@@ -21,6 +21,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPVariant, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleVariantList(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

@@ -20,6 +20,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPMass, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleMassList(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

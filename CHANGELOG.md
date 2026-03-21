@@ -2,6 +2,48 @@
 
 All notable changes to AgenticMCP are documented in this file.
 
+## [3.1.0] - 2026-03-18
+
+### Summary
+
+Full codebase audit (65 C++ handler files, 11 JS modules), critical bug fixes, and new Scene Verifier module. Fixed a fatal missing import that prevented the MCP bridge from starting, fixed 3 dead-code bugs in subsystem handlers, and created the Scene Verifier tool suite for post-wiring validation.
+
+### Added
+
+- **Scene Verifier** (`Tools/scene-verifier.js`) — 4 new read-only tools for post-wiring validation:
+  - `verifyScene` — Check actor presence, component integrity, transform validity
+  - `verifyBlueprint` — Validate compilation, broken pins, graph structure
+  - `verifySequence` — Validate bindings, tracks, unbound possessables
+  - `verifyAll` — Aggregate verification across all assets in current level
+
+### Fixed
+
+- **CRITICAL: Missing `scene-verifier.js`** — `index.js` imported this module but the file did not exist, causing a fatal ES6 import error that prevented the MCP bridge from starting. Created the full implementation.
+- **Dead-code bug in `HandleClothList`** (`Handlers_ClothSim.cpp`) — Bare `{ return MakeErrorJson(...); }` block without `if (!GEditor)` guard made all cloth listing logic unreachable.
+- **Dead-code bug in `HandleGASList`** (`Handlers_GAS.cpp`) — Same pattern. GAS ability/effect listing was dead code.
+- **Dead-code bug in `HandleMassList`** (`Handlers_MassEntity.cpp`) — Same pattern. Mass Entity config listing was dead code.
+
+### Audit Findings (No Code Change Needed)
+
+- **48 conditional compilation stubs** (MetaXR 16, Niagara 16, PCG 10, AI 6) are correctly gated behind `WITH_OCULUSXR`, `WITH_NIAGARA`, `HAS_PCG_PLUGIN`, `HAS_AI_MODULE` preprocessor defines. These return clear error messages when the optional plugin is not available. By design.
+- **20+ Python-dependent functions** across 9 handler files correctly delegate to `IPythonScriptPlugin` and return errors if not loaded. By design.
+- **6 BT mutation stubs** (`HandleBTAddTask`, `HandleBTAddComposite`, `HandleBTRemoveNode`, `HandleBTAddDecorator`, `HandleBTAddService`, `HandleBTWireNodes`) return `UE56_BT_EDITOR_ERROR` because BehaviorTreeEditor module headers are no longer public in UE 5.6. Known limitation.
+- **`HandleDuplicateNodes`** in `Handlers_Mutation.cpp` returns "not implemented". Known limitation.
+- **Story/Narrative (4 tools)** listed in CAPABILITIES.md and README.md but have no implementation. Known gap.
+
+### Stats
+
+| Metric | Value |
+|--------|-------|
+| Handler files audited | 65 |
+| JS modules verified | 11 |
+| Tool registry entries | 390+ (9,835 lines JSON) |
+| Critical bugs fixed | 4 (1 missing file + 3 dead-code) |
+| Stubs confirmed by-design | 68 (conditional + Python-dependent) |
+| New tools added | 4 (Scene Verifier) |
+
+---
+
 ## [3.0.0] - 2026-03-16
 
 ### Summary

@@ -25,6 +25,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPChaos, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleChaosList(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

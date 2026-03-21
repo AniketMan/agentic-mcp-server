@@ -9,7 +9,7 @@ This document covers reading and writing UE5 Data Tables and Data Assets via Pyt
 import unreal
 
 # Load a data table
-dt = unreal.load_asset("/Game/Data/DT_StorySteps")
+dt = unreal.load_asset("/Game/Data/DT_ExampleTable")
 
 # Get all row names
 row_names = unreal.DataTableFunctionLibrary.get_data_table_row_names(dt)
@@ -38,7 +38,7 @@ for i, scene in enumerate(scenes):
 # Data table rows can be modified via the editor property system
 # Note: This requires the row struct to be exposed to Python
 
-dt = unreal.load_asset("/Game/Data/DT_StorySteps")
+dt = unreal.load_asset("/Game/Data/DT_ExampleTable")
 
 # For complex modifications, use the DataTableEditor subsystem
 # or modify via JSON export/import:
@@ -52,7 +52,7 @@ json_str = unreal.DataTableFunctionLibrary.export_data_table_to_json_string(dt)
 
 ## Common Data Structures
 
-### FStoryStep (DT_StorySteps)
+### FStoryStep (DT_ExampleTable)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -79,7 +79,7 @@ json_str = unreal.DataTableFunctionLibrary.export_data_table_to_json_string(dt)
 # To add rows to a data table, use the JSON approach:
 import json
 
-dt = unreal.load_asset("/Game/Data/DT_StorySteps")
+dt = unreal.load_asset("/Game/Data/DT_ExampleTable")
 json_str = unreal.DataTableFunctionLibrary.export_data_table_to_json_string(dt)
 data = json.loads(json_str)
 
@@ -101,3 +101,4 @@ data.append(new_row)
 modified_json = json.dumps(data)
 # unreal.DataTableFunctionLibrary.fill_data_table_from_json_string(dt, modified_json)
 ```
+

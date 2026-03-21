@@ -1,8 +1,8 @@
-# AgenticMCP
+﻿# AgenticMCP
 
 A dual-path MCP (Model Context Protocol) server for Unreal Engine 5.6. Gives AI agents full read-write access to every major editor subsystem -- Blueprints, Sequencer, Materials, Niagara, Landscape, Animation, AI, Audio, Lighting, PCG, Physics, UMG, and more -- with an offline fallback when the editor is not running.
 
-**390 tools. 44 handler files. 27,000+ lines of C++. Full CRUD across every subsystem.**
+**394 tools. 66 handler files. 28,000+ lines of C++. Full CRUD across every subsystem.**
 
 ## What Makes This Different
 
@@ -593,10 +593,10 @@ All live editor endpoints are at `http://localhost:9847/api/<endpoint>`. Tools a
 
 | Tool | Description |
 |------|-------------|
-| `storyState` | Get current story/narrative state |
-| `storyAdvance` | Advance to the next story beat |
-| `storyGoto` | Jump to a specific story beat or chapter |
-| `storyPlay` | Play/resume story playback |
+| `storyGetState` | Read current narrative state: active level, DataTables (DT_ExampleTable, DA_GameData), VRNarrativeKit status, story/trigger/interaction actors with world positions |
+| `storySetStep` | Advance story to a step number or scene name. Params: `step` (int) and/or `sceneName` (string). Locates story DataTable and reports row count |
+| `storyGetScreenplay` | Scan `/Game/Maps` for master levels (`ML_*`), load source_truth scene map, list story-related DataAssets. Returns scene list with folder paths |
+| `storyExecuteAction` | Fire a named story action. Param: `actionName` (required), `parameters` (optional object). Returns actors matching the action separately from broad story actors |
 
 ### Validation and Safety (6)
 
@@ -709,6 +709,34 @@ npm test              # Run all tests
 npm run test:watch    # Watch mode
 npm run test:coverage # Coverage report
 ```
+
+## v3.1.0 Release Notes (2026-03-18)
+
+### Added
+
+- **Story / Narrative tools** (4 new handlers) — `storyGetState`, `storySetStep`, `storyGetScreenplay`, `storyExecuteAction`. Full read access to narrative state, screenplay metadata, and story event dispatch. Integrates with VRNarrativeKit and project DataTables.
+- **Scene Verifier** (4 new JS tools) — `verifyScene`, `verifyBlueprint`, `verifySequence`, `verifyAll`. Post-wiring validation that checks actor presence, component integrity, Blueprint compilation, sequence bindings.
+- **`duplicateNodes`** — Fully implemented using `FEdGraphUtilities::ExportNodesToText/ImportNodesFromText`. Duplicates selected Blueprint nodes with connections preserved, offsets positions, returns new GUIDs.
+- **BT mutation Python bridge** — 6 BehaviorTree handlers (`btAddTask`, `btAddComposite`, `btRemoveNode`, `btAddDecorator`, `btAddService`, `btWireNodes`) now route through UE Python scripting instead of returning UE 5.6 API errors. Includes output capture, GUID-based temp files, input sanitization.
+
+### Fixed
+
+- **Critical: Missing `scene-verifier.js`** — MCP bridge could not start due to unresolved ES6 import. Created full implementation.
+- **Dead-code bugs** in `HandleClothList`, `HandleGASList`, `HandleMassList` — bare return blocks without `if (!GEditor)` guard made all handler logic unreachable.
+- **`HandleDuplicateNodes`** — was returning "not implemented". Now fully functional with `SaveBlueprintPackage` and proper JSON response.
+- **Python injection risk** in BT handlers — user-supplied strings are now escaped via `EscapePythonString()` before interpolation into Python scripts.
+- **Race condition** in BT temp files — changed from fixed filename to `FGuid::NewGuid()` based paths, matching the existing pattern in `Handlers_PythonBridge.cpp`.
+- **Version drift** — unified all 4 version sources (`AgenticMCP.uplugin`, `VERSION`, `Tools/package.json`, `Tools/index.js`) to `3.1.0`.
+
+### Stats
+
+| Metric | v3.0.0 | v3.1.0 |
+|--------|--------|--------|
+| Handler files | 65 | 66 (+Handlers_Story.cpp) |
+| JS modules | 10 | 11 (+scene-verifier.js) |
+| C++ tools | 390 | 394 (+4 Story) |
+| JS verifier tools | 0 | 4 |
+| Stub functions fixed | — | 10 (1 duplicateNodes + 6 BT + 3 dead-code) |
 
 ## Compatibility
 

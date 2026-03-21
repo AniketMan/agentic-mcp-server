@@ -15,6 +15,7 @@
 // FindFirstObject() at runtime, so they have no compile-time type dependency.
 
 using UnrealBuildTool;
+using System.IO;
 
 public class AgenticMCP : ModuleRules
 {
@@ -26,8 +27,8 @@ public class AgenticMCP : ModuleRules
 
 		// UE 5.6: Disable warnings-as-errors for this module
 		bWarningsAsErrors = false;
-		bEnableUndefinedIdentifierWarnings = false;
-		UnsafeTypeCastWarningLevel = WarningLevel.Off;
+		CppCompileWarningSettings.UndefinedIdentifierWarningLevel = WarningLevel.Off;
+		CppCompileWarningSettings.UnsafeTypeCastWarningLevel = WarningLevel.Off;
 
 		// ---- Public dependencies (always available in editor builds) ----
 		PublicDependencyModuleNames.AddRange(new string[]
@@ -70,6 +71,7 @@ public class AgenticMCP : ModuleRules
 			"AnimGraph",
 			"AnimGraphRuntime",
 			"UMG",
+			"UMGEditor",
 			"SourceControl",
 			"AIModule",
 			"GameplayTasks",
@@ -85,6 +87,20 @@ public class AgenticMCP : ModuleRules
 		// ---- Niagara: direct type usage (UNiagaraComponent, etc.) ----
 		// Requires preprocessor guard WITH_NIAGARA in Handlers_Niagara.cpp
 		AddOptionalModule("Niagara", "WITH_NIAGARA");
+
+		// ---- VRNarrativeKit: direct type usage (UNarrativeData, FNarrativeSceneData) ----
+		// Requires preprocessor guard WITH_VRNARRATIVEKIT in Handlers_NarrativeData.cpp
+		// OPTIONAL: narrative authoring tools only available when VRNarrativeKit plugin is present
+		string VRNKPath = Path.Combine(PluginDirectory, "..", "VRNarrativeKit", "Source", "VRNarrativeKit");
+		if (Directory.Exists(VRNKPath))
+		{
+			PrivateDependencyModuleNames.Add("VRNarrativeKit");
+			PublicDefinitions.Add("WITH_VRNARRATIVEKIT=1");
+		}
+		else
+		{
+			PublicDefinitions.Add("WITH_VRNARRATIVEKIT=0");
+		}
 
 		// ---- OculusXR / Meta XR: direct type usage (UOculusXRFunctionLibrary) ----
 		// Requires preprocessor guard WITH_OCULUSXR in Handlers_MetaXR*.cpp

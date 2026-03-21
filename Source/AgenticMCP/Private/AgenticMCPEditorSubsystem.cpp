@@ -49,6 +49,13 @@ static bool ProcessOneRequestSEH(FAgenticMCPServer* Server)
 }
 #endif
 
+// Port range for auto-discovery when multiple editor instances are running.
+// The Node.js bridge reads UNREAL_MCP_URL or defaults to http://localhost:9847.
+// When running two projects (e.g. MCPLEVEL + OrdinaryCourage), the first editor
+// claims 9847 and the second auto-increments to 9848, etc.
+static constexpr int32 MCP_PORT_BASE = 9847;
+static constexpr int32 MCP_PORT_MAX  = 9857;
+
 void UAgenticMCPEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -61,17 +68,37 @@ void UAgenticMCPEditorSubsystem::Initialize(FSubsystemCollectionBase& Collection
 
 	Server = MakeUnique<FAgenticMCPServer>();
 
-	// Start in editor mode (disables /api/shutdown to prevent accidental editor kill)
-	if (Server->Start(9847, /*bEditorMode=*/true))
+	// Try ports in range until one succeeds (handles multiple editor instances)
+	bool bStarted = false;
+	for (int32 Port = MCP_PORT_BASE; Port <= MCP_PORT_MAX; ++Port)
 	{
-		UE_LOG(LogTemp, Display,
-			TEXT("AgenticMCP: Editor subsystem started - HTTP server on port %d (%d Blueprints, %d Maps)"),
-			Server->GetPort(), Server->GetBlueprintCount(), Server->GetMapCount());
+		if (Server->Start(Port, /*bEditorMode=*/true))
+		{
+			UE_LOG(LogTemp, Display,
+				TEXT("AgenticMCP: Editor subsystem started - HTTP server on port %d (%d Blueprints, %d Maps)"),
+				Server->GetPort(), Server->GetBlueprintCount(), Server->GetMapCount());
+
+			if (Port != MCP_PORT_BASE)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("AgenticMCP: Default port %d was in use. Bound to port %d instead. ")
+					TEXT("Set UNREAL_MCP_URL=http://localhost:%d for the Node.js bridge."),
+					MCP_PORT_BASE, Port, Port);
+			}
+
+			bStarted = true;
+			break;
+		}
+
+		UE_LOG(LogTemp, Log,
+			TEXT("AgenticMCP: Port %d in use, trying %d..."), Port, Port + 1);
 	}
-	else
+
+	if (!bStarted)
 	{
 		UE_LOG(LogTemp, Warning,
-			TEXT("AgenticMCP: Editor subsystem failed to start HTTP server (port 9847 may be in use)"));
+			TEXT("AgenticMCP: Failed to start HTTP server on any port in range %d-%d. All ports may be in use."),
+			MCP_PORT_BASE, MCP_PORT_MAX);
 		Server.Reset();
 	}
 }

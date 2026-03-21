@@ -1,5 +1,6 @@
 // Handlers_PixelStreaming.cpp
-// PixelStreaming control endpoints for AgenticMCP
+// Pixel Streaming 2 control endpoints for AgenticMCP
+// Targets UE 5.6 PixelStreaming2 module exclusively (not legacy PixelStreaming v1).
 
 // UE 5.6: Suppress C4459 warning (declaration hides global) from InterchangeCore
 #pragma warning(push)
@@ -11,8 +12,11 @@
 #include "Modules/ModuleManager.h"
 #include "Editor.h"
 #include "HAL/IConsoleManager.h"
+#pragma warning(pop)
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPPixelStreaming, Log, All);
+
+static const TCHAR* PS2Module = TEXT("PixelStreaming2");
 
 // ============================================================
 // HandlePixelStreamingGetStatus
@@ -20,24 +24,30 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPPixelStreaming, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingGetStatus(const TMap<FString, FString>& Params, const FString& Body)
 {
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
-	{
-		return MakeErrorJson(TEXT("PixelStreaming module not loaded"));
-	}
+	bool bModuleLoaded = FModuleManager::Get().IsModuleLoaded(PS2Module);
+
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
-
-	bool bModuleLoaded = FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming"));
-
 	OutJson->SetBoolField(TEXT("success"), true);
-	OutJson->SetBoolField(TEXT("pixelStreamingModuleLoaded"), bModuleLoaded);
+	OutJson->SetBoolField(TEXT("pixelStreaming2ModuleLoaded"), bModuleLoaded);
+	OutJson->SetStringField(TEXT("module"), PS2Module);
 
-	if (bModuleLoaded)
-	{
-		OutJson->SetStringField(TEXT("status"), TEXT("available"));
-	}
-	else
+	if (!bModuleLoaded)
 	{
 		OutJson->SetStringField(TEXT("status"), TEXT("unavailable"));
+		OutJson->SetStringField(TEXT("hint"), TEXT("Enable the PixelStreaming2 plugin in Edit > Plugins, then restart the editor."));
+		return JsonToString(OutJson);
+	}
+
+	OutJson->SetStringField(TEXT("status"), TEXT("available"));
+
+	if (IConsoleVariable* CVarEnabled = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.Encoder.Enable")))
+	{
+		OutJson->SetBoolField(TEXT("encoderEnabled"), CVarEnabled->GetBool());
+	}
+
+	if (IConsoleVariable* CVarUrl = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.Signalling.URL")))
+	{
+		OutJson->SetStringField(TEXT("signallingUrl"), CVarUrl->GetString());
 	}
 
 	return JsonToString(OutJson);
@@ -49,11 +59,9 @@ FString FAgenticMCPServer::HandlePixelStreamingGetStatus(const TMap<FString, FSt
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingStart(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
-
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	if (!FModuleManager::Get().IsModuleLoaded(PS2Module))
 	{
-		return MakeErrorJson(TEXT("PixelStreaming module is not loaded"));
+		return MakeErrorJson(TEXT("PixelStreaming2 module is not loaded. Enable it in Edit > Plugins."));
 	}
 
 	TSharedPtr<FJsonObject> JsonBody = ParseBodyJson(Body);
@@ -67,12 +75,13 @@ FString FAgenticMCPServer::HandlePixelStreamingStart(const TMap<FString, FString
 	if (GEngine && GEditor && GEditor->GetEditorWorldContext().World())
 	{
 		UWorld* World = GEditor->GetEditorWorldContext().World();
-		FString Command = FString::Printf(TEXT("PixelStreaming.URL=%s"), *SignallingUrl);
+		FString Command = FString::Printf(TEXT("PixelStreaming2.Signalling.URL=%s"), *SignallingUrl);
 		GEngine->Exec(World, *Command);
 	}
 
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	OutJson->SetBoolField(TEXT("success"), true);
-	OutJson->SetStringField(TEXT("message"), TEXT("PixelStreaming start requested"));
+	OutJson->SetStringField(TEXT("message"), TEXT("PixelStreaming2 start requested"));
 	OutJson->SetStringField(TEXT("signallingUrl"), SignallingUrl);
 
 	return JsonToString(OutJson);
@@ -84,21 +93,20 @@ FString FAgenticMCPServer::HandlePixelStreamingStart(const TMap<FString, FString
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingStop(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
-
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	if (!FModuleManager::Get().IsModuleLoaded(PS2Module))
 	{
-		return MakeErrorJson(TEXT("PixelStreaming module is not loaded"));
+		return MakeErrorJson(TEXT("PixelStreaming2 module is not loaded. Enable it in Edit > Plugins."));
 	}
 
 	if (GEngine && GEditor && GEditor->GetEditorWorldContext().World())
 	{
 		UWorld* World = GEditor->GetEditorWorldContext().World();
-		GEngine->Exec(World, TEXT("PixelStreaming.Stop"));
+		GEngine->Exec(World, TEXT("PixelStreaming2.Stop"));
 	}
 
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	OutJson->SetBoolField(TEXT("success"), true);
-	OutJson->SetStringField(TEXT("message"), TEXT("PixelStreaming stop requested"));
+	OutJson->SetStringField(TEXT("message"), TEXT("PixelStreaming2 stop requested"));
 
 	return JsonToString(OutJson);
 }
@@ -115,36 +123,30 @@ FString FAgenticMCPServer::HandlePixelStreamingListStreamers(const TMap<FString,
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> StreamersArray;
 
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	if (!FModuleManager::Get().IsModuleLoaded(PS2Module))
 	{
 		OutJson->SetBoolField(TEXT("success"), false);
-		OutJson->SetStringField(TEXT("error"), TEXT("PixelStreaming module is not loaded"));
+		OutJson->SetStringField(TEXT("error"), TEXT("PixelStreaming2 module is not loaded"));
 		OutJson->SetBoolField(TEXT("moduleLoaded"), false);
 		return JsonToString(OutJson);
 	}
 
-	// Query PixelStreaming module for actual streamer info
-	// Since we can't directly access the streamer list without the full module interface,
-	// we check console variables and session state
-
 	bool bIsStreaming = false;
-	FString StreamerUrl = TEXT("");
+	FString StreamerUrl;
 	FString StreamerId = TEXT("default");
 	FString Status = TEXT("unknown");
 
-	// Check if streaming is active via console variables
-	if (IConsoleVariable* CVarEnabled = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming.Enabled")))
+	if (IConsoleVariable* CVarEnabled = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.Encoder.Enable")))
 	{
 		bIsStreaming = CVarEnabled->GetBool();
 		Status = bIsStreaming ? TEXT("active") : TEXT("inactive");
 	}
 
-	if (IConsoleVariable* CVarUrl = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming.URL")))
+	if (IConsoleVariable* CVarUrl = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.Signalling.URL")))
 	{
 		StreamerUrl = CVarUrl->GetString();
 	}
 
-	// Build streamer info
 	TSharedRef<FJsonObject> StreamerObj = MakeShared<FJsonObject>();
 	StreamerObj->SetStringField(TEXT("id"), StreamerId);
 	StreamerObj->SetStringField(TEXT("status"), Status);
@@ -169,15 +171,21 @@ FString FAgenticMCPServer::HandlePixelStreamingListStreamers(const TMap<FString,
 // ============================================================
 FString FAgenticMCPServer::HandlePixelStreamingGetCodec(const TMap<FString, FString>& Params, const FString& Body)
 {
-	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
-
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	if (!FModuleManager::Get().IsModuleLoaded(PS2Module))
 	{
-		return MakeErrorJson(TEXT("PixelStreaming module is not loaded"));
+		return MakeErrorJson(TEXT("PixelStreaming2 module is not loaded"));
 	}
 
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TSharedRef<FJsonObject> CodecInfo = MakeShared<FJsonObject>();
-	CodecInfo->SetStringField(TEXT("codec"), TEXT("H264"));
+
+	FString Codec = TEXT("H264");
+	if (IConsoleVariable* CVarCodec = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.Encoder.Codec")))
+	{
+		Codec = CVarCodec->GetString();
+	}
+
+	CodecInfo->SetStringField(TEXT("codec"), Codec);
 
 	OutJson->SetBoolField(TEXT("success"), true);
 	OutJson->SetObjectField(TEXT("codecInfo"), CodecInfo);
@@ -197,9 +205,9 @@ FString FAgenticMCPServer::HandlePixelStreamingSetCodec(const TMap<FString, FStr
 		return MakeErrorJson(TEXT("Invalid JSON body"));
 	}
 
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	if (!FModuleManager::Get().IsModuleLoaded(PS2Module))
 	{
-		return MakeErrorJson(TEXT("PixelStreaming module is not loaded"));
+		return MakeErrorJson(TEXT("PixelStreaming2 module is not loaded"));
 	}
 
 	FString Codec = TEXT("H264");
@@ -208,7 +216,7 @@ FString FAgenticMCPServer::HandlePixelStreamingSetCodec(const TMap<FString, FStr
 	if (GEngine && GEditor && GEditor->GetEditorWorldContext().World())
 	{
 		UWorld* World = GEditor->GetEditorWorldContext().World();
-		FString Command = FString::Printf(TEXT("PixelStreaming.Encoder.Codec=%s"), *Codec);
+		FString Command = FString::Printf(TEXT("PixelStreaming2.Encoder.Codec=%s"), *Codec);
 		GEngine->Exec(World, *Command);
 	}
 
@@ -231,34 +239,30 @@ FString FAgenticMCPServer::HandlePixelStreamingListPlayers(const TMap<FString, F
 	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
 	TArray<TSharedPtr<FJsonValue>> PlayersArray;
 
-	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PixelStreaming")))
+	if (!FModuleManager::Get().IsModuleLoaded(PS2Module))
 	{
 		OutJson->SetBoolField(TEXT("success"), false);
-		OutJson->SetStringField(TEXT("error"), TEXT("PixelStreaming module is not loaded"));
+		OutJson->SetStringField(TEXT("error"), TEXT("PixelStreaming2 module is not loaded"));
 		OutJson->SetBoolField(TEXT("moduleLoaded"), false);
 		return JsonToString(OutJson);
 	}
 
-	// Get player/connection info from console variables and stats
 	int32 PlayerCount = 0;
 	bool bIsStreaming = false;
 
-	if (IConsoleVariable* CVarEnabled = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming.Enabled")))
+	if (IConsoleVariable* CVarEnabled = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.Encoder.Enable")))
 	{
 		bIsStreaming = CVarEnabled->GetBool();
 	}
 
-	// Check for connected peers via stats if available
-	if (IConsoleVariable* CVarConnected = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming.WebRTC.Stats.PeerCount")))
+	if (IConsoleVariable* CVarConnected = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.WebRTC.Stats.PeerCount")))
 	{
 		PlayerCount = CVarConnected->GetInt();
 	}
 
-	// If streaming is active, we have at least the potential for 1 player
 	if (bIsStreaming && PlayerCount == 0)
 	{
-		// Check if there's an active WebRTC connection
-		if (IConsoleVariable* CVarState = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming.WebRTC.State")))
+		if (IConsoleVariable* CVarState = IConsoleManager::Get().FindConsoleVariable(TEXT("PixelStreaming2.WebRTC.State")))
 		{
 			FString State = CVarState->GetString();
 			if (State.Contains(TEXT("Connected")))
@@ -274,7 +278,6 @@ FString FAgenticMCPServer::HandlePixelStreamingListPlayers(const TMap<FString, F
 		}
 	}
 
-	// Add any enumerated players
 	for (int32 i = 0; i < PlayerCount && PlayersArray.Num() < PlayerCount; i++)
 	{
 		TSharedRef<FJsonObject> PlayerObj = MakeShared<FJsonObject>();

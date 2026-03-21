@@ -14,6 +14,7 @@
 #include "Dom/JsonObject.h"
 #include "AssetRegistry/AssetData.h"
 #include "HttpResultCallback.h"
+#include "HttpServerRequest.h"
 #include "EdGraph/EdGraphPin.h"
 
 // Forward declarations
@@ -263,12 +264,6 @@ private:
 	FString HandleXRGetSpatialAudioStatus(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleXRConfigureAudioAttenuation(const TMap<FString, FString>& Params, const FString& Body);
 
-	// ---- Story Handlers (Handlers_Story.cpp) ----
-	FString HandleStoryState(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleStoryAdvance(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleStoryGoto(const TMap<FString, FString>& Params, const FString& Body);
-	FString HandleStoryPlay(const TMap<FString, FString>& Params, const FString& Body);
-
 	// ---- DataTable Handlers (Handlers_DataTable.cpp) ----
 	FString HandleDataTableRead(const TMap<FString, FString>& Params, const FString& Body);
 	FString HandleDataTableWrite(const TMap<FString, FString>& Params, const FString& Body);
@@ -459,6 +454,9 @@ private:
 
 	// ---- Build / Packaging Handlers (Handlers_Packaging.cpp) ----
 	FString HandleBuildGetStatus(const FString& Body);
+	FString HandleBuildCook(const FString& Body);
+	FString HandleBuildPackage(const FString& Body);
+	FString HandleBuildGetLog(const FString& Body);
 	FString HandleBuildLighting(const FString& Body);
 	FString HandleSourceControlGetStatus(const FString& Body);
 	FString HandleSourceControlCheckout(const FString& Body);
@@ -673,7 +671,35 @@ private:
 	// ---- RenderDoc (auto-generated declarations) ----
 
 	// ---- Story (auto-generated declarations) ----
+	FString HandleStoryGetState(const FString& Body);
+	FString HandleStorySetStep(const FString& Body);
+	FString HandleStoryGetScreenplay(const FString& Body);
+	FString HandleStoryExecuteAction(const FString& Body);
 
+	// ---- Narrative DataAsset Authoring (Handlers_NarrativeData.cpp) ----
+	// OPTIONAL: Only available when VRNarrativeKit plugin is present.
+#if WITH_VRNARRATIVEKIT
+	FString HandleNarrativeRead(const FString& Body);
+	FString HandleNarrativeAddChapter(const FString& Body);
+	FString HandleNarrativeAddScene(const FString& Body);
+	FString HandleNarrativeAddInteraction(const FString& Body);
+	FString HandleNarrativeAddNarrationCue(const FString& Body);
+	FString HandleNarrativeRemoveScene(const FString& Body);
+	FString HandleNarrativeRemoveChapter(const FString& Body);
+	FString HandleNarrativeClear(const FString& Body);
+	FString HandleNarrativeReorderScenes(const FString& Body);
+	FString HandleNarrativeUpdateScene(const FString& Body);
+#endif
+
+	// ---- Utility / Discovery (MCP_REQUESTS fixes) ----
+	FString HandleListEnumValues(const FString& Body);
+	FString HandleListEditableProperties(const FString& Body);
+	FString HandleCreateDataAsset(const FString& Body);
+	FString HandleCreateTransitionPresetRegistry(const FString& Body);
+	FString HandleAddComponentToActor(const FString& Body);
+	FString HandleSetMaterialOnActor(const FString& Body);
+	FString HandleSpawnActorBatch(const FString& Body);
+	FString HandleSetWorldSetting(const FString& Body);
 
 	// --- New subsystem handlers ---
 	FString HandleMRGGetStatus(const FString& Body);

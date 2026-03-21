@@ -24,6 +24,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPEnhancedInput, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleInputListActions(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}
@@ -58,6 +59,7 @@ FString FAgenticMCPServer::HandleInputListActions(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleInputListMappingContexts(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

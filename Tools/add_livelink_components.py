@@ -6,7 +6,7 @@ import unreal
 
 character_blueprints = [
     "/Game/Assets/Characters/Heathers/HeatherAdult/BP_Heather_Adult",
-    "/Game/Assets/Characters/Heathers/HeatherChild/BP_HeatherChild",
+    "/Game/Assets/Characters/Heathers/HeatherChild/YourCharacterBP",
     "/Game/Assets/Characters/Heathers/HeatherPreTeen/BP_HeatherPreTeen2",
     "/Game/Assets/Characters/Heathers/HeatherTeen/BP_Heather_Teen",
     "/Game/Assets/Characters/Detective/BP_Detective",
@@ -86,3 +86,4 @@ if added_count == 0:
     unreal.log(f"3. Search for 'LiveLinkComponent' and add it")
     unreal.log(f"4. Rename to 'LiveLinkFace'")
     unreal.log(f"5. Compile and Save")
+

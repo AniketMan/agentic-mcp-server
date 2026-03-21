@@ -20,6 +20,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPMRG, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleMRGGetStatus(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}
@@ -168,6 +169,7 @@ FString FAgenticMCPServer::HandleMRGRender(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleMRGListConfigs(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}

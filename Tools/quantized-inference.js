@@ -219,49 +219,8 @@ export async function getManifest(callUnreal, config, forceRefresh = false) {
  * @returns {Array} Array of scene coordination objects
  */
 export function loadSceneCoordination() {
-  const coordDir = join(__dirname, "..", "scene_coordination");
-  const scenes = [];
-
-  for (let i = 1; i <= 8; i++) {
-    const sceneDir = join(coordDir, `scene_${i}`);
-    const statusPath = join(sceneDir, "STATUS.json");
-    const instructionsPath = join(sceneDir, "INSTRUCTIONS.md");
-
-    const scene = {
-      id: i,
-      status: null,
-      instructions: null,
-      interactions: [],
-    };
-
-    // Load status
-    if (existsSync(statusPath)) {
-      try {
-        scene.status = JSON.parse(readFileSync(statusPath, "utf-8"));
-      } catch (error) {
-        log.error(`Failed to parse STATUS.json for scene ${i}`, {
-          error: error.message,
-        });
-      }
-    }
-
-    // Load instructions and parse interaction table
-    if (existsSync(instructionsPath)) {
-      try {
-        const md = readFileSync(instructionsPath, "utf-8");
-        scene.instructions = md;
-        scene.interactions = parseInteractionTable(md);
-      } catch (error) {
-        log.error(`Failed to parse INSTRUCTIONS.md for scene ${i}`, {
-          error: error.message,
-        });
-      }
-    }
-
-    scenes.push(scene);
-  }
-
-  return scenes;
+  // Scene coordination is project-specific. Override in your project if needed.
+  return [];
 }
 
 /**
@@ -1271,3 +1230,4 @@ export {
   MANIFEST_PATH,
   WIRING_PLAN_PATH,
 };
+

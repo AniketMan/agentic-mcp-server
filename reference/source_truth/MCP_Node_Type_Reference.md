@@ -98,7 +98,7 @@ Optional: `componentName`
 
 ## loadLevel API
 POST /api/load-level
-Required: `levelPath` (e.g. "/Game/Maps/Game/Main/Levels/SLs/SL_Main_Logic")
+Required: `levelPath` (e.g. "/Game/Maps/Game/Main/Levels/SLs/SL_YourLevel")
 - ADDS a streaming sublevel to the CURRENT persistent world
 - Does NOT switch maps
 - Does NOT open a new persistent level
@@ -125,3 +125,4 @@ import unreal
 unreal.EditorLevelLibrary.load_level('/Game/Maps/Game/Main/Levels/ML_Main')
 ```
 This actually switches the persistent level. Then the sublevels that are already configured in the World Settings will load automatically.
+

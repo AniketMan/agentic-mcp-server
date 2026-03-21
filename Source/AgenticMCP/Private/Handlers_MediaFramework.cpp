@@ -13,11 +13,18 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
+#include "UObject/Package.h"
+
+// MediaAssets headers - guarded for builds without the MediaAssets module
+#if __has_include("MediaPlayer.h")
 #include "MediaPlayer.h"
 #include "MediaTexture.h"
 #include "MediaSource.h"
 #include "FileMediaSource.h"
-#include "UObject/Package.h"
+#define HAS_MEDIA_ASSETS 1
+#else
+#define HAS_MEDIA_ASSETS 0
+#endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogMCPMedia, Log, All);
 
@@ -27,6 +34,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogMCPMedia, Log, All);
 // ============================================================
 FString FAgenticMCPServer::HandleMediaList(const FString& Body)
 {
+	if (!GEditor)
 	{
 		return MakeErrorJson(TEXT("Editor not available"));
 	}
@@ -78,6 +86,7 @@ FString FAgenticMCPServer::HandleMediaList(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleMediaCreatePlayer(const FString& Body)
 {
+#if HAS_MEDIA_ASSETS
     TSharedPtr<FJsonObject> Json;
     TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
     if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
@@ -136,6 +145,9 @@ FString FAgenticMCPServer::HandleMediaCreatePlayer(const FString& Body)
     Writer->WriteObjectEnd();
     Writer->Close();
     return Result;
+#else
+	return MakeErrorJson(TEXT("MediaAssets module is not available. Enable the MediaAssets plugin to use mediaCreatePlayer."));
+#endif
 }
 
 // ============================================================
@@ -145,6 +157,7 @@ FString FAgenticMCPServer::HandleMediaCreatePlayer(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleMediaCreateSource(const FString& Body)
 {
+#if HAS_MEDIA_ASSETS
     TSharedPtr<FJsonObject> Json;
     TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
     if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
@@ -182,6 +195,9 @@ FString FAgenticMCPServer::HandleMediaCreateSource(const FString& Body)
     Writer->WriteObjectEnd();
     Writer->Close();
     return Result;
+#else
+	return MakeErrorJson(TEXT("MediaAssets module is not available. Enable the MediaAssets plugin to use mediaCreateSource."));
+#endif
 }
 
 // ============================================================
@@ -191,6 +207,7 @@ FString FAgenticMCPServer::HandleMediaCreateSource(const FString& Body)
 // ============================================================
 FString FAgenticMCPServer::HandleMediaSetSource(const FString& Body)
 {
+#if HAS_MEDIA_ASSETS
     TSharedPtr<FJsonObject> Json;
     TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
     if (!FJsonSerializer::Deserialize(Reader, Json) || !Json.IsValid())
@@ -229,4 +246,7 @@ FString FAgenticMCPServer::HandleMediaSetSource(const FString& Body)
     Writer->WriteObjectEnd();
     Writer->Close();
     return Result;
+#else
+	return MakeErrorJson(TEXT("MediaAssets module is not available. Enable the MediaAssets plugin to use mediaSetSource."));
+#endif
 }

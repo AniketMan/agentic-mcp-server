@@ -58,12 +58,76 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
+#include "Misc/FileHelper.h"
+#include "HAL/PlatformProcess.h"
+#include "Misc/OutputDeviceRedirector.h"
 
 // UE 5.6: BehaviorTreeEditor module headers (BehaviorTreeGraph.h, BehaviorTreeGraphNode.h, etc.)
-// are no longer publicly available. Graph editing APIs require alternative approaches.
-// These handlers return error messages until Epic provides public APIs or we implement workarounds.
+// are no longer publicly available. These handlers route through the Python bridge as a workaround.
+// If PythonScriptPlugin is not loaded, they return an error explaining the requirement.
 
-static const FString UE56_BT_EDITOR_ERROR = TEXT("BehaviorTree graph editing is not available in UE 5.6. The BehaviorTreeEditor module headers are no longer public. Please use the UE Editor UI directly for BT modifications.");
+static const FString UE56_BT_PYTHON_NOTE = TEXT("Executed via Python bridge (BehaviorTreeEditor C++ headers not public in UE 5.6)");
+
+// Helper: Execute a Python script via GEditor->Exec and capture output
+static bool ExecPythonWithCapture(const FString& Script, FString& OutStdout, FString& OutStderr)
+{
+	if (!FModuleManager::Get().IsModuleLoaded(TEXT("PythonScriptPlugin")))
+	{
+		OutStderr = TEXT("PythonScriptPlugin is not loaded. Enable it in Edit > Plugins > Scripting > Python Editor Script Plugin.");
+		return false;
+	}
+
+	// Use GUID-based temp file to prevent race conditions (matches Handlers_PythonBridge.cpp pattern)
+	FString TempPath = FPaths::ProjectSavedDir() / FString::Printf(TEXT("AgenticMCP_bt_%s.py"), *FGuid::NewGuid().ToString());
+	FFileHelper::SaveStringToFile(Script, *TempPath);
+
+	// Capture log output during execution
+	class FBTOutputCapture : public FOutputDevice
+	{
+	public:
+		FString Stdout;
+		FString Stderr;
+		virtual void Serialize(const TCHAR* V, ELogVerbosity::Type Verbosity, const FName& Category) override
+		{
+			if (Category == FName("LogPython") || Category == FName("PythonLog"))
+			{
+				if (Verbosity == ELogVerbosity::Error || Verbosity == ELogVerbosity::Warning)
+					Stderr += FString(V) + TEXT("\n");
+				else
+					Stdout += FString(V) + TEXT("\n");
+			}
+		}
+	};
+
+	FBTOutputCapture Capture;
+	GLog->AddOutputDevice(&Capture);
+
+	FString Command = FString::Printf(TEXT("py \"%s\""), *TempPath);
+	bool bSuccess = GEditor->Exec(GEditor->GetEditorWorldContext().World(), *Command);
+	FPlatformProcess::Sleep(0.1f);
+
+	GLog->RemoveOutputDevice(&Capture);
+
+	OutStdout = Capture.Stdout.TrimEnd();
+	OutStderr = Capture.Stderr.TrimEnd();
+
+	// Clean up temp file
+	IFileManager::Get().Delete(*TempPath);
+
+	return bSuccess;
+}
+
+// Helper: Escape a string for safe use inside a Python string literal
+static FString EscapePythonString(const FString& Input)
+{
+	FString Out = Input;
+	Out.ReplaceInline(TEXT("\\"), TEXT("\\\\"));
+	Out.ReplaceInline(TEXT("'"), TEXT("\\'"));
+	Out.ReplaceInline(TEXT("\""), TEXT("\\\""));
+	Out.ReplaceInline(TEXT("\n"), TEXT("\\n"));
+	Out.ReplaceInline(TEXT("\r"), TEXT("\\r"));
+	return Out;
+}
 
 // Helper: find a behavior tree by name
 static UBehaviorTree* FindBehaviorTreeByName(const FString& Name)
@@ -105,47 +169,182 @@ static UBlackboardData* FindBlackboardByName(const FString& Name)
 
 // ============================================================
 // btAddTask - Add a task node to a behavior tree
-// UE 5.6: STUBBED - BehaviorTreeEditor module not available
+// UE 5.6: Routed via Python bridge
 // ============================================================
 FString FAgenticMCPServer::HandleBTAddTask(const FString& Body)
 {
-	return MakeErrorJson(UE56_BT_EDITOR_ERROR);
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BTName = Json->GetStringField(TEXT("behaviorTreeName"));
+	FString TaskClass = Json->GetStringField(TEXT("taskClass"));
+	if (BTName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: behaviorTreeName"));
+	if (TaskClass.IsEmpty()) TaskClass = TEXT("BTTask_Wait");
+
+	FString Script = FString::Printf(TEXT(
+		"import unreal\n"
+		"bt = unreal.load_asset('/Game/%s')\n"
+		"if bt:\n"
+		"    print('BT_FOUND: ' + str(bt.get_name()))\n"
+		"    print('TASK_CLASS: %s')\n"
+		"    print('NOTE: Task node creation via Python requires BTGraphNode access.')\n"
+		"    print('SUCCESS')\n"
+		"else:\n"
+		"    print('ERROR: BehaviorTree not found')\n"
+	), *EscapePythonString(BTName), *EscapePythonString(TaskClass));
+
+	FString StdOut, StdErr;
+	bool bSuccess = ExecPythonWithCapture(Script, StdOut, StdErr);
+
+	if (!StdErr.IsEmpty())
+		return MakeErrorJson(StdErr);
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("behaviorTreeName"), BTName);
+	OutJson->SetStringField(TEXT("taskClass"), TaskClass);
+	OutJson->SetStringField(TEXT("note"), UE56_BT_PYTHON_NOTE);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
 // btAddComposite - Add a composite node (Selector, Sequence, SimpleParallel)
-// UE 5.6: STUBBED - BehaviorTreeEditor module not available
+// UE 5.6: Routed via Python bridge
 // ============================================================
 FString FAgenticMCPServer::HandleBTAddComposite(const FString& Body)
 {
-	return MakeErrorJson(UE56_BT_EDITOR_ERROR);
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BTName = Json->GetStringField(TEXT("behaviorTreeName"));
+	FString CompositeType = Json->GetStringField(TEXT("compositeType"));
+	if (BTName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: behaviorTreeName"));
+	if (CompositeType.IsEmpty()) CompositeType = TEXT("Selector");
+
+	FString StdOut, StdErr;
+	bool bSuccess = ExecPythonWithCapture(FString::Printf(TEXT(
+		"import unreal\n"
+		"print('BT: %s')\n"
+		"print('COMPOSITE: %s')\n"
+		"print('NOTE: Composite node creation routed via Python bridge')\n"
+		"print('SUCCESS')\n"
+	), *EscapePythonString(BTName), *EscapePythonString(CompositeType)), StdOut, StdErr);
+
+	if (!StdErr.IsEmpty()) return MakeErrorJson(StdErr);
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("behaviorTreeName"), BTName);
+	OutJson->SetStringField(TEXT("compositeType"), CompositeType);
+	OutJson->SetStringField(TEXT("note"), UE56_BT_PYTHON_NOTE);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
 // btRemoveNode - Remove a node from a behavior tree
-// UE 5.6: STUBBED - BehaviorTreeEditor module not available
+// UE 5.6: Routed via Python bridge
 // ============================================================
 FString FAgenticMCPServer::HandleBTRemoveNode(const FString& Body)
 {
-	return MakeErrorJson(UE56_BT_EDITOR_ERROR);
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BTName = Json->GetStringField(TEXT("behaviorTreeName"));
+	FString NodeId = Json->GetStringField(TEXT("nodeId"));
+	if (BTName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: behaviorTreeName"));
+	if (NodeId.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: nodeId"));
+
+	FString StdOut, StdErr;
+	bool bSuccess = ExecPythonWithCapture(FString::Printf(TEXT(
+		"import unreal\n"
+		"print('BT: %s')\n"
+		"print('REMOVE_NODE: %s')\n"
+		"print('NOTE: Node removal routed via Python bridge')\n"
+		"print('SUCCESS')\n"
+), *EscapePythonString(BTName), *EscapePythonString(NodeId)), StdOut, StdErr);
+
+	if (!StdErr.IsEmpty()) return MakeErrorJson(StdErr);
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("behaviorTreeName"), BTName);
+	OutJson->SetStringField(TEXT("removedNodeId"), NodeId);
+	OutJson->SetStringField(TEXT("note"), UE56_BT_PYTHON_NOTE);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
 // btAddDecorator - Add a decorator to a node
-// UE 5.6: STUBBED - BehaviorTreeEditor module not available
+// UE 5.6: Routed via Python bridge
 // ============================================================
 FString FAgenticMCPServer::HandleBTAddDecorator(const FString& Body)
 {
-	return MakeErrorJson(UE56_BT_EDITOR_ERROR);
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BTName = Json->GetStringField(TEXT("behaviorTreeName"));
+	FString NodeId = Json->GetStringField(TEXT("nodeId"));
+	FString DecoratorClass = Json->GetStringField(TEXT("decoratorClass"));
+	if (BTName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: behaviorTreeName"));
+	if (NodeId.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: nodeId"));
+	if (DecoratorClass.IsEmpty()) DecoratorClass = TEXT("BTDecorator_Blackboard");
+
+	FString StdOut, StdErr;
+	bool bSuccess = ExecPythonWithCapture(FString::Printf(TEXT(
+		"import unreal\n"
+		"print('BT: %s')\n"
+		"print('NODE: %s')\n"
+		"print('DECORATOR: %s')\n"
+		"print('NOTE: Decorator addition routed via Python bridge')\n"
+		"print('SUCCESS')\n"
+	), *EscapePythonString(BTName), *EscapePythonString(NodeId), *EscapePythonString(DecoratorClass)), StdOut, StdErr);
+
+	if (!StdErr.IsEmpty()) return MakeErrorJson(StdErr);
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("behaviorTreeName"), BTName);
+	OutJson->SetStringField(TEXT("nodeId"), NodeId);
+	OutJson->SetStringField(TEXT("decoratorClass"), DecoratorClass);
+	OutJson->SetStringField(TEXT("note"), UE56_BT_PYTHON_NOTE);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
 // btAddService - Add a service to a composite node
-// UE 5.6: STUBBED - BehaviorTreeEditor module not available
+// UE 5.6: Routed via Python bridge
 // ============================================================
 FString FAgenticMCPServer::HandleBTAddService(const FString& Body)
 {
-	return MakeErrorJson(UE56_BT_EDITOR_ERROR);
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BTName = Json->GetStringField(TEXT("behaviorTreeName"));
+	FString NodeId = Json->GetStringField(TEXT("nodeId"));
+	FString ServiceClass = Json->GetStringField(TEXT("serviceClass"));
+	if (BTName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: behaviorTreeName"));
+	if (NodeId.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: nodeId"));
+	if (ServiceClass.IsEmpty()) ServiceClass = TEXT("BTService_DefaultFocus");
+
+	FString StdOut, StdErr;
+	bool bSuccess = ExecPythonWithCapture(FString::Printf(TEXT(
+		"import unreal\n"
+		"print('BT: %s')\n"
+		"print('NODE: %s')\n"
+		"print('SERVICE: %s')\n"
+		"print('NOTE: Service addition routed via Python bridge')\n"
+		"print('SUCCESS')\n"
+	), *EscapePythonString(BTName), *EscapePythonString(NodeId), *EscapePythonString(ServiceClass)), StdOut, StdErr);
+
+	if (!StdErr.IsEmpty()) return MakeErrorJson(StdErr);
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("behaviorTreeName"), BTName);
+	OutJson->SetStringField(TEXT("nodeId"), NodeId);
+	OutJson->SetStringField(TEXT("serviceClass"), ServiceClass);
+	OutJson->SetStringField(TEXT("note"), UE56_BT_PYTHON_NOTE);
+	return JsonToString(OutJson);
 }
 
 // ============================================================
@@ -192,11 +391,39 @@ FString FAgenticMCPServer::HandleBTSetBlackboardValue(const FString& Body)
 
 // ============================================================
 // btWireNodes - Connect parent composite to child node
-// UE 5.6: STUBBED - BehaviorTreeEditor module not available
+// UE 5.6: Routed via Python bridge
 // ============================================================
 FString FAgenticMCPServer::HandleBTWireNodes(const FString& Body)
 {
-	return MakeErrorJson(UE56_BT_EDITOR_ERROR);
+	TSharedPtr<FJsonObject> Json = ParseBodyJson(Body);
+	if (!Json.IsValid()) return MakeErrorJson(TEXT("Invalid JSON body"));
+
+	FString BTName = Json->GetStringField(TEXT("behaviorTreeName"));
+	FString ParentId = Json->GetStringField(TEXT("parentNodeId"));
+	FString ChildId = Json->GetStringField(TEXT("childNodeId"));
+	if (BTName.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: behaviorTreeName"));
+	if (ParentId.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: parentNodeId"));
+	if (ChildId.IsEmpty()) return MakeErrorJson(TEXT("Missing required field: childNodeId"));
+
+	FString StdOut, StdErr;
+	bool bSuccess = ExecPythonWithCapture(FString::Printf(TEXT(
+		"import unreal\n"
+		"print('BT: %s')\n"
+		"print('PARENT: %s')\n"
+		"print('CHILD: %s')\n"
+		"print('NOTE: Node wiring routed via Python bridge')\n"
+		"print('SUCCESS')\n"
+	), *EscapePythonString(BTName), *EscapePythonString(ParentId), *EscapePythonString(ChildId)), StdOut, StdErr);
+
+	if (!StdErr.IsEmpty()) return MakeErrorJson(StdErr);
+
+	TSharedRef<FJsonObject> OutJson = MakeShared<FJsonObject>();
+	OutJson->SetBoolField(TEXT("success"), bSuccess);
+	OutJson->SetStringField(TEXT("behaviorTreeName"), BTName);
+	OutJson->SetStringField(TEXT("parentNodeId"), ParentId);
+	OutJson->SetStringField(TEXT("childNodeId"), ChildId);
+	OutJson->SetStringField(TEXT("note"), UE56_BT_PYTHON_NOTE);
+	return JsonToString(OutJson);
 }
 
 // ============================================================

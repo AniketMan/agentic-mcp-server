@@ -285,7 +285,7 @@ On first connection (or when the scene map is empty), the plugin should:
 1. Scan `/Game/Maps/Game/` for all subdirectories matching `S{N}_*` pattern.
 2. For each, find the `ML_*` (master level) and `SL_*_Logic` (logic level) files.
 3. Cross-reference with `DA_GameData` to get the screenplay scene name.
-4. Cross-reference with `DT_StorySteps` to get the step range.
+4. Cross-reference with `DT_ExampleTable` to get the step range.
 5. Populate the scene map and write to project state.
 
 This can be implemented as a Python script executed via `execute_python`, since it needs access to `unreal.load_asset()` and `unreal.EditorAssetLibrary`.
@@ -635,7 +635,7 @@ Add a `get_output_log` tool that returns the last 50 lines.
 
 ### Problem
 
-The project uses Data Tables (`DT_StorySteps`) and Data Assets (`DA_GameData`) to define the story structure. The AI cannot read or modify these.
+The project uses Data Tables (`DT_ExampleTable`) and Data Assets (`DA_GameData`) to define the story structure. The AI cannot read or modify these.
 
 ### Solution
 
@@ -645,7 +645,7 @@ Add tools to read and write Data Table rows via Python:
 import unreal
 
 # Read
-dt = unreal.load_asset("/Game/Blueprints/Data/DT_StorySteps")
+dt = unreal.load_asset("/Game/Blueprints/Data/DT_ExampleTable")
 row_names = unreal.DataTableFunctionLibrary.get_data_table_row_names(dt)
 for name in row_names:
     # Access row data
@@ -678,3 +678,4 @@ for name in row_names:
 | 8 | Output Log Streaming | Medium — debugging visibility | Low |
 | 9 | Component Management | Medium — full actor configuration | Medium |
 | 10 | Data Table Read/Write | Medium — story structure access | Low |
+

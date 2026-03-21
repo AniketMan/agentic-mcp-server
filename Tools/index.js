@@ -160,7 +160,7 @@ let fallbackAvailable = false;
 
 // Create the MCP server
 const server = new Server(
-  { name: "agentic-mcp-server", version: "3.0.0" },
+  { name: "agentic-mcp-server", version: "3.1.0" },
   { capabilities: { tools: {} } }
 );
 
